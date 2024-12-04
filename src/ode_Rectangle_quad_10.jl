@@ -32,10 +32,23 @@ prob = ODEProblem(
 sol = solve(
     prob, 
     CVODE_BDF(), # Rosenbrock23(), # Tsit5(), # CVODE_BDF
+    # Tsit5(),
     saveat=tpoints,
     dense=false,
     reltol=relative_tolerance, 
     abstol=absolute_tolerance)
+end
+
+x0[26] = 10.0  # set marginal concentration
+@time begin
+    sol = solve(
+        prob, 
+        CVODE_BDF(), # Rosenbrock23(), # Tsit5(), # CVODE_BDF
+        # Tsit5(),
+        saveat=tpoints,
+        dense=false,
+        reltol=relative_tolerance, 
+        abstol=absolute_tolerance)
 end
 
 # print(sol)
