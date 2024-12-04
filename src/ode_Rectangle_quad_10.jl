@@ -29,12 +29,13 @@ prob = ODEProblem(
     Rectangle_quad_10.p)
 
 @time begin
-    sol = solve(
-        prob, 
-        CVODE_BDF(), # Rosenbrock23(), # Tsit5(), # CVODE_BDF
-        saveat=tpoints,
-        reltol=relative_tolerance, 
-        abstol=absolute_tolerance)
+sol = solve(
+    prob, 
+    CVODE_BDF(), # Rosenbrock23(), # Tsit5(), # CVODE_BDF
+    saveat=tpoints,
+    dense=false,
+    reltol=relative_tolerance, 
+    abstol=absolute_tolerance)
 end
 
 # print(sol)
@@ -44,4 +45,4 @@ df = DataFrame(time=sol.t, value=sol.u)
 
 # Step 4: Write DataFrame to CSV
 header = vcat(["time"], Rectangle_quad_10.xids)
-CSV.write("Rectangle_quad_10.csv", df)
+CSV.write("Rectangle_quad_10.csv", df, header=header)
