@@ -24,6 +24,12 @@ https://gitlab.com/etiennejessen/SyntheticVascularTrees.jl.git.
  import Pkg; Pkg.add("OrdinaryDiffEq")
  ```
 
+ # allow multiprocessing
+
+ To enable multiprocessing in Julia while using Visual Studio Code (VS Code), you need to configure the environment to allow Julia to utilize multiple threads or processes.
+To allow Julia to use multiple threads, you need to set the JULIA_NUM_THREADS environment variable. This can be done in several ways, but one effective method is to modify the settings.json file in VS Code.
+
+
 
 # License
 * Source Code: `LGPLv3 <http://opensource.org/licenses/LGPL-3.0>`__
