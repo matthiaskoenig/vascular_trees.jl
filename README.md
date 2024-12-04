@@ -8,11 +8,21 @@ https://github.com/matthiaskoenig/vascular_trees.
 
 # Installation
 
+
+
+
+## Install SyntheticVascularTrees.jl
 This package depends on the `SyntheticVascularTrees.jl` package developed by Etienne Jessen and [Dominik Schillinger](https://www.bauing.tu-darmstadt.de/fachbereich_bau_umwelt/ueber_den_fachbereich/professoren____innen_am_fb/professorenliste_details_115392.de.jsp) at the TU Darmstadt available from 
 https://gitlab.com/etiennejessen/SyntheticVascularTrees.jl.git.
 
+- clone the repository and open terminal in `SyntheticVascularTrees.jl`
+- julia --> ] --> activate . --> build --> test
+- choose the Julia environment in visual studio code
 
-
+# Install additional packages
+```
+ import Pkg; Pkg.add("OrdinaryDiffEq")
+ ```
 
 
 # License
