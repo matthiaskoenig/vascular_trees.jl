@@ -476,7 +476,7 @@ module Rectangle_quad_10
     ]
 
     # odes
-    function f_dxdt(dx, x, p, t)
+    function f_dxdt!(dx, x, p, t)
         rged_A_11_20_T_20 = p[2] * x[2]      # y[1] rged_A_11_20_T_20
         rged_A_11_2_T_2 = p[1] * x[1]      # y[2] rged_A_11_2_T_2
         rged_A_13_10_T_10 = p[3] * x[3]      # y[3] rged_A_13_10_T_10
