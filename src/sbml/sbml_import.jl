@@ -4,7 +4,9 @@ using SBMLToolkit, OrdinaryDiffEq
 using Sundials
 
 # odesys = readSBML("src/sbml/dapagliflozin_body_flat.xml", ODESystemImporter())
-odesys = readSBML("src/sbml/dapagliflozin_liver.xml", ODESystemImporter())
+odesys = readSBML("src/sbml/dapagliflozin_body_flat.xml", ReactionSystemImporter())
+# odesys = readSBML("src/sbml/dapagliflozin_liver.xml", ODESystemImporter())
+# odesys = readSBML("src/sbml/dapagliflozin_liver.xml", ReactionSystemImporter())
 
 
 tspan = (0.0, 24 * 60.0)
