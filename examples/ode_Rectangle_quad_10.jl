@@ -23,7 +23,7 @@ x0[26] = 1.0  # set marginal concentration
 tspan = (0.0, 10.0/60)
 tpoints = range(tspan[1], stop=tspan[2], length=1001)
 prob = ODEProblem(
-    Rectangle_quad_10.f_dxdt, 
+    Rectangle_quad_10.f_dxdt!, 
     x0,
     tspan, 
     Rectangle_quad_10.p)
