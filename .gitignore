@@ -1,3 +1,5 @@
 .idea
 .vscode
 vascular_trees.jl.code-workspace
+SyntheticVascularTrees.jl
+results
