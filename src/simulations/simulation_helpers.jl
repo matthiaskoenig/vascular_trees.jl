@@ -19,7 +19,7 @@ module Simulation_helpers
         prob = ODEProblem(
             ode_system, 
             x0,
-            tspan, 
+            tspan,
             parameter_values)
 
         sol = solve(
@@ -92,7 +92,7 @@ module Simulation_helpers
                 end
             end
         end
-        show(to)
+        show(to, sortby=:firstexec)
 
         if bench_options.save_running_times
             save_times_as_csv(times=to, n_species=n_species)

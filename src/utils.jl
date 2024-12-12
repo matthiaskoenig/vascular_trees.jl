@@ -23,20 +23,20 @@ module Utils
 
         @with_kw struct benchmark_options
             save_running_times::Bool = false
-            plot_running_times::Bool = false
             n_iterations::Int16 = 5
         end
         
     end
 
     module Benchmarking
-        export save_times_as_csv ,plot_running_times
+        export save_times_as_csv
 
         using CSV
         using TimerOutputs
-        using DataFrames
-        using PlotlyJS
+        using Tables
         import ..JULIA_RESULTS_DIR
+
+        const filecount = Ref(0)
 
         function save_times_as_csv(; times::TimerOutput, n_species)
             individual_times = TimerOutputs.todict(times)["inner_timers"]
@@ -49,27 +49,16 @@ module Utils
                 time_min = get(get(individual_times, graph_id, NaN), "time_ns", NaN) / 60 * 10^-9
                 push!(n_calls, n_call)
                 push!(times_min, time_min)
-                push!(labels, chopsuffix(string(graph_id), "_$(n_calls)"))
+                push!(labels, string(graph_id))
                 push!(n_sp, n_species[n_call])
             end
+            table = (graph_id=labels, n_calls=n_calls, times_min=times_min, n_species=n_sp)
 
-            df = DataFrame([:graph_id=>labels, :n_calls=>n_calls, :times_min=>times_min, :n_species=>n_sp])
+            newcount = filecount[] + 1
+            filecount[] = newcount 
 
-            CSV.write(joinpath(JULIA_RESULTS_DIR, "running_times.csv"), df)
+            CSV.write(joinpath(JULIA_RESULTS_DIR, "running_times_$newcount.csv"), table)
         end
 
-        function plot_running_times()
-
-            running_times = CSV.read(joinpath(JULIA_RESULTS_DIR, "running_times.csv"))
-
-            plt = plot(
-                scatter(running_times, x=:n_calls, y=:n_species, z=:times_min, 
-                        color=:graph_id, mode="markers",
-                        type="scatter3d", labels=:graph_id),
-                Layout(showlegend=true)
-            )
-            display(plt)
-
-        end
     end
 end
