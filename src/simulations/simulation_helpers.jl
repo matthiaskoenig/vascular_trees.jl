@@ -65,38 +65,32 @@ module Simulation_helpers
 
     function create_benchmarked_simulations(; g_options, sim_options, bench_options)
         to = TimerOutput()
-        kp::Int16 = 1
         graph_id::String = ""
         file_name::String = ""
-        n_species::Array{Int32} = []
+        
+        
         for n_node ∈ g_options.n_nodes
             for tree_id ∈ g_options.tree_ids
-                for _ in range(1, bench_options.n_iterations, step=1)
+                n_species::Array{Int32} = []
+                graph_id = "$(tree_id)_$(n_node)"
+                file_name = "$(graph_id)_$(g_options.file_suffix)"
+                MODEL_PATH = normpath(joinpath(@__FILE__, "../../.." , JULIA_RESULTS_DIR, tree_id, graph_id, "models", "$(file_name).jl"))
+                for ki in range(1, bench_options.n_iterations, step=1)
 
-                    graph_id = "$(tree_id)_$(n_node)"
-                    file_name = "$(graph_id)_$(g_options.file_suffix)"
-                    MODEL_PATH = normpath(joinpath(@__FILE__, "../../.." , JULIA_RESULTS_DIR, tree_id, graph_id, "models", "$(file_name).jl"))
-                    @timeit to "$(graph_id)_$(kp)" begin
+                    @timeit to "$(graph_id)" begin
                         include(MODEL_PATH) # Load the odes module
-                        simulations = ODE_solver(ode_system=Transport_model.f_dxdt, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p)
-
-                        if sim_options.save_simulations
-                            save_simulations_to_csv(simulations=simulations, column_names=Transport_model.xids, simulations_path=joinpath(JULIA_RESULTS_DIR, tree_id, graph_id, "simulations", "$(file_name).csv"))
-                        end
-                        if bench_options.save_running_times
-                            push!(n_species, length(Transport_model.xids))
-                        end
+                        @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=Transport_model.f_dxdt, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p)
                     end
-
-                    kp = kp + 1
+                    if bench_options.save_running_times
+                        push!(n_species, length(Transport_model.xids))
+                    end
                 end
+                show(to, sortby=:firstexec)
+                if bench_options.save_running_times
+                    save_times_as_csv(times=to, n_species=n_species)
+                end
+                reset_timer!(to::TimerOutput)
             end
         end
-        show(to, sortby=:firstexec)
-
-        if bench_options.save_running_times
-            save_times_as_csv(times=to, n_species=n_species)
-        end
     end
-
 end

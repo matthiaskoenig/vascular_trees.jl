@@ -2,15 +2,15 @@
 module Simulation_runner
     """
     Module that summarizes functions that load graph files created in Python (system of ODEs written in julia format, 
-    initial values, parameters' values) and run simulations.
+    initial values, parameters' values) and runs simulations.
 
-    Make sure that structure of vascular_trees.jl is as needed (somewhere it should be written)
+    Make sure that structure of vascular_trees.jl directory is as needed (somewhere it should be written)
 
     What must/may be specified in code below:
     1. must
         1.1. g_options (graph options)
         1.2. sim_options (simulation options)
-    2. may (if if you do not like default variants)
+    2. may (if you whant to geet additional data and do not like default variants)
         2.1. benchmark options 
 
     Inputs:
@@ -18,11 +18,11 @@ module Simulation_runner
     in vectorized as in symbolic form.
 
     Showed in the terminal:
-    1. Julia staff
+    1. Julia stuff
     2. benchmark results if sim_options.benchmark=true
 
     Outputs:
-    1. simulations.csv - if sim_options.save_simulations = true
+    1. simulations.csv - if sim_options.save_simulations = true and if you do not do benchmarking
     2. running_times.csv - if sim_options.benchmark abd bench_options.save_running_times = true
 
     TODO: run macros @timeit only when you need it - now it is so, but it is dirty
@@ -37,11 +37,11 @@ module Simulation_runner
 
     # ============ Specify options
     g_options::graph_options = graph_options(
-        n_nodes=[10, 100],
+        n_nodes=[10, 30], #[10, 30, 50, 100, 250, 500, 750, 1000, 1250, 1500]
         tree_ids=[
-            #"Rectangle_quad",
+            "Rectangle_quad",
             "Rectangle_trio",],
-        file_suffix="vectorized" #"vectorized" "symbolic"
+        file_suffix="vectorized" #"vectorized", "symbolic"
     )
 
     tspan=(0.0, 10.0/60)
@@ -56,6 +56,7 @@ module Simulation_runner
 
         import .Utils.Options: benchmark_options
 
+        # do not write anything here in brackets if you are okay with default variant
         bench_options:: benchmark_options = benchmark_options(
             save_running_times=true
         )
