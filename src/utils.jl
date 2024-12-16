@@ -44,36 +44,39 @@ module Utils
             graph_ids::Array{String} = []
             n_calls::Array{Int16} = []
             call_orders::Array{Int16} = []
+            tree_ids::Array{Int16} = []
             times_ns::Array{Float64} = [] 
             allocated_bytes:: Array{Float64} = []
             n_sp::Array{Int32} = []
             for graph_id ∈ keys(individual_times)
+                without_compilation = get(get(individual_times, graph_id, NaN), "inner_timers", NaN)
+
                 n_call = get(get(individual_times, graph_id, NaN), "n_calls", NaN)
                 time_ns = get(get(individual_times, graph_id, NaN), "time_ns", NaN) 
                 allocated_mem = get(get(individual_times, graph_id, NaN), "allocated_bytes", NaN)
                 push!(n_calls, n_call)
+                push!(call_orders, "With module inclusion (n=$(n_call / keys(without_compilation))")
                 push!(times_ns, time_ns)
                 push!(allocated_bytes, allocated_mem)
                 push!(labels, string(graph_id))
                 push!(graph_ids, graph_id)
                 push!(n_sp, n_species[1])
-                push!(call_orders, 1)
-                without_compilation = get(get(individual_times, graph_id, NaN), "inner_timers", NaN)
+                push!(tree_ids, chopsuffix(graph_id, r"_\d"))
                 for subgraph_id ∈ keys(without_compilation)
-                    n_call = get(get(without_compilation, subgraph_id, NaN), "n_calls", NaN)
+                    n_call_minor = get(get(without_compilation, subgraph_id, NaN), "n_calls", NaN)
                     time_ns = get(get(without_compilation, subgraph_id, NaN), "time_ns", NaN)
                     allocated_mem = get(get(without_compilation, subgraph_id, NaN), "allocated_bytes", NaN)
-                    call_order = parse(Int16, split(string(subgraph_id), "_")[4]) + 1
-                    push!(n_calls, n_call)
+                    push!(n_calls, n_call_minor)
+                    push!(call_orders, "Without module inclusion (n=$n_call)")
                     push!(times_ns, time_ns)
                     push!(allocated_bytes, allocated_mem)
                     push!(labels, string(subgraph_id))
                     push!(graph_ids, graph_id)
                     push!(n_sp, n_species[n_call])
-                    push!(call_orders, call_order)
+                    push!(tree_ids, chopsuffix(graph_id, r"_\d"))
                 end
             end
-            table = (graph_ids=graph_ids, labels=labels, call_orders=call_orders, n_calls=n_calls, times_min=times_ns/60*10^-9, n_species=n_sp, allocated_gbytes=allocated_bytes/10^9)
+            table = (graph_ids=graph_ids, labels=labels, tree_ids=tree_ids, n_calls=n_calls, call_orders=call_orders, times_min=times_ns/60*10^-9, n_species=n_sp, allocated_gbytes=allocated_bytes/10^9)
 
             if isfile(BENCHMARKING_RESULTS_PATH)
                 kwargs = (writeheader = false, append = true, sep=',')

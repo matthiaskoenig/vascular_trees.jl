@@ -37,7 +37,7 @@ module Simulation_runner
 
     # ============ Specify options
     g_options::graph_options = graph_options(
-        n_nodes=[10, 30], #[10, 30, 50, 100, 250, 500, 750, 1000, 1250, 1500]
+        n_nodes=[10, 30, 50, 100, 250, 500, 750, 1000, 1250, 1500],
         tree_ids=[
             "Rectangle_quad",
             "Rectangle_trio",],
