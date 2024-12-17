@@ -1,78 +1,82 @@
 module Plots
 
     include("../utils.jl")
-    import .Utils: JULIA_RESULTS_DIR
+    import .Utils: BENCHMARKING_RESULTS_PATH
 
     using CSV
-    using Glob
     using DataFrames
     using CairoMakie
     using GLMakie
+    using AlgebraOfGraphics
+    using DataFramesMeta
+    using Statistics
 
     function __init__()
         plot_running_times(plot_3D=false)
     end
 
-    function plot_running_times(; plot_3D:: Bool)
+    function plot_running_times(; plot_3D::Bool)
 
-        files = glob(joinpath(JULIA_RESULTS_DIR, "running_times_*.csv"))
-        dfs = CSV.read.(files, DataFrame)
-
-        # find max for time axis, so all plots will have the same time axis grid
-        tmax = 0
-        for df ∈ dfs
-            tmax_local = maximum(df[!, :times_min])
-            if tmax < tmax_local
-                tmax=tmax_local
-            end
+        df = CSV.read(BENCHMARKING_RESULTS_PATH, DataFrame)
+        
+        df_error = @by df [:graph_ids, :call_orders, :n_species, :tree_ids] begin
+            :time_min_mean = mean(:times_min)
+            :time_min_std = std(:times_min)
+            :allocated_gbytes_mean = mean(:allocated_gbytes)
+            :allocated_gbytes_std = std(:allocated_gbytes)
         end
+        sort!(df_error, [:n_species])
+        replace!.([df_error.time_min_std, df_error.allocated_gbytes_std], NaN => 0.0)
 
-        if plot_3D
-            function plot_3D_figure()
-                # ==== 3D plot
-                f3 = Figure()
-                ax = Axis3(f3[1, 1],
-                    title = "Running times",
-                    xlabel = "Execution number, [n]",
-                    ylabel = "Number of species, [n]",
-                    zlabel = "Running time, [min]",
-                    limits = (nothing, nothing, (0, tmax)))
+        if !plot_3D
 
-                for df ∈ dfs
-                    execution_n = df[!, :n_calls]
-                    n_species = df[!, :n_species]
-                    time_min = df[!, :times_min]
-                    scatter!(ax, execution_n, n_species, time_min; markersize=n_species/100)
-                end
-                display(f3)
+            f2 = Figure()
 
-            end
+            #First axis
+            plot1 = data(df_error) * (
+                mapping(:n_species => "Number of species, [n]", 
+                :time_min_mean => "Time, [min]", 
+                :time_min_std, 
+                color=:call_orders => "Call order") * 
+                (visual(Scatter) + visual(Errorbars) + smooth())
+            ) 
+            subfig1 = draw!(f2[2,1], plot1)
+
+            #Second axis
+            plot2 = data(df_error) * mapping(
+                :n_species => "Number of species, [n]", 
+                :allocated_gbytes_mean => "Allocated memory, [GB]", 
+                :allocated_gbytes_std, 
+                color=:call_orders => "Call order") * 
+                (visual(Scatter) + visual(Errorbars) + smooth())
+            draw!(f2[2,2], plot2)
+
+            Label(f2[0, :], "Benchmarking", fontsize=20, color=:magenta)
+
+            # Insert the legend
+            legend!(
+                f2[1, :],
+                subfig1;
+                position=:top,
+                orientation=:horizontal,
+                tellheight=true,
+                framevisible=false
+            )
+
+            display(f2)
+        
         else
-            function plot_2D()
-                # ==== 2D plot
-                f2 = Figure()
-                kwargs = (; axis = (; limits = (nothing, (0, tmax))))
-                kf = 1
-                i = 1
-                while kf <= length(dfs)
-                    j = 1
-                    while j < 4 
 
-                        execution_n = dfs[kf][!, :n_calls]
-                        n_species = dfs[kf][!, :n_species]
-                        time_min = dfs[kf][!, :times_min]
-                        scatter(f2[i, j], execution_n, time_min; kwargs..., markersize=n_species/100)
-                        j += 1
-                        kf += 1
-                        if kf > length(dfs)
-                            break
-                        end
+            plot3_1 = data(df_error) * (
+                mapping(:n_species => "Number of species, [n]", 
+                :allocated_gbytes_mean => "Allocated memory, [GB]", 
+                :time_min_mean => "Time, [min]", 
+                color=:call_orders => "Call order")
+            ) 
+            plot3 = draw(plot3_1, 
+                axis=((type=Axis3, title="Benchmarking", titlesize=20)))
 
-                    end
-                    i += 1
-                end
-                display(f2)
-            end
+            display(plot3)
         end
 
     end
