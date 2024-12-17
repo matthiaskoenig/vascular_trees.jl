@@ -30,14 +30,14 @@ module Simulation_runner
     """
 
     include("../utils.jl")
-    import .Utils.Options: graph_options, simulations_options, benchmark_options
+    import .Utils.Options: graph_options, simulations_options, benchmark_options, solver_options
 
     include("simulation_helpers.jl")
     import .Simulation_helpers: create_simulations, create_benchmarked_simulations
 
     # ============ Specify options
     g_options::graph_options = graph_options(
-        n_nodes=[1500],
+        n_nodes=[10],
         tree_ids=[
             "Rectangle_quad",
             "Rectangle_trio",],
@@ -52,6 +52,8 @@ module Simulation_runner
         benchmark=true
     )
 
+    sol_options:: solver_options = solver_options()
+
     if sim_options.benchmark
 
         import .Utils.Options: benchmark_options
@@ -60,10 +62,10 @@ module Simulation_runner
         bench_options:: benchmark_options = benchmark_options(
             save_running_times=true
         )
-        create_benchmarked_simulations(g_options=g_options, sim_options=sim_options, bench_options=bench_options)
+        create_benchmarked_simulations(g_options=g_options, sim_options=sim_options, bench_options=bench_options, sol_options=sol_options)
 
     else
-        create_simulations(g_options=g_options, sim_options=sim_options)
+        create_simulations(g_options=g_options, sim_options=sim_options, sol_options=sol_options)
     end
 
 end

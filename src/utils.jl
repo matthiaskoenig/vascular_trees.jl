@@ -8,6 +8,7 @@ module Utils
         export graph_options, simulations_options, benchmark_options, solver_options
 
         using Parameters
+        using OrdinaryDiffEq
 
         @with_kw struct graph_options
             n_nodes::Vector{Int32}
@@ -27,7 +28,7 @@ module Utils
             n_iterations::Int16 = 5
         end
 
-        @with_kw mutable struct solver_options
+        @with_kw struct solver_options
             solver = Tsit5()
             absolute_tolerance::Float64 = 1e-6
             relative_tolerance::Float64 = 1e-6
@@ -50,7 +51,7 @@ module Utils
             graph_ids::Array{String} = []
             n_calls::Array{Int16} = []
             call_orders::Array{String} = []
-            tree_ids::Array{Int16} = []
+            tree_ids::Array{String} = []
             times_ns::Array{Float64} = [] 
             allocated_bytes:: Array{Float64} = []
             n_sp::Array{Int32} = []
