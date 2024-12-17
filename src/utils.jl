@@ -5,7 +5,7 @@ module Utils
     BENCHMARKING_RESULTS_PATH = joinpath(JULIA_RESULTS_DIR, "running_times.csv")
 
     module Options
-        export graph_options, simulations_options, benchmark_options
+        export graph_options, simulations_options, benchmark_options, solver_options
 
         using Parameters
 
@@ -26,6 +26,12 @@ module Utils
             save_running_times::Bool = false
             n_iterations::Int16 = 5
         end
+
+        @with_kw mutable struct solver_options
+            solver = Tsit5()
+            absolute_tolerance::Float64 = 1e-6
+            relative_tolerance::Float64 = 1e-6
+        end
         
     end
 
@@ -43,7 +49,7 @@ module Utils
             labels::Array{String} = []
             graph_ids::Array{String} = []
             n_calls::Array{Int16} = []
-            call_orders::Array{Int16} = []
+            call_orders::Array{String} = []
             tree_ids::Array{Int16} = []
             times_ns::Array{Float64} = [] 
             allocated_bytes:: Array{Float64} = []
@@ -55,7 +61,7 @@ module Utils
                 time_ns = get(get(individual_times, graph_id, NaN), "time_ns", NaN) 
                 allocated_mem = get(get(individual_times, graph_id, NaN), "allocated_bytes", NaN)
                 push!(n_calls, n_call)
-                push!(call_orders, "With module inclusion (n=$(n_call / keys(without_compilation))")
+                push!(call_orders, "With module inclusion (n=$(n_call / length(keys(without_compilation)))")
                 push!(times_ns, time_ns)
                 push!(allocated_bytes, allocated_mem)
                 push!(labels, string(graph_id))

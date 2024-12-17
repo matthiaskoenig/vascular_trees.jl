@@ -68,7 +68,6 @@ module Simulation_helpers
         graph_id::String = ""
         file_name::String = ""
         
-        
         for n_node ∈ g_options.n_nodes
             for tree_id ∈ g_options.tree_ids
                 n_species::Array{Int32} = []

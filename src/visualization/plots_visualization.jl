@@ -12,7 +12,7 @@ module Plots
     using Statistics
 
     function __init__()
-        plot_running_times(plot_3D=true)
+        plot_running_times(plot_3D=false)
     end
 
     function plot_running_times(; plot_3D::Bool)
@@ -40,7 +40,7 @@ module Plots
                 color=:call_orders => "Call order") * 
                 (visual(Scatter) + visual(Errorbars) + smooth())
             ) 
-            subfig1 = draw!(f2[3,1], plot1)
+            subfig1 = draw!(f2[2,1], plot1)
 
             #Second axis
             plot2 = data(df_error) * mapping(
@@ -49,7 +49,7 @@ module Plots
                 :allocated_gbytes_std, 
                 color=:call_orders => "Call order") * 
                 (visual(Scatter) + visual(Errorbars) + smooth())
-            draw!(f2[3,2], plot2)
+            draw!(f2[2,2], plot2)
 
             Label(f2[0, :], "Benchmarking", fontsize=20, color=:magenta)
 
@@ -62,21 +62,18 @@ module Plots
                 tellheight=true,
                 framevisible=false
             )
-            
-            Label(f2[2, 1], "Running time", fontsize=10)
-            Label(f2[2, 2], "Memory allocation", fontsize=10)
 
             display(f2)
         
         else
 
-            plot1 = data(df_error) * (
+            plot3_1 = data(df_error) * (
                 mapping(:n_species => "Number of species, [n]", 
                 :allocated_gbytes_mean => "Allocated memory, [GB]", 
                 :time_min_mean => "Time, [min]", 
                 color=:call_orders => "Call order")
             ) 
-            plot3 = draw(plot1, 
+            plot3 = draw(plot3_1, 
                 axis=((type=Axis3, title="Benchmarking", titlesize=20)))
 
             display(plot3)

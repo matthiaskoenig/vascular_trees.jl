@@ -22,7 +22,7 @@ module Simulation_runner
     2. benchmark results if sim_options.benchmark=true
 
     Outputs:
-    1. simulations.csv - if sim_options.save_simulations = true and if you do not do benchmarking
+    1. simulations.csv - if you do not do benchmarking and sim_options.save_simulations = true
     2. running_times.csv - if sim_options.benchmark abd bench_options.save_running_times = true
 
     TODO: run macros @timeit only when you need it - now it is so, but it is dirty
@@ -37,7 +37,7 @@ module Simulation_runner
 
     # ============ Specify options
     g_options::graph_options = graph_options(
-        n_nodes=[10, 30, 50, 100, 250, 500, 750, 1000, 1250, 1500],
+        n_nodes=[1500],
         tree_ids=[
             "Rectangle_quad",
             "Rectangle_trio",],
