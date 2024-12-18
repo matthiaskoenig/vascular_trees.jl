@@ -9,11 +9,12 @@ module Utils
 
         using Parameters
         using OrdinaryDiffEq
+        using Revise # this package must not be in final version
 
         @with_kw struct graph_options
             n_nodes::Vector{Int32}
             tree_ids::Vector{String}
-            file_suffix::String
+            model_types::Vector{String}
         end
 
         @with_kw struct simulations_options
@@ -28,10 +29,14 @@ module Utils
             n_iterations::Int16 = 5
         end
 
+        # https://docs.sciml.ai/DiffEqDocs/stable/solvers/split_ode_solve/
         @with_kw struct solver_options
-            solver = Tsit5()
+            #krylov::Bool = true
+            solver = Tsit5() #LawsonEuler(krylov=krylov)
             absolute_tolerance::Float64 = 1e-6
             relative_tolerance::Float64 = 1e-6
+            dt::Float64 = 0.001
+            solver_name:: String = "Tsit5" #LawsonEuler(krylov=$(krylov),dt=$(dt))"
         end
         
     end
@@ -44,46 +49,58 @@ module Utils
         using Tables
         import ..JULIA_RESULTS_DIR, ..BENCHMARKING_RESULTS_PATH
 
-        function save_times_as_csv(; times::TimerOutput, n_species)
+        function save_times_as_csv(; times::TimerOutput, n_species, model_type, solver_name)
 
             individual_times = TimerOutputs.todict(times)["inner_timers"]
-            labels::Array{String} = []
-            graph_ids::Array{String} = []
-            n_calls::Array{Int16} = []
-            call_orders::Array{String} = []
-            tree_ids::Array{String} = []
-            times_ns::Array{Float64} = [] 
-            allocated_bytes:: Array{Float64} = []
-            n_sp::Array{Int32} = []
+            labels::Vector{String} = []
+            graph_ids::Vector{String} = []
+            n_calls::Vector{Int16} = []
+            call_orders::Vector{String} = []
+            times_ns::Vector{Float64} = [] 
+            allocated_bytes:: Vector{Float64} = []
+            n_sp::Vector{Int32} = []
             for graph_id ∈ keys(individual_times)
                 without_compilation = get(get(individual_times, graph_id, NaN), "inner_timers", NaN)
+                len = length(keys(without_compilation))
 
                 n_call = get(get(individual_times, graph_id, NaN), "n_calls", NaN)
                 time_ns = get(get(individual_times, graph_id, NaN), "time_ns", NaN) 
                 allocated_mem = get(get(individual_times, graph_id, NaN), "allocated_bytes", NaN)
                 push!(n_calls, n_call)
-                push!(call_orders, "With module inclusion (n=$(n_call / length(keys(without_compilation)))")
+                push!(call_orders, "Time with f_dxdt precompilation, first call")
                 push!(times_ns, time_ns)
                 push!(allocated_bytes, allocated_mem)
                 push!(labels, string(graph_id))
                 push!(graph_ids, graph_id)
                 push!(n_sp, n_species[1])
-                push!(tree_ids, chopsuffix(graph_id, r"_\d"))
-                for subgraph_id ∈ keys(without_compilation)
+                for (ksb, subgraph_id) ∈ enumerate(keys(without_compilation))
                     n_call_minor = get(get(without_compilation, subgraph_id, NaN), "n_calls", NaN)
                     time_ns = get(get(without_compilation, subgraph_id, NaN), "time_ns", NaN)
                     allocated_mem = get(get(without_compilation, subgraph_id, NaN), "allocated_bytes", NaN)
                     push!(n_calls, n_call_minor)
-                    push!(call_orders, "Without module inclusion (n=$n_call)")
+                    if ksb == 1
+                        push!(call_orders, "Time without f_dxdt precompilation, first call")
+                    else
+                        push!(call_orders, "Time without f_dxdt precompilation, call number > 1 (n=$(len-1))")
+                    end
                     push!(times_ns, time_ns)
                     push!(allocated_bytes, allocated_mem)
                     push!(labels, string(subgraph_id))
                     push!(graph_ids, graph_id)
                     push!(n_sp, n_species[n_call])
-                    push!(tree_ids, chopsuffix(graph_id, r"_\d"))
                 end
             end
-            table = (graph_ids=graph_ids, labels=labels, tree_ids=tree_ids, n_calls=n_calls, call_orders=call_orders, times_min=times_ns/60*10^-9, n_species=n_sp, allocated_gbytes=allocated_bytes/10^9)
+            model_types = [model_type for _ ∈ 1:length(graph_ids)]
+            solver_names = [solver_name for _ ∈ 1:length(graph_ids)]
+            table = (graph_ids=graph_ids, 
+                    labels=labels, 
+                    n_calls=n_calls, 
+                    call_orders=call_orders, 
+                    times_min=times_ns/60*10^-9, 
+                    n_species=n_sp, 
+                    allocated_gbytes=allocated_bytes/10^9, 
+                    model_types=model_types, 
+                    solver_names=solver_names)
 
             if isfile(BENCHMARKING_RESULTS_PATH)
                 kwargs = (writeheader = false, append = true, sep=',')

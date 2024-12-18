@@ -15,7 +15,7 @@ module Simulation_runner
 
     Inputs:
     1. Graph files (ODE models written in julia format). Each graph may have model written as 
-    in vectorized as in symbolic form.
+    in different forms (see somewhere).
 
     Showed in the terminal:
     1. Julia stuff
@@ -37,11 +37,19 @@ module Simulation_runner
 
     # ============ Specify options
     g_options::graph_options = graph_options(
-        n_nodes=[10],
+        n_nodes=[500], #[10, 30, 50, 100, 250]
         tree_ids=[
             "Rectangle_quad",
-            "Rectangle_trio",],
-        file_suffix="vectorized" #"vectorized", "symbolic"
+            "Rectangle_trio",
+            ],
+        model_types=[
+            "vectorized", 
+            "vectorized!", 
+            "vectorized_cleaned", 
+            "vectorized!_cleaned", 
+            "vectorized!_cleaned_typed",
+            "vectorized_typed"
+            ] 
     )
 
     tspan=(0.0, 10.0/60)

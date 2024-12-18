@@ -11,7 +11,7 @@ g_options::graph_options = graph_options(
     tree_ids=[
         #"Rectangle_quad",
         "Rectangle_trio",],
-    file_suffix="symbolic" #"vectorized" "symbolic"
+    model_type="symbolic" #"vectorized" "symbolic"
 )
 
 tspan=(0.0, 10.0/60)
@@ -28,7 +28,7 @@ for n_node ∈ g_options.n_nodes
     for tree_id ∈ g_options.tree_ids
 
         graph_id = "$(tree_id)_$(n_node)"
-        file_name = "$(graph_id)_$(g_options.file_suffix)"
+        file_name = "$(graph_id)_$(g_options.model_type)"
         MODEL_PATH = normpath(joinpath(@__FILE__, "../../.." , JULIA_RESULTS_DIR, tree_id, graph_id, "models", "$(file_name).jl"))
         include(MODEL_PATH) # Load the odes module
         import .Transport_model: f_dxdt, x0, p
