@@ -33,35 +33,27 @@ module Plots
 
             f2 = Figure()
 
-            grouped_df = groupby(df_error, :call_orders)
-            for (kg, group) in enumerate(grouped_df)
-                if kg >= 3
-                    continue
-                end
-                #First axis
-                plot1 = data(group) * (
-                    mapping(:n_species => "Number of species, [n]", 
-                    :time_min_mean => "Time, [min]", 
-                    :time_min_std, 
-                    color=:model_type,
-                    layout=:algorithm => "Solver name") * 
-                    (visual(Scatter) + visual(Errorbars) + smooth())
-                ) 
-                if kg == 1
-                    global subfig1=draw!(f2[kg+1,1], plot1)
-                else
-                    draw!(f2[kg+1,1], plot1) 
-                end
-                #Second axis
-                plot2 = data(group) * mapping(
-                    :n_species => "Number of species, [n]", 
-                    :allocated_gbytes_mean => "Allocated memory, [GB]", 
-                    :allocated_gbytes_std, 
-                    color=:model_type,
-                    layout=:algorithm => "Solver name") * 
-                    (visual(Scatter) + visual(Errorbars) + smooth())
-                draw!(f2[kg+4,1], plot2)
-            end
+            #grouped_df = groupby(df_error, :call_orders)
+            #First axis
+            plot1 = data(df_error) * (
+                mapping(:n_species => "Number of species, [n]", 
+                :time_min_mean => "Time, [min]", 
+                :time_min_std, 
+                color=:model_type,
+                layout=:call_orders => "Solver name") * 
+                (visual(Scatter) + visual(Errorbars) + smooth())
+            ) 
+            subfig1=draw!(f2[1,1], plot1)
+
+            #Second axis
+            plot2 = data(df_error) * mapping(
+                :n_species => "Number of species, [n]", 
+                :allocated_gbytes_mean => "Allocated memory, [GB]", 
+                :allocated_gbytes_std, 
+                color=:model_type,
+                layout=:call_orders => "Solver name") * 
+                (visual(Scatter) + visual(Errorbars) + smooth())
+            draw!(f2[2,1], plot2)
 
             #Label(f2[1, :], "Time with f_dxdt precompilation, first call", fontsize=10, color=:magenta)
             #Label(f2[4, :], "Time without f_dxdt precompilation, first call", fontsize=10, color=:magenta)

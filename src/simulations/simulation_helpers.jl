@@ -10,7 +10,11 @@ module Simulation_helpers
     include("../utils.jl")
     import .Utils: JULIA_RESULTS_DIR
     import .Utils.Benchmarking: save_times_as_csv
-    import .Utils.Options: solver_options
+    import .Utils.Options: model_types
+    m_types::model_types = model_types()
+
+    include("../models/julia_from_graph.jl")
+    import .Julia_from_graph: get_ODE_components
 
     function ODE_solver(; ode_system, x0, tspan, tpoints, parameter_values, sol_options)::SciMLBase.ODESolution
         
@@ -66,32 +70,57 @@ module Simulation_helpers
         graph_id::String = ""
         file_name::String = ""
         
-        for model_type in g_options.model_types, n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
-                n_species::Array{Int32} = []
-                graph_id = "$(tree_id)_$(n_node)"
-                file_name = "$(graph_id)_$(model_type)"
-                print("\r...Working with $(file_name)...")
-                
-                MODEL_PATH = normpath(joinpath(@__FILE__, "../../.." , JULIA_RESULTS_DIR, tree_id, graph_id, "models", "$(file_name).jl"))
-                include(MODEL_PATH) # Load the odes module\
-                @timeit to "$(graph_id)" begin
-                    if contains(model_type, "!")
-                        @invokelatest Transport_model.f_dxdt!(zeros(size(Transport_model.x0)...), Transport_model.x0, Transport_model.p, 0.0)
-                        for ki in range(1, bench_options.n_iterations, step=1)
-                                @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=Transport_model.f_dxdt!, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options)
-                        end
-                    else
-                        @invokelatest Transport_model.f_dxdt(zeros(size(Transport_model.x0)...), Transport_model.x0, Transport_model.p, 0.0)
-                        for ki in range(1, bench_options.n_iterations, step=1)
-                                @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=Transport_model.f_dxdt, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options)
+        for model_type in g_options.model_types
+            if model_type ∈ m_types.templates
+                for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
+                    n_species::Array{Int32} = []
+                    graph_id = "$(tree_id)_$(n_node)"
+                    file_name = "$(graph_id)_$(model_type)"
+                    print("\r...Working with $(file_name)...")
+                    
+                    MODEL_PATH = normpath(joinpath(@__FILE__, "../../.." , JULIA_RESULTS_DIR, tree_id, graph_id, "models", "$(file_name).jl"))
+                    include(MODEL_PATH) # Load the odes module\
+                    @timeit to "$(graph_id)" begin
+                        if contains(model_type, "!")
+                            @invokelatest Transport_model.f_dxdt!(zeros(size(Transport_model.x0)...), Transport_model.x0, Transport_model.p, 0.0)
+                            for ki in range(1, bench_options.n_iterations, step=1)
+                                    @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=Transport_model.f_dxdt!, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options)
+                            end
+                        else
+                            @invokelatest Transport_model.f_dxdt(zeros(size(Transport_model.x0)...), Transport_model.x0, Transport_model.p, 0.0)
+                            for ki in range(1, bench_options.n_iterations, step=1)
+                                    @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=Transport_model.f_dxdt, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options)
+                            end
                         end
                     end
+                    (bench_options.save_running_times) && (push!(n_species, length(Transport_model.xids)))
+                    show(to, sortby=:firstexec)
+                    #(sol_options.krylov) && (model_type="$(model_type)_krylov")
+                    (bench_options.save_running_times) && (save_times_as_csv(times=to, n_species=n_species, model_type=model_type, solver_name=sol_options.solver_name))
+                    reset_timer!(to::TimerOutput)
                 end
-                (bench_options.save_running_times) && (push!(n_species, length(Transport_model.xids)))
-                show(to, sortby=:firstexec)
-                #(sol_options.krylov) && (model_type="$(model_type)_krylov")
-                (bench_options.save_running_times) && (save_times_as_csv(times=to, n_species=n_species, model_type=model_type, solver_name=sol_options.solver_name))
-                reset_timer!(to::TimerOutput)
+
+            elseif model_type ∈ m_types.julia_model
+                for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
+                    n_species::Array{Int32} = []
+                    graph_id = "$(tree_id)_$(n_node)"
+                    print("\r...Working with Julia model $(graph_id)...")
+                    
+                    x0, p, f_dxdt! = get_ODE_components(tree_id=tree_id, n_node=n_node)
+
+                    @timeit to "$(graph_id)" begin
+                        f_dxdt!(zeros(size(x0)...), x0, p, 0.0)
+                        for ki in range(1, bench_options.n_iterations, step=1)
+                            @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=f_dxdt!, x0=x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=p, sol_options=sol_options)
+                        end
+                    end
+                    (bench_options.save_running_times) && (push!(n_species, length(x0)))
+                    show(to, sortby=:firstexec)
+                    #(sol_options.krylov) && (model_type="$(model_type)_krylov")
+                    (bench_options.save_running_times) && (save_times_as_csv(times=to, n_species=n_species, model_type=model_type, solver_name=sol_options.solver_name))
+                    reset_timer!(to::TimerOutput)
+                end
+            end
         end
     end
 end
