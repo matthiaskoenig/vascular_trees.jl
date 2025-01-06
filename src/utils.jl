@@ -59,7 +59,8 @@ module Utils
                                         "vectorized", 
                                         "vectorized!", 
                                         "vectorized_cleaned", 
-                                        "vectorized!_cleaned", 
+                                        "vectorized!_cleaned",
+                                        "symbolic_MT"
                                         ]
             julia_model::Vector{String} = ["vectorized!_loop_typed"]
         end

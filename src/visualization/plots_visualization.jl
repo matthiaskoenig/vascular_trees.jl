@@ -19,14 +19,14 @@ module Plots
 
         df = CSV.read(BENCHMARKING_RESULTS_PATH, DataFrame)
         
-        df_error = @by df [:graph_ids, :call_orders, :n_species, :model_type, :algorithm] begin
+        df_error = @by df [:graph_ids, :call_orders, :n_species, :model_types, :solver_names] begin
             :time_min_mean = mean(:times_min)
             :time_min_std = std(:times_min)
             :allocated_gbytes_mean = mean(:allocated_gbytes)
             :allocated_gbytes_std = std(:allocated_gbytes)
         end
         replace!.([df_error.time_min_std, df_error.allocated_gbytes_std], NaN => 0.0)
-        sort!(df_error, [:n_species, :model_type])
+        sort!(df_error, [:n_species, :model_types])
         
 
         if !plot_3D
@@ -39,7 +39,7 @@ module Plots
                 mapping(:n_species => "Number of species, [n]", 
                 :time_min_mean => "Time, [min]", 
                 :time_min_std, 
-                color=:model_type,
+                color=:model_types,
                 layout=:call_orders => "Solver name") * 
                 (visual(Scatter) + visual(Errorbars) + smooth())
             ) 
@@ -50,7 +50,7 @@ module Plots
                 :n_species => "Number of species, [n]", 
                 :allocated_gbytes_mean => "Allocated memory, [GB]", 
                 :allocated_gbytes_std, 
-                color=:model_type,
+                color=:model_types,
                 layout=:call_orders => "Solver name") * 
                 (visual(Scatter) + visual(Errorbars) + smooth())
             draw!(f2[2,1], plot2)

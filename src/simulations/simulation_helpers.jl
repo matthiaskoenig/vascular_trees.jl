@@ -6,6 +6,7 @@ module Simulation_helpers
     using DataFrames
     using CSV
     using TimerOutputs
+    using ModelingToolkit
 
     include("../utils.jl")
     import .Utils: JULIA_RESULTS_DIR
@@ -16,13 +17,22 @@ module Simulation_helpers
     include("../models/julia_from_graph.jl")
     import .Julia_from_graph: get_ODE_components
 
-    function ODE_solver(; ode_system, x0, tspan, tpoints, parameter_values, sol_options)::SciMLBase.ODESolution
+    function ODE_solver(; ode_system, x0, tspan, tpoints, parameter_values, sol_options, model_type)::SciMLBase.ODESolution
+
+        if contains(model_type, "precomp_MT")
+            prob = ODEProblem(structural_simplify(ode_system), 
+                     x0,
+                     tspan,
+                     parameter_values,
+                     eval_module = @__MODULE__, 
+                     eval_expression = true)
+        else
+            prob = ODEProblem(ode_system, 
+                     x0,
+                     tspan,
+                     parameter_values)
+        end
         
-        prob = ODEProblem(
-            ode_system, 
-            x0,
-            tspan,
-            parameter_values)
 
         sol = solve(
             prob, 
@@ -84,16 +94,16 @@ module Simulation_helpers
                         if contains(model_type, "!")
                             @invokelatest Transport_model.f_dxdt!(zeros(size(Transport_model.x0)...), Transport_model.x0, Transport_model.p, 0.0)
                             for ki in range(1, bench_options.n_iterations, step=1)
-                                    @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=Transport_model.f_dxdt!, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options)
+                                    @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=Transport_model.f_dxdt!, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options, model_type=model_type)
                             end
                         else
-                            @invokelatest Transport_model.f_dxdt(zeros(size(Transport_model.x0)...), Transport_model.x0, Transport_model.p, 0.0)
+                            #@invokelatest Transport_model.f_dxdt(zeros(size(Transport_model.x0)...), Transport_model.x0, Transport_model.p, 0.0)
                             for ki in range(1, bench_options.n_iterations, step=1)
-                                    @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=Transport_model.f_dxdt, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options)
+                                    @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=Transport_model.f_dxdt, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options, model_type=model_type)
                             end
                         end
                     end
-                    (bench_options.save_running_times) && (push!(n_species, length(Transport_model.xids)))
+                    (bench_options.save_running_times) && (push!(n_species, length(Transport_model.x0)))
                     show(to, sortby=:firstexec)
                     #(sol_options.krylov) && (model_type="$(model_type)_krylov")
                     (bench_options.save_running_times) && (save_times_as_csv(times=to, n_species=n_species, model_type=model_type, solver_name=sol_options.solver_name))
@@ -111,7 +121,7 @@ module Simulation_helpers
                     @timeit to "$(graph_id)" begin
                         f_dxdt!(zeros(size(x0)...), x0, p, 0.0)
                         for ki in range(1, bench_options.n_iterations, step=1)
-                            @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=f_dxdt!, x0=x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=p, sol_options=sol_options)
+                            @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=f_dxdt!, x0=x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=p, sol_options=sol_options, model_type=model_type)
                         end
                     end
                     (bench_options.save_running_times) && (push!(n_species, length(x0)))
