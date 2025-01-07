@@ -1,14 +1,13 @@
 module Julia_from_graph
     """
-    Module which contains functions for generation f_dxdt function, vector with parameters values 
-    and vector with x initials from graph.csv file generated in Python.
+    Module which contains functions for checking f_dxdt! function.
 
     Input:
     1. graph.csv - DataFrame with information about edges of the graph 
        and their attributes
 
     Output:
-    1. f_dxdt
+    1. f_dxdt!
     """
     # https://juliagraphs.org/Graphs.jl/dev/
     using CSV, DataFrames, Graphs, EzXML, ParameterizedFunctions, GraphDataFrameBridge, MetaGraphs, OrdinaryDiffEq, TimerOutputs
@@ -20,7 +19,7 @@ module Julia_from_graph
     export get_ODE_components
 
     function __init__()
-        get_ODE_components(tree_id="Rectangle_trio", n_node=Int32(10))
+        get_ODE_components(tree_id="Rectangle_trio", n_node=Int32(100))
     end
 
     function get_ODE_components(; tree_id::String, n_node::Int32)
@@ -29,22 +28,13 @@ module Julia_from_graph
         edges_df, graph = read_graph(tree_id=tree_id, n_node=n_node)
         @timeit to "benchmarking" begin
             p = collect_graph_characteristics(edges_df=edges_df, graph=graph)
-            A = @view p[:, 1:Int8(size(p, 2)/4)]
+            A = @view p[:, 1:Int(size(p, 2)/4)]
             dx::Vector{Float64} = zeros(length(A))
             x::Array{Float64} = zeros(size(A))
             f_dxdt!(dx, x, p)
         end
 
         show(to)
-        #create_f_dxdt(A=A)
-
-        #elements = collect_edges_metadata(edges_df=edges_df)
-        #x0 = collect_initial_values(elements=elements)
-        #p = collect_parameters_values(elements=elements)
-        
-        #f_dxdt! = create_dxdt!(elements=elements, graph=graph)
-
-        #return x0, p, f_dxdt!
     end
 
     function f_dxdt!(dx::Vector{Float64}, x::Array{Float64}, p::Array{Float64})
@@ -52,7 +42,7 @@ module Julia_from_graph
         # create views for convenience
         # p contains adjacency matrix, volumes, flows, 
         # is the edge from inflow system or not
-        A = @view p[:, 1:Int8(size(p, 2)/4)]
+        A = @view p[:, 1:Int(size(p, 2)/4)]
         volume_values = @view p[:, size(A, 2)+1:size(A, 2)*2]
         flow_values = @view p[:, size(A, 2)*2+1:size(A, 2)*3]
         is_inflow = @view p[:, size(A, 2)*3+1:size(p, 2)]
@@ -184,7 +174,7 @@ module Julia_from_graph
 
         # create views for convenience
         # adjacency matrix for a graph, indexed by [u, v] vertices, so rows - sources, columns - targets
-        A = @view p[:, 1:Int8(size(p, 2)/4)]
+        A = @view p[:, 1:Int(size(p, 2)/4)]
         # volumes
         volume_values = @view p[:, size(A, 2)+1:size(A, 2)*2]
         # flows
