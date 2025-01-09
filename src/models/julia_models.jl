@@ -12,7 +12,7 @@ module Julia_models
         # take only existing edges from the adjacency matrix, we do not need zeroes
         elements::Vector{CartesianIndex} = findall(!iszero, A)
 
-        for element ∈ elements
+        @inbounds for element ∈ elements
             # retrieve information for element
             source_id, target_id = Tuple.(element)
             element_index = source_id + (target_id - 1) * size(A, 1)

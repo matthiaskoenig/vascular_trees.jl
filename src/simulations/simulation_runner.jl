@@ -50,7 +50,7 @@ module Simulation_runner
             # "vectorized_cleaned", 
             # "vectorized!_cleaned",
             # "symbolic_MT",
-            # "vectorized!_loop_typed"
+            "vectorized!_loop_typed"
             ] 
     )
 
