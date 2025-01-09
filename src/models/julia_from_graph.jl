@@ -1,6 +1,15 @@
 module Julia_from_graph
     """
-    Module which contains functions for checking f_dxdt! function.
+    Module which contains functions for creating x0 and p vectors for ODESolve function.
+        These matrices are needed for ODE functions from julia_models.jl.
+
+    Also this module can be used for checking ODE functions from julia_models.jl.
+        1. For this uncomment:
+            #include("./julia_models.jl")
+            #import .Julia_models: f_dxdt!
+            __init__ function
+        2. Specialize what graph do you want to use in  __init__ function
+        
 
     Input:
     1. graph.csv - DataFrame with information about edges of the graph 
@@ -8,150 +17,36 @@ module Julia_from_graph
 
     Output:
     1. f_dxdt!
+    
+    FIXME matrices are two large. Once fully created matrix A should be transformed to sparse adjacency matrix.
     """
+
     # https://juliagraphs.org/Graphs.jl/dev/
     using CSV, DataFrames, Graphs, EzXML, ParameterizedFunctions, GraphDataFrameBridge, MetaGraphs, OrdinaryDiffEq, TimerOutputs
     # using GraphPlot
     include("../utils.jl")
     import .Utils: JULIA_RESULTS_DIR
     import .Utils.Options: graph_options, edge_options
+    #include("./julia_models.jl")
+    #import .Julia_models: f_dxdt!
 
     export get_ODE_components
 
-    function __init__()
-        get_ODE_components(tree_id="Rectangle_trio", n_node=Int32(100))
-    end
+    # function __init__()
+    #     x0, p = get_ODE_components(tree_id="Rectangle_quad", n_node=Int32(100))
+    #     dx::Matrix{Float64} = zeros(size(@view p[:, 1:Int(size(p, 2)/4)]))
+    #     f_dxdt!(dx, x0, p, 0.0)
+    # end
 
-    function get_ODE_components(; tree_id::String, n_node::Int32)
-        to = TimerOutput()
-
+    function get_ODE_components(; tree_id::String, n_node::Int32)::Tuple{Matrix{Float64}, Matrix{Float64}}
+        # to = TimerOutput()
         edges_df, graph = read_graph(tree_id=tree_id, n_node=n_node)
-        @timeit to "benchmarking" begin
             p = collect_graph_characteristics(edges_df=edges_df, graph=graph)
-            A = @view p[:, 1:Int(size(p, 2)/4)]
-            dx::Vector{Float64} = zeros(length(A))
-            x::Array{Float64} = zeros(size(A))
-            f_dxdt!(dx, x, p)
-        end
-
-        show(to)
+        x0::Matrix{Float64} = zeros(size(@view p[:, 1:Int(size(p, 2)/4)]))
+        return x0, p
     end
-
-    function f_dxdt!(dx::Vector{Float64}, x::Array{Float64}, p::Array{Float64})
-
-        # create views for convenience
-        # p contains adjacency matrix, volumes, flows, 
-        # is the edge from inflow system or not
-        A = @view p[:, 1:Int(size(p, 2)/4)]
-        volume_values = @view p[:, size(A, 2)+1:size(A, 2)*2]
-        flow_values = @view p[:, size(A, 2)*2+1:size(A, 2)*3]
-        is_inflow = @view p[:, size(A, 2)*3+1:size(p, 2)]
-
-        # take only existing edges from the adjacency matrix
-        elements::Vector{CartesianIndex} = findall(!iszero, A)
-
-        for element ∈ elements
-            # retrieve information for element
-            source_id, target_id = Tuple.(element)
-            element_index = source_id + (target_id - 1) * size(A, 1)
-            # species before the slement
-            pre_elements = findall(!iszero, @view A[:, source_id]) 
-            # species after the slement
-            post_elements = findall(!iszero, @view A[target_id, :])
-
-            # distinguish elements connected to terminal nodes
-            terminal_source::Bool = false
-            if (length(post_elements) == 1) && (target_id == post_elements[1])
-                terminal_source = true
-            end
-            terminal_target::Bool = false
-            if (length(pre_elements) == 1) && (source_id == pre_elements[1])
-                terminal_target = true
-            end
-
-            # write equations
-            # marginal inflow element & in -> inflow & inflow element not connected to terminal
-            if (terminal_source == false .&& is_inflow[element] == 1.0) 
-                # dA_marginal/dt = -QAmarginal * A_marginal / VAmarginal;
-                # or
-                # dA/dt = QA * A_pre / VA - Q_post * A / VA;
-                # or
-                # dA/dt = QA * A_marginal / VA - Q_post * A / VA; (QA and VA here are equal to QAmarginal and VAmarginal - done in processing julia graph)
-                
-                # species before
-                for pre_element ∈ pre_elements
-                    dx[element_index] += flow_values[element] * x[pre_element, source_id] / volume_values[element]
-                end
-                # species after
-                for post_element ∈ post_elements
-                    dx[element_index] -= flow_values[target_id, post_element] * x[element] / volume_values[element]
-                end
-
-            # inflow element connected to terminal
-            elseif (terminal_source == true .&& is_inflow[element] == 1.0 .&& length(pre_elements) != 0) 
-                # dA/dt = QA * A_pre / VA - QA * A / VA;
-                
-                # species before
-                for pre_element ∈ pre_elements
-                    dx[element_index] += flow_values[element] * x[pre_element, source_id] / volume_values[element]
-                end
-                # species after
-                for _ ∈ post_elements
-                    dx[element_index] -= flow_values[element] * x[element] / volume_values[element]
-                end
-            
-            # terminal element
-            elseif (is_inflow[element] == 0.0 .&& source_id == target_id)
-                # dT/dt = QA * A / VT - QV * T / VT
-
-                # species before
-                for pre_element ∈ pre_elements
-                    dx[element_index] += flow_values[pre_element, source_id] * x[pre_element, source_id] / volume_values[element]
-                end
-                # species after
-                for post_element ∈ post_elements
-                    dx[element_index] -= flow_values[target_id, post_element] * x[element] / volume_values[element]
-                end
-
-            # outflow element connected to terminal
-            elseif (terminal_target == true .&& is_inflow[element] == 0.0 .&& source_id != target_id)
-                # dV/dt = QV * T / VT - QV * V / VV;
-
-                # species before
-                for pre_element ∈ pre_elements
-                    dx[element_index] += flow_values[element] * x[pre_element, source_id] / volume_values[element]
-                end
-                # species after
-                for _ ∈ post_elements
-                    dx[element_index] -= flow_values[element] * x[element] / volume_values[element]
-                end
-
-            # outflow element & outflow -> out not connected to terminal
-            elseif (terminal_target == false .&& is_inflow[element] == 0.0 .&& source_id != target_id)
-                # dV/dt = QV_pre * V_pre / VV - QV * V / VV;
-                # or
-                # dV_marginal = QV_pre * V_pre / VVmarginal - QV_marginal * V_marginal / VV_marginal; (QV and VV here are equal to QVmarginal and VVmarginal - done in processing julia graph)
-                
-                # species before
-                for pre_element ∈ pre_elements
-                    dx[element_index] += flow_values[pre_element, source_id] * x[pre_element, source_id] / volume_values[element]
-                end
-                # species after
-                for _ ∈ post_elements
-                    dx[element_index] -= flow_values[element] * x[element] / volume_values[element]
-                end
-
-            end
-
-        end
-
-        #@show dx
-        
-    end
-
 
     function read_graph(; tree_id::String, n_node::Int32)::Tuple{DataFrame, MetaDiGraph{Int64, Float64}}
-
         # get graph id
         graph_id = "$(tree_id)_$(n_node)"
         # get path to the graph
@@ -161,11 +56,10 @@ module Julia_from_graph
         # create graph from DataFrame
         graph = MetaDiGraph(edges_df, :source, :target, 
                             edge_attributes=[:terminal, :start, :group, :is_inflow, :radius, :flow, :length])
-
         return edges_df, graph
     end
 
-    function collect_graph_characteristics(; edges_df::DataFrame, graph::MetaDiGraph{Int64, Float64})::Array{Float64}
+    function collect_graph_characteristics(; edges_df::DataFrame, graph::MetaDiGraph{Int64, Float64})::Matrix{Float64}
         
         # create a parameter vector, which will contain:
         # adjacency matrix, volume values, flow_values, whether edge is from inflow system or not
@@ -195,7 +89,7 @@ module Julia_from_graph
                 flow_values[index] = props(graph, source_id, target_id)[:flow]
                 is_inflow[index] = Float64(props(graph, source_id, target_id)[:is_inflow])
             end
-            if (target_id == source_id .&& startswith(props(graph, target_id)[:name], "T_"))
+            if (target_id == source_id) && (startswith(props(graph, target_id)[:name], "T_"))
                 value = 1.0
                 volume_values[index] = volume_terminal
                 is_inflow[index] = 0.0
