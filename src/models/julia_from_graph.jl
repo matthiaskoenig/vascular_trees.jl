@@ -10,7 +10,7 @@ module Julia_from_graph
     1. f_dxdt!
     """
     # https://juliagraphs.org/Graphs.jl/dev/
-    using CSV, DataFrames, Graphs, EzXML, ParameterizedFunctions, GraphDataFrameBridge, MetaGraphs, OrdinaryDiffEq, TimerOutputs
+    using CSV, DataFrames, Graphs, EzXML, ParameterizedFunctions, GraphDataFrameBridge, MetaGraphs, OrdinaryDiffEq, TimerOutputs, BenchmarkTools
     # using GraphPlot
     include("../utils.jl")
     import .Utils: JULIA_RESULTS_DIR
@@ -26,15 +26,14 @@ module Julia_from_graph
         to = TimerOutput()
 
         edges_df, graph = read_graph(tree_id=tree_id, n_node=n_node)
-        @timeit to "benchmarking" begin
-            p = collect_graph_characteristics(edges_df=edges_df, graph=graph)
-            A = @view p[:, 1:Int(size(p, 2)/4)]
-            dx::Vector{Float64} = zeros(length(A))
-            x::Array{Float64} = zeros(size(A))
-            f_dxdt!(dx, x, p)
-        end
 
-        show(to)
+        p = collect_graph_characteristics(edges_df=edges_df, graph=graph)
+
+        A = @view p[:, 1:Int(size(p, 2)/4)]
+        dx::Vector{Float64} = zeros(length(A))
+        x::Array{Float64} = zeros(size(A))
+        @time f_dxdt!(dx, x, p) 
+
     end
 
     function f_dxdt!(dx::Vector{Float64}, x::Array{Float64}, p::Array{Float64})
@@ -48,16 +47,16 @@ module Julia_from_graph
         is_inflow = @view p[:, size(A, 2)*3+1:size(p, 2)]
 
         # take only existing edges from the adjacency matrix
-        elements::Vector{CartesianIndex} = findall(!iszero, A)
+        elements::Vector{CartesianIndex{2}} = findall(!iszero, A)
 
         for element ∈ elements
             # retrieve information for element
             source_id, target_id = Tuple.(element)
-            element_index = source_id + (target_id - 1) * size(A, 1)
+            element_index::Int32 = source_id + (target_id - 1) * size(A, 1)
             # species before the slement
-            pre_elements = findall(!iszero, @view A[:, source_id]) 
+            pre_elements::Vector{Int64} = findall(!iszero, @view A[:, source_id]) 
             # species after the slement
-            post_elements = findall(!iszero, @view A[target_id, :])
+            post_elements::Vector{Int64} = findall(!iszero, @view A[target_id, :])
 
             # distinguish elements connected to terminal nodes
             terminal_source::Bool = false
@@ -79,11 +78,11 @@ module Julia_from_graph
                 # dA/dt = QA * A_marginal / VA - Q_post * A / VA; (QA and VA here are equal to QAmarginal and VAmarginal - done in processing julia graph)
                 
                 # species before
-                for pre_element ∈ pre_elements
+                @inbounds for pre_element ∈ pre_elements
                     dx[element_index] += flow_values[element] * x[pre_element, source_id] / volume_values[element]
                 end
                 # species after
-                for post_element ∈ post_elements
+                @inbounds for post_element ∈ post_elements
                     dx[element_index] -= flow_values[target_id, post_element] * x[element] / volume_values[element]
                 end
 
@@ -92,11 +91,11 @@ module Julia_from_graph
                 # dA/dt = QA * A_pre / VA - QA * A / VA;
                 
                 # species before
-                for pre_element ∈ pre_elements
+                @inbounds for pre_element ∈ pre_elements
                     dx[element_index] += flow_values[element] * x[pre_element, source_id] / volume_values[element]
                 end
                 # species after
-                for _ ∈ post_elements
+                @inbounds for _ ∈ post_elements
                     dx[element_index] -= flow_values[element] * x[element] / volume_values[element]
                 end
             
@@ -105,11 +104,11 @@ module Julia_from_graph
                 # dT/dt = QA * A / VT - QV * T / VT
 
                 # species before
-                for pre_element ∈ pre_elements
+                @inbounds for pre_element ∈ pre_elements
                     dx[element_index] += flow_values[pre_element, source_id] * x[pre_element, source_id] / volume_values[element]
                 end
                 # species after
-                for post_element ∈ post_elements
+                @inbounds for post_element ∈ post_elements
                     dx[element_index] -= flow_values[target_id, post_element] * x[element] / volume_values[element]
                 end
 
@@ -118,11 +117,11 @@ module Julia_from_graph
                 # dV/dt = QV * T / VT - QV * V / VV;
 
                 # species before
-                for pre_element ∈ pre_elements
+                @inbounds for pre_element ∈ pre_elements
                     dx[element_index] += flow_values[element] * x[pre_element, source_id] / volume_values[element]
                 end
                 # species after
-                for _ ∈ post_elements
+                @inbounds for _ ∈ post_elements
                     dx[element_index] -= flow_values[element] * x[element] / volume_values[element]
                 end
 
@@ -133,11 +132,11 @@ module Julia_from_graph
                 # dV_marginal = QV_pre * V_pre / VVmarginal - QV_marginal * V_marginal / VV_marginal; (QV and VV here are equal to QVmarginal and VVmarginal - done in processing julia graph)
                 
                 # species before
-                for pre_element ∈ pre_elements
+                @inbounds for pre_element ∈ pre_elements
                     dx[element_index] += flow_values[pre_element, source_id] * x[pre_element, source_id] / volume_values[element]
                 end
                 # species after
-                for _ ∈ post_elements
+                @inbounds for _ ∈ post_elements
                     dx[element_index] -= flow_values[element] * x[element] / volume_values[element]
                 end
 
@@ -153,14 +152,14 @@ module Julia_from_graph
     function read_graph(; tree_id::String, n_node::Int32)::Tuple{DataFrame, MetaDiGraph{Int64, Float64}}
 
         # get graph id
-        graph_id = "$(tree_id)_$(n_node)"
+        graph_id::String = "$(tree_id)_$(n_node)"
         # get path to the graph
-        GRAPH_PATH = normpath(joinpath(@__FILE__, "../../.." , JULIA_RESULTS_DIR, tree_id, graph_id, "graphs/graph.csv"))
+        GRAPH_PATH::String = normpath(joinpath(@__FILE__, "../../.." , JULIA_RESULTS_DIR, tree_id, graph_id, "graphs/graph.csv"))
         # read csv file with information about edges
-        edges_df = DataFrame(CSV.File(GRAPH_PATH))
+        edges_df::DataFrame = DataFrame(CSV.File(GRAPH_PATH))
         # create graph from DataFrame
-        graph = MetaDiGraph(edges_df, :source, :target, 
-                            edge_attributes=[:terminal, :start, :group, :is_inflow, :radius, :flow, :length])
+        graph::MetaDiGraph{Int64, Float64} = MetaDiGraph(edges_df, :source, :target, 
+                                                        edge_attributes=[:terminal, :start, :group, :is_inflow, :radius, :flow, :length])
 
         return edges_df, graph
     end
@@ -170,7 +169,7 @@ module Julia_from_graph
         # create a parameter vector, which will contain:
         # adjacency matrix, volume values, flow_values, whether edge is from inflow system or not
         # THIS ORDER IS CRUCIAL
-        p = repeat(convert(Matrix{Float64}, (adjacency_matrix(graph))), outer=(1, 4))
+        p::Array{Float64} = repeat(convert(Matrix{Float64}, (adjacency_matrix(graph))), outer=(1, 4))
 
         # create views for convenience
         # adjacency matrix for a graph, indexed by [u, v] vertices, so rows - sources, columns - targets
@@ -188,7 +187,7 @@ module Julia_from_graph
         volume_terminal::Float64 = volume_geometry / n_terminals
 
 
-        for (index, value) in pairs(IndexCartesian(), A)
+        @inbounds for (index, value) in pairs(IndexCartesian(), A)
             source_id, target_id = Tuple.(index)
             if value == 1.0
                 volume_values[index] = π * props(graph, source_id, target_id)[:radius]^2 * props(graph, source_id, target_id)[:length]
