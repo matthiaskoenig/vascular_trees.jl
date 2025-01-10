@@ -37,13 +37,12 @@ module Simulation_runner
 
     # ============ Specify options
     g_options::graph_options = graph_options(
-        n_nodes=[10, 30, 50, 100, 250, 500],  #750, 1000, 1250, 1500
+        n_nodes=[100],  #750, 1000, 1250, 1500
         tree_ids=[
             "Rectangle_quad",
-            "Rectangle_trio",
+            #"Rectangle_trio",
             ],
         model_types=[
-            # "vectorized!_loop_typed",
             # "vectorized!_cleaned_typed",
             # "vectorized_typed",
             # "vectorized", 
@@ -51,6 +50,7 @@ module Simulation_runner
             # "vectorized_cleaned", 
             # "vectorized!_cleaned",
             # "symbolic_MT",
+            "vectorized!_loop_typed"
             ] 
     )
 
@@ -70,7 +70,7 @@ module Simulation_runner
 
         # do not write anything here in brackets if you are okay with default variant
         bench_options:: benchmark_options = benchmark_options(
-            save_running_times=true
+            save_running_times=false
         )
         create_benchmarked_simulations(g_options=g_options, sim_options=sim_options, bench_options=bench_options, sol_options=sol_options)
 

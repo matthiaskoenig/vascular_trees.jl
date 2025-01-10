@@ -94,12 +94,12 @@ module Simulation_helpers
                         if contains(model_type, "!")
                             @invokelatest Transport_model.f_dxdt!(zeros(size(Transport_model.x0)...), Transport_model.x0, Transport_model.p, 0.0)
                             for ki in range(1, bench_options.n_iterations, step=1)
-                                    @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=Transport_model.f_dxdt!, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options, model_type=model_type)
+                                @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=Transport_model.f_dxdt!, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options, model_type=model_type)
                             end
                         else
-                            #@invokelatest Transport_model.f_dxdt(zeros(size(Transport_model.x0)...), Transport_model.x0, Transport_model.p, 0.0)
+                            @invokelatest Transport_model.f_dxdt(zeros(size(Transport_model.x0)...), Transport_model.x0, Transport_model.p, 0.0)
                             for ki in range(1, bench_options.n_iterations, step=1)
-                                    @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=Transport_model.f_dxdt, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options, model_type=model_type)
+                                @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=Transport_model.f_dxdt, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options, model_type=model_type)
                             end
                         end
                     end
@@ -111,15 +111,17 @@ module Simulation_helpers
                 end
 
             elseif model_type ∈ m_types.julia_model
+                MODEL_PATH = normpath(joinpath(@__FILE__, "../../models/julia_models.jl"))
+                include(MODEL_PATH)
+                f_dxdt! = Julia_models.f_dxdt!
                 for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
                     n_species::Array{Int32} = []
                     graph_id = "$(tree_id)_$(n_node)"
                     print("\r...Working with Julia model $(graph_id)...")
                     
-                    x0, p, f_dxdt! = get_ODE_components(tree_id=tree_id, n_node=n_node)
-
+                    x0, p = get_ODE_components(tree_id=tree_id, n_node=n_node)
                     @timeit to "$(graph_id)" begin
-                        f_dxdt!(zeros(size(x0)...), x0, p, 0.0)
+                        @invokelatest f_dxdt!(zeros(size(x0)), x0, p, 0.0)
                         for ki in range(1, bench_options.n_iterations, step=1)
                             @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=f_dxdt!, x0=x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=p, sol_options=sol_options, model_type=model_type)
                         end
