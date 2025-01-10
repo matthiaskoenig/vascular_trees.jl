@@ -1,23 +1,23 @@
 module Julia_models
-    function f_dxdt!(dx::Matrix{Float64}, x::Matrix{Float64}, p::Matrix{Float64}, t::Float64)
+    function f_dxdt!(dx::Vector{Float64}, x::Vector{Float64}, p::Matrix{Float64}, t::Float64)
 
         # create views for convenience
-        # p contains adjacency matrix, volumes, flows, 
+        # p contains edges / elements (source id, target id), volumes, flows, 
         # is the edge from inflow system or not
-        A = @view p[:, 1:Int(size(p, 2)/4)]
-        volume_values = @view p[:, size(A, 2)+1:size(A, 2)*2]
-        flow_values = @view p[:, size(A, 2)*2+1:size(A, 2)*3]
-        is_inflow = @view p[:, size(A, 2)*3+1:size(p, 2)]
+        elements = @view p[:, 1:2]
+        volume_values = @view p[:, 3]
+        flow_values = @view p[:, 4]
+        is_inflow = @view p[:, 5]
 
-        # take only existing edges from the adjacency matrix, we do not need zeroes
-        elements::Vector{CartesianIndex} = findall(!iszero, A)
-
-        @inbounds for element ∈ elements
+        @inbounds for (ke, element) ∈ enumerate(elements)
             # retrieve information for element
-            source_id, target_id = Tuple.(element)
+            source_id, target_id = element
             element_index = source_id + (target_id - 1) * size(A, 1)
+            #
+            #
+            #
             # species before the slement
-            pre_elements = findall(!iszero, @view A[:, source_id]) 
+            pre_elements = findall(x -> x==, @view A[:, source_id]) 
             # species after the slement
             post_elements = findall(!iszero, @view A[target_id, :])
 
