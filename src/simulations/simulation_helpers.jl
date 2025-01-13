@@ -46,22 +46,41 @@ module Simulation_helpers
         CSV.write(simulations_path, df, header=header)
     end
 
-    function create_simulations(; g_options, sim_options)
-        
+    function create_simulations(; g_options, sim_options, sol_options)
+
         graph_id::String = ""
         file_name::String = ""
-        for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
-                graph_id = "$(tree_id)_$(n_node)"
-                file_name = "$(graph_id)_$(g_options.model_type)"
-                MODEL_PATH = normpath(joinpath(@__FILE__, "../../.." , JULIA_RESULTS_DIR, tree_id, graph_id, "models", "$(file_name).jl"))
-                include(MODEL_PATH) # Load the odes module
-                if contains(g_options.model_type, "!")
-                    simulations = ODE_solver(ode_system=Transport_model.f_dxdt!, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options)
-                else
-                    simulations = ODE_solver(ode_system=Transport_model.f_dxdt, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options)
+        
+        for model_type in g_options.model_types
+            if model_type ∈ m_types.templates
+                for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
+                    graph_id = "$(tree_id)_$(n_node)"
+                    file_name = "$(graph_id)_$(model_type)"
+                    print("\r...Working with $(file_name)...")
+                    MODEL_PATH = normpath(joinpath(@__FILE__, "../../.." , JULIA_RESULTS_DIR, tree_id, graph_id, "models", "$(file_name).jl"))
+                    include(MODEL_PATH) # Load the odes module
+                    if contains(model_type, "!")
+                        f_dxdt = Transport_model.f_dxdt!
+                    else
+                        f_dxdt = Transport_model.f_dxdt
+                    end
+                    simulations = ODE_solver(ode_system=f_dxdt, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options, model_type=model_type)
+                    (sim_options.save_simulations) && (save_simulations_to_csv(simulations=simulations, column_names=Transport_model.xids, simulations_path=joinpath(JULIA_RESULTS_DIR, tree_id, graph_id, "simulations", "$(file_name).csv")))
                 end
 
-                (sim_options.save_simulations) && (save_simulations_to_csv(simulations=simulations, column_names=Transport_model.xids, simulations_path=joinpath(JULIA_RESULTS_DIR, tree_id, graph_id, "simulations", "$(file_name).csv")))
+            elseif model_type ∈ m_types.julia_model
+                MODEL_PATH = normpath(joinpath(@__FILE__, "../../models/julia_models.jl"))
+                include(MODEL_PATH)
+                f_dxdt = Julia_models.f_dxdt!
+                for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
+                    graph_id = "$(tree_id)_$(n_node)"
+                    file_name = "$(graph_id)_$(model_type)"
+                    print("\r...Working with Julia model $(graph_id)...")
+                    x0, p = get_ODE_components(tree_id=tree_id, n_node=n_node)
+                    simulations = ODE_solver(ode_system=f_dxdt, x0=x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=p, sol_options=sol_options, model_type=model_type)
+                    (sim_options.save_simulations) && (save_simulations_to_csv(simulations=simulations, column_names=["$x" for x in x0], simulations_path=joinpath(JULIA_RESULTS_DIR, tree_id, graph_id, "simulations", "$(file_name).csv")))
+                end
+            end
         end
     end
 
@@ -108,7 +127,7 @@ module Simulation_helpers
                     
                     x0, p = get_ODE_components(tree_id=tree_id, n_node=n_node)
                     @timeit to "$(graph_id)" begin
-                        @invokelatest f_dxdt(zeros(length(x0)), x0, p, 0.0)
+                       # @invokelatest f_dxdt(zeros(length(x0)), x0, p, 0.0)
                         for ki in range(1, bench_options.n_iterations, step=1)
                             @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=f_dxdt, x0=x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=p, sol_options=sol_options, model_type=model_type)
                         end

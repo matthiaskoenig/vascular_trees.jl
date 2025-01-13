@@ -43,6 +43,7 @@ module Julia_from_graph
         edges_df, graph = read_graph(tree_id=tree_id, n_node=n_node)
         p = collect_graph_characteristics(edges_df=edges_df, graph=graph)
         x0::Vector{Float64} = zeros(size(p, 1))
+        set_initial_values!(x0, p, 10.0)
         return x0, p
     end
 
@@ -88,7 +89,7 @@ module Julia_from_graph
         # create parameters matrix - p
         # size of p is determined by: rows - number of connections/edges, columns - number of edges characteristic 
         # that we need to store for writing ODE system correctly
-        p::Matrix{Float64} = zeros(length(edges), 7)
+        p::Matrix{Float64} = zeros(length(edges), 8)
         # get and store all the information that we need to write ODE system correctly in the p matrix
         collect_parameters_values!(p, edges, graph, volume_terminal)
 
@@ -105,7 +106,7 @@ module Julia_from_graph
     function collect_parameters_values!(p::Matrix{Float64}, edges::Vector{CartesianIndex{2}}, graph::MetaDiGraph{Int64, Float64}, volume_terminal::Float64)
         # parameter vector:
         # 1 row = sorce id, traget id, volume value, flow value, whether edge is from inflow system or not,
-        # is it source for terminal node, is it target for terminal node
+        # is it source for terminal node, is it target for terminal node, is it a marginal node
         # this order of columns IS CRUCIAL not only here, but also for ODE function
         # create views for convenience
         sources = @view p[:, 1]
@@ -115,6 +116,7 @@ module Julia_from_graph
         is_inflow = @view p[:, 5]
         source_for_terminal = @view p[:, 6]
         target_for_terminal = @view p[:, 7]
+        is_start_node = @view p[:, 8]
         @inbounds for (ke, edge) ∈ enumerate(edges)
             source_id, target_id = Tuple.(edge)
             sources[ke] = source_id
@@ -132,7 +134,16 @@ module Julia_from_graph
                 volume_values[ke] = π * props(graph, source_id, target_id)[:radius]^2 * props(graph, source_id, target_id)[:length]
                 flow_values[ke] = props(graph, source_id, target_id)[:flow]
                 is_inflow[ke] = Float64(props(graph, source_id, target_id)[:is_inflow])
+                (is_inflow[ke] == 1.0) && (endswith(props(graph, source_id)[:name], "_marginal")) && (is_start_node[ke] = 1.0)
             end
+        end
+    end
+
+    function set_initial_values!(x0::Vector{Float64}, p::Matrix{Float64}, initial_value::Float64)
+        is_start_node = @view p[:, 8]
+        start_nodes_idx = findall(!iszero, is_start_node)
+        for start_node_idx in start_nodes_idx
+            x0[start_node_idx] = initial_value
         end
     end
 
