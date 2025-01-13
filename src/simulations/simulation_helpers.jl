@@ -19,20 +19,10 @@ module Simulation_helpers
 
     function ODE_solver(; ode_system, x0, tspan, tpoints, parameter_values, sol_options, model_type)::SciMLBase.ODESolution
 
-        if contains(model_type, "precomp_MT")
-            prob = ODEProblem(structural_simplify(ode_system), 
-                     x0,
-                     tspan,
-                     parameter_values,
-                     eval_module = @__MODULE__, 
-                     eval_expression = true)
-        else
-            prob = ODEProblem(ode_system, 
-                     x0,
-                     tspan,
-                     parameter_values)
-        end
-        
+        prob = ODEProblem(ode_system, 
+                        x0,
+                        tspan,
+                        parameter_values)
 
         sol = solve(
             prob, 
@@ -48,10 +38,10 @@ module Simulation_helpers
     end
 
     function save_simulations_to_csv(; simulations::SciMLBase.ODESolution, column_names::Vector{String}, simulations_path)
-        # Step 3: Convert solution to DataFrame
+        # Convert solution to DataFrame
         df = DataFrame(simulations)
 
-        # Step 4: Write DataFrame to CSV
+        # Write DataFrame to CSV
         header = vcat(["time"], column_names)
         CSV.write(simulations_path, df, header=header)
     end
@@ -89,23 +79,20 @@ module Simulation_helpers
                     print("\r...Working with $(file_name)...")
                     
                     MODEL_PATH = normpath(joinpath(@__FILE__, "../../.." , JULIA_RESULTS_DIR, tree_id, graph_id, "models", "$(file_name).jl"))
-                    include(MODEL_PATH) # Load the odes module\
+                    include(MODEL_PATH) # Load the odes module
                     @timeit to "$(graph_id)" begin
                         if contains(model_type, "!")
-                            @invokelatest Transport_model.f_dxdt!(zeros(size(Transport_model.x0)...), Transport_model.x0, Transport_model.p, 0.0)
-                            for ki in range(1, bench_options.n_iterations, step=1)
-                                @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=Transport_model.f_dxdt!, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options, model_type=model_type)
-                            end
+                            f_dxdt = Transport_model.f_dxdt!
                         else
-                            @invokelatest Transport_model.f_dxdt(zeros(size(Transport_model.x0)...), Transport_model.x0, Transport_model.p, 0.0)
-                            for ki in range(1, bench_options.n_iterations, step=1)
-                                @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=Transport_model.f_dxdt, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options, model_type=model_type)
-                            end
+                            f_dxdt = Transport_model.f_dxdt
+                        end
+                        (!contains(model_type, "MT")) && (@invokelatest f_dxdt(zeros(length(Transport_model.x0)), Transport_model.x0, Transport_model.p, 0.0))
+                        for ki in range(1, bench_options.n_iterations, step=1)
+                            @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=f_dxdt, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options, model_type=model_type)
                         end
                     end
                     (bench_options.save_running_times) && (push!(n_species, length(Transport_model.x0)))
                     show(to, sortby=:firstexec)
-                    #(sol_options.krylov) && (model_type="$(model_type)_krylov")
                     (bench_options.save_running_times) && (save_times_as_csv(times=to, n_species=n_species, model_type=model_type, solver_name=sol_options.solver_name))
                     reset_timer!(to::TimerOutput)
                 end
@@ -113,7 +100,7 @@ module Simulation_helpers
             elseif model_type ∈ m_types.julia_model
                 MODEL_PATH = normpath(joinpath(@__FILE__, "../../models/julia_models.jl"))
                 include(MODEL_PATH)
-                f_dxdt! = Julia_models.f_dxdt!
+                f_dxdt = Julia_models.f_dxdt!
                 for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
                     n_species::Array{Int32} = []
                     graph_id = "$(tree_id)_$(n_node)"
@@ -121,9 +108,9 @@ module Simulation_helpers
                     
                     x0, p = get_ODE_components(tree_id=tree_id, n_node=n_node)
                     @timeit to "$(graph_id)" begin
-                        @invokelatest f_dxdt!(zeros(size(x0)), x0, p, 0.0)
+                        @invokelatest f_dxdt(zeros(length(x0)), x0, p, 0.0)
                         for ki in range(1, bench_options.n_iterations, step=1)
-                            @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=f_dxdt!, x0=x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=p, sol_options=sol_options, model_type=model_type)
+                            @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=f_dxdt, x0=x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=p, sol_options=sol_options, model_type=model_type)
                         end
                     end
                     (bench_options.save_running_times) && (push!(n_species, length(x0)))

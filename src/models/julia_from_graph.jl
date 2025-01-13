@@ -1,7 +1,7 @@
 module Julia_from_graph
     """
-    Module which contains functions for creating x0 and p vectors for ODESolve function.
-        These matrices are needed for ODE functions from julia_models.jl.
+    Module which contains functions for creating x0 and p vectors specific for each type of graph for ODESolve function.
+        These matrices are needed for ODE function from julia_models.jl.
 
     Also this module can be used for checking ODE functions from julia_models.jl.
         1. For this uncomment:
@@ -17,29 +17,29 @@ module Julia_from_graph
 
     Output:
     1. x0, p
-
-    FIXME matrices are two large. Once fully created matrix A should be transformed to sparse adjacency matrix.
     """
 
     # https://juliagraphs.org/Graphs.jl/dev/
-    using CSV, DataFrames, Graphs, EzXML, ParameterizedFunctions, GraphDataFrameBridge, MetaGraphs, OrdinaryDiffEq, TimerOutputs, BenchmarkTools, SparseArrays
+    using CSV, DataFrames, Graphs, EzXML, ParameterizedFunctions, GraphDataFrameBridge, MetaGraphs, OrdinaryDiffEq, InteractiveUtils
     # using GraphPlot
     include("../utils.jl")
     import .Utils: JULIA_RESULTS_DIR
     import .Utils.Options: graph_options, edge_options
-    include("./julia_models.jl")
-    import .Julia_models: f_dxdt!
+    # include("./julia_models.jl")
+    # import .Julia_models: f_dxdt!
 
     export get_ODE_components
 
-    function __init__()
-        x0, p = get_ODE_components(tree_id="Rectangle_quad", n_node=Int32(100))
-        dx::Matrix{Float64} = zeros(size(@view p[:, 1:Int(size(p, 2)/4)]))
-        f_dxdt!(dx, x0, p, 0.0)
-    end
+    # function __init__()
+    #     x0, p = get_ODE_components(tree_id="Rectangle_quad", n_node=Int32(100))
+    #     dx::Vector{Float64} = zeros(size(p, 1))
+    #     @code_warntype f_dxdt!(dx, x0, p, 0.0)
+    # end
 
-    function get_ODE_components(; tree_id::String, n_node::Int32)::Tuple{Matrix{Float64}, Matrix{Float64}}
-        # to = TimerOutput()
+    function get_ODE_components(; tree_id::String, n_node::Int32)::Tuple{Vector{Float64}, Matrix{Float64}}
+        """
+        Summarized workflow.
+        """
         edges_df, graph = read_graph(tree_id=tree_id, n_node=n_node)
         p = collect_graph_characteristics(edges_df=edges_df, graph=graph)
         x0::Vector{Float64} = zeros(size(p, 1))
@@ -47,7 +47,12 @@ module Julia_from_graph
     end
 
     function read_graph(; tree_id::String, n_node::Int32)::Tuple{DataFrame, MetaDiGraph{Int64, Float64}}
-        # get graph id
+        """
+        1. Load and store dataframe with edges information.
+        2. Create and store graph from this dataframe.
+        3. Return this objects.
+        """
+        # get graph id for correct path definition
         graph_id::String = "$(tree_id)_$(n_node)"
         # get path to the graph
         GRAPH_PATH::String = normpath(joinpath(@__FILE__, "../../.." , JULIA_RESULTS_DIR, tree_id, graph_id, "graphs/graph.csv"))
@@ -61,20 +66,31 @@ module Julia_from_graph
     end
 
     function collect_graph_characteristics(; edges_df::DataFrame, graph::MetaDiGraph{Int64, Float64})::Matrix{Float64}
+        """
+        Workflow for creating correct p vector.
+        """
 
         # calculation of terminal volume
         volume_geometry::Float64 = (0.100 * 0.100 * 0.10) / 1000  # [cm^3] -> [l]
         n_terminals::Int32 = nrow(edges_df[edges_df.terminal, :])
         volume_terminal::Float64 = volume_geometry / n_terminals
 
+        # get full (not sparse) adjacency matrix
         A::Matrix{Float64} = convert(Matrix{Float64}, (adjacency_matrix(graph)))
+        # add to the adjacency matrix "edges" connection of terminal node to themselves, 
+        # for example, terminal_node_i -> terminal_node_i
+        # this is needed for simplifiction of writing ODEs for terminal nodes
+        # and for connected to them edges
         modify_adjacency_matrix!(A, graph)
         
+        # get rid of zeros (non existing edges) from adjacency matrix, we do not need them
         edges::Vector{CartesianIndex{2}} = findall(!iszero, A)
-        p::Matrix{Float64} = zeros(length(edges), 5)
+        # create parameters matrix - p
+        # size of p is determined by: rows - number of connections/edges, columns - number of edges characteristic 
+        # that we need to store for writing ODE system correctly
+        p::Matrix{Float64} = zeros(length(edges), 7)
+        # get and store all the information that we need to write ODE system correctly in the p matrix
         collect_parameters_values!(p, edges, graph, volume_terminal)
-
-        @show p
 
         return p
     end
@@ -87,22 +103,32 @@ module Julia_from_graph
     end
 
     function collect_parameters_values!(p::Matrix{Float64}, edges::Vector{CartesianIndex{2}}, graph::MetaDiGraph{Int64, Float64}, volume_terminal::Float64)
-        # create a parameter vector, which will contain:
-        # esges (source id, target id), volume values, flow_values, whether edge is from inflow system or not
-        # THIS ORDER IS CRUCIAL
+        # parameter vector:
+        # 1 row = sorce id, traget id, volume value, flow value, whether edge is from inflow system or not,
+        # is it source for terminal node, is it target for terminal node
+        # this order of columns IS CRUCIAL not only here, but also for ODE function
+        # create views for convenience
         sources = @view p[:, 1]
         targets = @view p[:, 2]
         volume_values = @view p[:, 3]
         flow_values = @view p[:, 4]
         is_inflow = @view p[:, 5]
+        source_for_terminal = @view p[:, 6]
+        target_for_terminal = @view p[:, 7]
         @inbounds for (ke, edge) ∈ enumerate(edges)
             source_id, target_id = Tuple.(edge)
             sources[ke] = source_id
             targets[ke] = target_id
+            # check if an edge is terminal
             if target_id == source_id
+                # terminal edge (= terminal node)
                 volume_values[ke] = volume_terminal
                 is_inflow[ke] = 0.0
+                # mark elements connected to terminal nodes
+                source_for_terminal[findfirst(x -> x==source_id, target)] = 1.0
+                target_for_terminal[findfirst(x -> x==target_id, sources)] = 1.0
             else 
+                # other edges
                 volume_values[ke] = π * props(graph, source_id, target_id)[:radius]^2 * props(graph, source_id, target_id)[:length]
                 flow_values[ke] = props(graph, source_id, target_id)[:flow]
                 is_inflow[ke] = Float64(props(graph, source_id, target_id)[:is_inflow])

@@ -27,7 +27,6 @@ module Plots
         end
         replace!.([df_error.time_min_std, df_error.allocated_gbytes_std], NaN => 0.0)
         sort!(df_error, [:n_species, :model_types])
-        
 
         if !plot_3D
 

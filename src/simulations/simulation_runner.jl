@@ -26,7 +26,6 @@ module Simulation_runner
     2. running_times.csv - if sim_options.benchmark abd bench_options.save_running_times = true
 
     TODO: run macros @timeit only when you need it - now it is so, but it is dirty
-    FIXME: symbolic does not work - type error, because module is included in function
     """
 
     include("../utils.jl")
@@ -37,20 +36,20 @@ module Simulation_runner
 
     # ============ Specify options
     g_options::graph_options = graph_options(
-        n_nodes=[100],  #750, 1000, 1250, 1500
+        n_nodes=[10, 50, 100, 250, 500, 750, 1000, 1250, 1500],  #750, 1000, 1250, 1500
         tree_ids=[
             "Rectangle_quad",
-            #"Rectangle_trio",
+            "Rectangle_trio",
             ],
         model_types=[
-            # "vectorized!_cleaned_typed",
-            # "vectorized_typed",
-            # "vectorized", 
-            # "vectorized!", 
-            # "vectorized_cleaned", 
-            # "vectorized!_cleaned",
-            # "symbolic_MT",
-            "vectorized!_loop_typed"
+            "vectorized!_loop_typed",
+            "vectorized!_cleaned_typed",
+            "vectorized_typed",
+            "vectorized", 
+            "vectorized!", 
+            "vectorized_cleaned", 
+            "vectorized!_cleaned",
+            "symbolic_MT",
             ] 
     )
 
@@ -70,7 +69,7 @@ module Simulation_runner
 
         # do not write anything here in brackets if you are okay with default variant
         bench_options:: benchmark_options = benchmark_options(
-            save_running_times=false
+            save_running_times=true
         )
         create_benchmarked_simulations(g_options=g_options, sim_options=sim_options, bench_options=bench_options, sol_options=sol_options)
 
