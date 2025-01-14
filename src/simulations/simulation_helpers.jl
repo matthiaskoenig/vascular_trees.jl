@@ -14,8 +14,8 @@ module Simulation_helpers
     import .Utils.Options: model_types
     m_types::model_types = model_types()
 
-    include("../models/julia_from_graph.jl")
-    import .Julia_from_graph: get_ODE_components
+    include("../models/julia_from_pygraph.jl")
+    import .Julia_from_pygraph: get_ODE_components
 
     function ODE_solver(; ode_system, x0, tspan, tpoints, parameter_values, sol_options, model_type)::SciMLBase.ODESolution
 

@@ -4,6 +4,23 @@ module Utils
     JULIA_RESULTS_DIR = RESULTS_DIR * "/julia_vessel_trees"
     BENCHMARKING_RESULTS_PATH = joinpath(JULIA_RESULTS_DIR, "running_times.csv")
 
+    using Revise
+
+    module Graph_structure
+        export graph_frame
+        
+        struct graph_frame
+            nodes::Vector{Int32}
+            nodes_coordinates::Vector{Tuple{Float64, Float64, Float64}}
+            edges::Vector{Tuple{Int32, Int32}}
+            terminal_edges::Vector{Tuple{Int32, Int32}}
+            start_edge::Tuple{Int32, Int32}
+            preterminal_edges::Vector{Tuple{Int32, Int32}}
+            flows::Vector{Float64}
+            volumes::Vector{Float64}
+        end
+    end
+
     module Options
         export graph_options, simulations_options, benchmark_options, solver_options, edge_options, model_types
 
@@ -36,20 +53,6 @@ module Utils
             relative_tolerance::Float64 = 1e-6
             dt::Float64 = 0.001
             solver_name:: String = "Tsit5"
-        end
-
-        @with_kw struct edge_options
-            id::String
-            source::String
-            target::String
-            volume_id::String
-            volume_value::Float32
-            flow_id::String
-            flow_value::Float32
-            terminal::Bool
-            start::Bool
-            inflow::Bool
-            initial::Float32
         end
 
         @with_kw struct model_types

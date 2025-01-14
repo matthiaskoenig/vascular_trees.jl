@@ -1,6 +1,6 @@
-module Julia_from_graph
+module Julia_from_pygraph
     """
-    Module which contains functions for creating x0 and p vectors specific for each type of graph for ODESolve function.
+    Module which contains functions for creating x0 and p vectors specific for each type of PYTHON MERGED graph for ODESolve function.
         These matrices are needed for ODE function from julia_models.jl.
 
     Also this module can be used for checking ODE functions from julia_models.jl.
@@ -17,6 +17,8 @@ module Julia_from_graph
 
     Output:
     1. x0, p
+
+    TODO: adjacency matrix - optimize
     """
 
     # https://juliagraphs.org/Graphs.jl/dev/
@@ -24,7 +26,7 @@ module Julia_from_graph
     # using GraphPlot
     include("../utils.jl")
     import .Utils: JULIA_RESULTS_DIR
-    import .Utils.Options: graph_options, edge_options
+    import .Utils.Options: graph_options
     # include("./julia_models.jl")
     # import .Julia_models: f_dxdt!
 
