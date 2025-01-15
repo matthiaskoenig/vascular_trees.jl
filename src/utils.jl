@@ -52,7 +52,7 @@ module Utils
             solver = Tsit5()
             absolute_tolerance::Float64 = 1e-6
             relative_tolerance::Float64 = 1e-6
-            dt::Float64 = 0.001
+            dt::Float64 = 0.1
             solver_name:: String = "Tsit5"
         end
 

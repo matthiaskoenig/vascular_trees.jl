@@ -25,7 +25,6 @@ module Simulation_helpers
                         x0,
                         tspan,
                         parameter_values)
-
         sol = solve(
             prob, 
             sol_options.solver, # Rosenbrock23(), # Tsit5(), # CVODE_BDF

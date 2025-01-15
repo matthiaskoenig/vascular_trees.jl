@@ -4,7 +4,7 @@ module Julia_models
 
     function pyf_dxdt!(dx::Vector{Float64}, x::Vector{Float64}, p::Matrix{Float64}, t::Float64)
         """
-        check ODEs!
+        check ODEs! - double loops for terminal edges!
         """
         # create views for convenience
         # p contains edges / elements (source id, target id), volumes, flows, 
@@ -116,7 +116,7 @@ module Julia_models
 
         edges = p[1]
         terminals = p[2]
-        #start = p[3]
+        start = p[3]
         preterminals = p[4]
         flows = p[5]
         volumes = p[6]
@@ -136,7 +136,7 @@ module Julia_models
 
             # write equations
             # marginal inflow element & in -> inflow & inflow element not connected to terminal
-            if (!is_preterminal) 
+            if (!is_preterminal .&& !is_terminal) 
                 # dA_marginal/dt = -QAmarginal * A_marginal / VAmarginal;
                 # or
                 # dA/dt = QA * A_pre / VA - Q_post * A / VA;
@@ -146,7 +146,7 @@ module Julia_models
                 # species before
                 if length(pre_elements) != 0
                     for pre_element ∈ pre_elements
-                        dx[ke] += element_flow * x[pre_element] / element_volume
+                        dx[ke] += element_flow * x[pre_element] / element_volume  
                     end
                 end
                 # species after
@@ -169,20 +169,17 @@ module Julia_models
 
             # terminal element
             elseif (is_terminal)
-                # dT/dt = QA * A / VT - QV * T / VT
+                # THIS IS DIFFERENT THAN IN OTHER MODELS
+                # dT/dt = QA * A / VT - QA * T / VT
     
                 # species before
                 for pre_element ∈ pre_elements
-                    dx[ke] += flows[pre_element] * x[pre_element] / element_volume
+                    (!in(edges[pre_element], terminals)) && (dx[ke] += flows[pre_element] * x[pre_element] / element_volume)
                 end
-                # species after
-                for post_element ∈ post_elements
-                    dx[ke] -= flows[post_element] * x[ke] / element_volume
-                end
+                # output
+                dx[ke] -= flows[ke] * x[ke] / element_volume
             end
-
         end
-
     end
 
 end

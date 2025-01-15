@@ -20,14 +20,14 @@ module Julia_from_jgraph
 
     function __init__()
         for tree_id ∈ g_options.tree_ids, n_node ∈ g_options.n_nodes
-            p = get_ODE_components(tree_id=tree_id, n_node=n_node)
-            jf_dxdt!([0.0 for _ in 1:length(p[1])], [0.0 for _ in 1:length(p[1])], p, 0.0)
+            x0, p = get_ODE_components(tree_id=tree_id, n_node=n_node)
+            jf_dxdt!([0.0 for _ in 1:length(p[1])], x0, p, 0.0)
         end
     end
 
     function get_ODE_components(; tree_id::String, n_node::Int32)::Tuple{Vector{Float64}, Tuple}
         graph = load_graph(tree_id, n_node)
-        @show p::Tuple{Vector{Tuple{Int32, Int32}}, Vector{Tuple{Int32, Int32}}, Vector{Tuple{Int32, Int32}}, Vector{Tuple{Int32, Int32}}, Vector{Float64}, Vector{Float64}} = (
+        p::Tuple{Vector{Tuple{Int32, Int32}}, Vector{Tuple{Int32, Int32}}, Vector{Tuple{Int32, Int32}}, Vector{Tuple{Int32, Int32}}, Vector{Float64}, Vector{Float64}} = (
             graph.edges,
             graph.terminal_edges,
             graph.start_edge,
