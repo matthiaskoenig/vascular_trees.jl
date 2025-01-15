@@ -7,18 +7,32 @@ module Process_julia_graph
     include("./processing_helpers.jl")
     import .Processing_helpers: read_edges, read_nodes_attributes
 
-    using CSV, DataFrames, DataFramesMeta
+    using DataFrames, JLD2, InteractiveUtils
 
-    #graph::graph_frame = graph_frame()
+    # ============ Specify options
+    g_options::graph_options = graph_options(
+        n_nodes=[10],  #750, 1000, 1250, 1500
+        tree_ids=[
+            # "Rectangle_quad",
+            "Rectangle_trio",
+            ],
+    )
 
     function __init__()
-        graph_structure, nodes_attrib = read_graph(tree_id="Rectangle_trio", n_node=Int32(10))
-        create_graph_structure(graph_structure, nodes_attrib)
+        for tree_id ∈ g_options.tree_ids, n_node ∈ g_options.n_nodes
+            process_julia_graph(tree_id, n_node)
+        end
     end
 
-    function read_graph(; tree_id::String, n_node::Int32)::Tuple{DataFrame, DataFrame}
+    function process_julia_graph(tree_id::String, n_node::Int32)
         # get graph id for correct path definition
         graph_id::String = "$(tree_id)_$(n_node)"
+        graph_structure, nodes_attrib = read_graph(tree_id, graph_id)
+        graph = create_graph_structure(graph_structure, nodes_attrib)
+        save_graph!(graph, tree_id, graph_id)
+    end
+
+    function read_graph(tree_id::String, graph_id::String)::Tuple{DataFrame, DataFrame}
         # get directory with graph's files
         GRAPH_DIR::String = normpath(joinpath(@__FILE__, "../../.." , JULIA_RESULTS_DIR, tree_id, graph_id, "julia"))
         
@@ -30,28 +44,26 @@ module Process_julia_graph
         return graph_structure, nodes_attrib
     end
 
-    function create_graph_structure(graph_structure::DataFrame, nodes_attrib::DataFrame)
-        # nodes::Vector{Int32}
-        # nodes_coordinates::Vector{Tuple{Float64, Float64, Float64}}
-        # edges::Vector{Tuple{Int32, Int32}}
-        # terminal_edges::Vector{Tuple{Int32, Int32}}
-        # start_edges::Tuple{Int32, Int32}
-        # preterminal_edges::Vector{Tuple{Int32, Int32}}
-        # flows::Vector{Float64}
-        # volumes::Vector{Float64}
-        terminal_edges = subset(graph_skeleton, :terminal => x -> x .== true, view=true)
-        start_edge = subset(graph_skeleton, :start => x -> x .== true, view=true)
-        preterminal_edges = subset(graph_skeleton, :preterminal => x -> x .== true, view=true)
-        @show graph::graph_frame = graph_frame(
-            nodes_attrib.ids,
-            Tuple.(Tables.namedtupleiterator(nodes_attrib[:, [:x, :y, :z]])),
-            Tuple.(Tables.namedtupleiterator(graph_structure[:, [:source_id, :target_id]])),
-            Tuple.(Tables.namedtupleiterator(terminal_edges[:, [:source_id, :target_id]])),
-            # Tuple.(Tables.namedtupleiterator(start_edge[:, [:source_id, :target_id]])),
-            Tuple.(Tables.namedtupleiterator(preterminal_edges[:, [:source_id, :target_id]])),
-            graph_structure.flow,
-            graph_structure.volumes
+    function create_graph_structure(graph_structure::DataFrame, nodes_attrib::DataFrame)::graph_frame
+        terminal_edges::SubDataFrame = subset(graph_structure, :terminal => x -> x .== true, view=true)
+        start_edge::SubDataFrame = subset(graph_structure, :start => x -> x .== true, view=true)
+        preterminal_edges::SubDataFrame = subset(graph_structure, :preterminal => x -> x .== true, view=true)
+        graph::graph_frame = graph_frame(
+            nodes_attrib.ids, # nodes::Vector{Int32}
+            Tuple.(Tables.namedtupleiterator(@view nodes_attrib[:, [:x, :y, :z]])), # nodes_coordinates::Vector{Tuple{Float64, Float64, Float64}}
+            Tuple.(Tables.namedtupleiterator(@view graph_structure[:, [:source_id, :target_id]])), # edges::Vector{Tuple{Int32, Int32}}
+            Tuple.(Tables.namedtupleiterator(terminal_edges[:, [:source_id, :target_id]])), # terminal_edges::Vector{Tuple{Int32, Int32}}
+            Tuple.(Tables.namedtupleiterator(start_edge[:, [:source_id, :target_id]])), # start_edge::Tuple{Int32, Int32}
+            Tuple.(Tables.namedtupleiterator(preterminal_edges[:, [:source_id, :target_id]])), # preterminal_edges::Vector{Tuple{Int32, Int32}}
+            graph_structure.flows, # flows::Vector{Float64}
+            graph_structure.volumes # volumes::Vector{Float64}
         )
+        return graph
+    end
+
+    function save_graph!(graph::graph_frame, tree_id::String, graph_id::String)
+        JLD2_DIR::String = normpath(joinpath(@__FILE__, "../../.." , JULIA_RESULTS_DIR, tree_id, graph_id, "graphs"))
+        jldsave(joinpath(JLD2_DIR, "A.jld2"), graph = graph)
     end
 
 end

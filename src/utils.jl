@@ -14,11 +14,12 @@ module Utils
             nodes_coordinates::Vector{Tuple{Float64, Float64, Float64}}
             edges::Vector{Tuple{Int32, Int32}}
             terminal_edges::Vector{Tuple{Int32, Int32}}
-            start_edge::Tuple{Int32, Int32}
+            start_edge::Vector{Tuple{Int32, Int32}} #MUST be changed to just Tuple
             preterminal_edges::Vector{Tuple{Int32, Int32}}
             flows::Vector{Float64}
             volumes::Vector{Float64}
         end
+
     end
 
     module Options
@@ -31,7 +32,7 @@ module Utils
         @with_kw struct graph_options
             n_nodes::Vector{Int32}
             tree_ids::Vector{String}
-            model_types::Vector{String}
+            model_types::Union{Vector{String},Nothing} = nothing
         end
 
         @with_kw struct simulations_options

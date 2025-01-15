@@ -12,8 +12,8 @@ module Julia_from_pygraph
 
 
     Input:
-    1. graph.csv - DataFrame with information about edges of the graph
-       and their attributes
+    1. pygraph.csv - DataFrame with information about edges of the graph
+       and their attributes made in python
 
     Output:
     1. x0, p
@@ -58,7 +58,7 @@ module Julia_from_pygraph
         # get graph id for correct path definition
         graph_id::String = "$(tree_id)_$(n_node)"
         # get path to the graph
-        GRAPH_PATH::String = normpath(joinpath(@__FILE__, "../../.." , JULIA_RESULTS_DIR, tree_id, graph_id, "graphs/graph.csv"))
+        GRAPH_PATH::String = normpath(joinpath(@__FILE__, "../../.." , JULIA_RESULTS_DIR, tree_id, graph_id, "graphs/pygraph.csv"))
         # read csv file with information about edges
         edges_df::DataFrame = DataFrame(CSV.File(GRAPH_PATH))
         # create graph from DataFrame
@@ -133,8 +133,8 @@ module Julia_from_pygraph
                 target_for_terminal[findfirst(x -> x==target_id, sources)] = 1.0
             else 
                 # other edges
-                volume_values[ke] = π * props(graph, source_id, target_id)[:radius]^2 * props(graph, source_id, target_id)[:length]
-                flow_values[ke] = props(graph, source_id, target_id)[:flow]
+                volume_values[ke] = π * props(graph, source_id, target_id)[:radius]^2 * props(graph, source_id, target_id)[:length] / 1e6 # [mm3 --> L]
+                flow_values[ke] = props(graph, source_id, target_id)[:flow] # are already converted to [L] in python
                 is_inflow[ke] = Float64(props(graph, source_id, target_id)[:is_inflow])
                 (is_inflow[ke] == 1.0) && (endswith(props(graph, source_id)[:name], "_marginal")) && (is_start_node[ke] = 1.0)
             end
