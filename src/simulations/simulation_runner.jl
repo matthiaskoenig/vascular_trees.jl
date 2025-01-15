@@ -36,13 +36,14 @@ module Simulation_runner
 
     # ============ Specify options
     g_options::graph_options = graph_options(
-        n_nodes=[50],  #750, 1000, 1250, 1500
+        n_nodes=[10],  #750, 1000, 1250, 1500
         tree_ids=[
             # "Rectangle_quad",
             "Rectangle_trio",
             ],
         model_types=[
-            "vectorized!_loop_typed",
+            # "loop!_python",
+            "loop!_julia",
             # "vectorized!_cleaned_typed",
             # "vectorized_typed",
             # "vectorized", 

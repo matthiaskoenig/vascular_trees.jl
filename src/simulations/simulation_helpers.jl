@@ -16,6 +16,8 @@ module Simulation_helpers
 
     include("../models/julia_from_pygraph.jl")
     import .Julia_from_pygraph: get_ODE_components
+    include("../models/julia_from_jgraph.jl")
+    import .Julia_from_jgraph: get_ODE_components
 
     function ODE_solver(; ode_system, x0, tspan, tpoints, parameter_values, sol_options, model_type)::SciMLBase.ODESolution
 
@@ -71,7 +73,13 @@ module Simulation_helpers
             elseif model_type ∈ m_types.julia_model
                 MODEL_PATH = normpath(joinpath(@__FILE__, "../../models/julia_models.jl"))
                 include(MODEL_PATH)
-                f_dxdt = Julia_models.f_dxdt!
+                if endswith(model_type, "python")
+                    f_dxdt = Julia_models.pyf_dxdt!
+                    get_ODE_components = Julia_from_pygraph.get_ODE_components
+                elseif endswith(model_type, "julia")
+                    f_dxdt = Julia_models.jf_dxdt!
+                    get_ODE_components = Julia_from_jgraph.get_ODE_components
+                end
                 for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
                     graph_id = "$(tree_id)_$(n_node)"
                     file_name = "$(graph_id)_$(model_type)"

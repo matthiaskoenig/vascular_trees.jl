@@ -10,14 +10,14 @@ module Utils
         export graph_frame
         
         struct graph_frame
-            nodes::Vector{Int32}
-            nodes_coordinates::Vector{Tuple{Float64, Float64, Float64}}
-            edges::Vector{Tuple{Int32, Int32}}
-            terminal_edges::Vector{Tuple{Int32, Int32}}
-            start_edge::Vector{Tuple{Int32, Int32}} #MUST be changed to just Tuple
-            preterminal_edges::Vector{Tuple{Int32, Int32}}
-            flows::Vector{Float64}
-            volumes::Vector{Float64}
+            nodes::Vector{Int32} # ids of all nodes
+            nodes_coordinates::Vector{Tuple{Float64, Float64, Float64}} # position of each node (x, y, z)
+            edges::Vector{Tuple{Int32, Int32}} # all edges
+            terminal_edges::Vector{Tuple{Int32, Int32}} # edges between terminal nodes (the lowest nodes in network) and themselves
+            start_edge::Vector{Tuple{Int32, Int32}} #MUST be changed to just Tuple # the highest node in network
+            preterminal_edges::Vector{Tuple{Int32, Int32}} # edges between the terminal nodes and nodes on the level higher
+            flows::Vector{Float64} # flow values
+            volumes::Vector{Float64} # volume values
         end
 
     end
@@ -66,7 +66,8 @@ module Utils
                                         "vectorized!_cleaned",
                                         "symbolic_MT"
                                         ]
-            julia_model::Vector{String} = ["vectorized!_loop_typed"]
+            julia_model::Vector{String} = ["loop!_python",
+                                            "loop!_julia"]
         end
         
     end

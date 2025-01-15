@@ -4,6 +4,9 @@ module Julia_from_jgraph
     import .Utils.Graph_structure: graph_frame
     import .Utils.Options: graph_options
 
+    include("./julia_models.jl")
+    import .Julia_models: jf_dxdt!
+
     using JLD2
 
     # ============ Specify options
@@ -17,13 +20,14 @@ module Julia_from_jgraph
 
     function __init__()
         for tree_id ∈ g_options.tree_ids, n_node ∈ g_options.n_nodes
-            get_ODE_components(tree_id, n_node)
+            p = get_ODE_components(tree_id=tree_id, n_node=n_node)
+            jf_dxdt!([0.0 for _ in 1:length(p[1])], [0.0 for _ in 1:length(p[1])], p, 0.0)
         end
     end
 
-    function get_ODE_components(tree_id::String, n_node::Int32)
+    function get_ODE_components(; tree_id::String, n_node::Int32)::Tuple{Vector{Float64}, Tuple}
         graph = load_graph(tree_id, n_node)
-        p::Tuple{Vector{Tuple{Int32, Int32}}, Vector{Tuple{Int32, Int32}}, Vector{Tuple{Int32, Int32}}, Vector{Tuple{Int32, Int32}}, Vector{Float64}, Vector{Float64}} = (
+        @show p::Tuple{Vector{Tuple{Int32, Int32}}, Vector{Tuple{Int32, Int32}}, Vector{Tuple{Int32, Int32}}, Vector{Tuple{Int32, Int32}}, Vector{Float64}, Vector{Float64}} = (
             graph.edges,
             graph.terminal_edges,
             graph.start_edge,
@@ -31,6 +35,9 @@ module Julia_from_jgraph
             graph.flows,
             graph.volumes
         )
+        x0::Vector{Float64} = zeros(length(p[1]))
+        set_initial_values!(x0, 10.0, p[1], p[3])
+        return x0, p
     end
 
     function load_graph(tree_id::String, n_node::Int32)::Any
@@ -42,6 +49,11 @@ module Julia_from_jgraph
         graph = graph_file["graph"]
 
         return graph
+    end
+
+    function set_initial_values!(x0::Vector{Float64}, initial_value::Float64, edges::Vector{Tuple{Int32, Int32}}, start_edge::Vector{Tuple{Int32, Int32}})
+        start_edge_idx = findfirst(x -> x==start_edge[1], edges)
+        x0[start_edge_idx] = initial_value
     end
 
 end

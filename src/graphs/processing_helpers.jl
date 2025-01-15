@@ -19,6 +19,9 @@ module Processing_helpers
 
     export read_edges, read_nodes_attributes
 
+    # calculation of terminal volume
+    volume_geometry::Float64 = (0.100 * 0.100 * 0.10) / 1000  # [cm^3] -> [l]
+
     function read_edges(GRAPH_DIR::String)::DataFrame
         # read and prepare lg file with information about edges
         graph_structure::DataFrame = read_graph_skeleton(GRAPH_DIR)
@@ -26,6 +29,7 @@ module Processing_helpers
         edges_attrib::DataFrame = read_edges_attributes(GRAPH_DIR)
         # join dfs with graph structure and edges attributes
         leftjoin!(graph_structure, edges_attrib, on = :target_id)
+        adding_graph_characteristics!(graph_structure)
 
         return graph_structure
     end
@@ -35,11 +39,6 @@ module Processing_helpers
         select!(graph_skeleton, Not(names(graph_skeleton, Missing)))
         rename!(graph_skeleton, [:source_id, :target_id])
         transform!(graph_skeleton, names(graph_skeleton, Int64) .=> ByRow(Int32), renamecols=false)
-        graph_skeleton[!, :terminal] = .!in.(graph_skeleton.target_id, [Set(graph_skeleton.source_id)])
-        graph_skeleton[!, :start] = .!in.(graph_skeleton.source_id, [Set(graph_skeleton.target_id)])
-
-        terminal_edges::SubDataFrame = subset(graph_skeleton, :terminal => x -> x .== true, view=true)
-        graph_skeleton[!, :preterminal] = in.(graph_skeleton.target_id, [Set(terminal_edges.source_id)])
 
         return graph_skeleton
     end
@@ -66,8 +65,20 @@ module Processing_helpers
         return edges_attrib
     end
 
-    function create_terminal_edges(graph_structure::DataFrame)
-        terminal_edges::SubDataFrame = subset(graph_skeleton, :terminal => x -> x .== true, view=true)
+    function adding_graph_characteristics!(graph_structure::DataFrame)
+        graph_structure[!, :preterminal] = .!in.(graph_structure.target_id, [Set(graph_structure.source_id)])
+        graph_structure[!, :start] = .!in.(graph_structure.source_id, [Set(graph_structure.target_id)])
+        graph_structure[!, :terminal] = [false for _ ∈ 1:nrow(graph_structure)]
+
+        # adding self edges of terminal nodes
+        preterminal_edges::SubDataFrame = subset(graph_structure, :preterminal => x -> x .== true, view=true)
+        n_terminals::Int32 = nrow(preterminal_edges)
+        volume_terminal::Float64 = volume_geometry / n_terminals
+        terminal_node_ids = preterminal_edges[:, :target_id]
+        for terminal_node_id ∈ terminal_node_ids
+            push!(graph_structure, [terminal_node_id, terminal_node_id, 0, 0.0, 0.0, 0.0, 0.0, 0.0, volume_terminal, false, false, true])
+        end
+
     end
 
     function read_nodes_attributes(GRAPH_DIR::String)::DataFrame
