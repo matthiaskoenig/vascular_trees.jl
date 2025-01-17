@@ -133,8 +133,8 @@ module Julia_from_pygraph
                 target_for_terminal[findfirst(x -> x==target_id, sources)] = 1.0
             else 
                 # other edges
-                volume_values[ke] = π * props(graph, source_id, target_id)[:radius]^2 * props(graph, source_id, target_id)[:length] / 1e6 # [mm3 --> L]
-                flow_values[ke] = props(graph, source_id, target_id)[:flow] # are already converted to [L] in python
+                volume_values[ke] = π * props(graph, source_id, target_id)[:radius]^2 * props(graph, source_id, target_id)[:length] ./ 1000000 # [mm3 --> L]
+                flow_values[ke] = props(graph, source_id, target_id)[:flow] # are already converted to [L / min] in python
                 is_inflow[ke] = Float64(props(graph, source_id, target_id)[:is_inflow])
                 (is_inflow[ke] == 1.0) && (endswith(props(graph, source_id)[:name], "_marginal")) && (is_start_node[ke] = 1.0)
             end

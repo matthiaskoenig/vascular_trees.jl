@@ -18,6 +18,8 @@ module Utils
             preterminal_edges::Vector{Tuple{Int32, Int32}} # edges between the terminal nodes and nodes on the level higher
             flows::Vector{Float64} # flow values
             volumes::Vector{Float64} # volume values
+            flow_ids::Vector{String}
+            volume_ids::Vector{String}
         end
 
     end
@@ -53,7 +55,7 @@ module Utils
             absolute_tolerance::Float64 = 1e-6
             relative_tolerance::Float64 = 1e-6
             dt::Float64 = 0.1
-            solver_name:: String = "Tsit5"
+            solver_name:: String = "Rodas4" # "Tsit5"
         end
 
         @with_kw struct model_types

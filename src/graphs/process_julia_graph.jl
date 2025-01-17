@@ -56,7 +56,9 @@ module Process_julia_graph
             Tuple.(Tables.namedtupleiterator(start_edge[:, [:source_id, :target_id]])), # start_edge::Tuple{Int32, Int32}
             Tuple.(Tables.namedtupleiterator(preterminal_edges[:, [:source_id, :target_id]])), # preterminal_edges::Vector{Tuple{Int32, Int32}}
             graph_structure.flows, # flows::Vector{Float64}
-            graph_structure.volumes # volumes::Vector{Float64}
+            graph_structure.volumes, # volumes::Vector{Float64}
+            graph_structure.flow_ids,
+            graph_structure.volume_ids
         )
         return graph
     end

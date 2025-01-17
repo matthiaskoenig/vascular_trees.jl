@@ -31,6 +31,8 @@ module Processing_helpers
         leftjoin!(graph_structure, edges_attrib, on = :target_id)
         adding_graph_characteristics!(graph_structure)
 
+        @show graph_structure
+
         return graph_structure
     end
 
@@ -62,6 +64,8 @@ module Processing_helpers
             end 
         end
 
+        transform!(edges_attrib, [:target_id] => ByRow(target_id -> ["Q_$(target_id)", "V_$(target_id)"]) => [:flow_ids, :volume_ids])
+
         return edges_attrib
     end
 
@@ -70,13 +74,13 @@ module Processing_helpers
         graph_structure[!, :start] = .!in.(graph_structure.source_id, [Set(graph_structure.target_id)])
         graph_structure[!, :terminal] = [false for _ ∈ 1:nrow(graph_structure)]
 
-        # adding self edges of terminal nodes
+        # adding self edges for terminal nodes
         preterminal_edges::SubDataFrame = subset(graph_structure, :preterminal => x -> x .== true, view=true)
         n_terminals::Int32 = nrow(preterminal_edges)
         volume_terminal::Float64 = volume_geometry / n_terminals
         terminal_node_ids = preterminal_edges[:, :target_id]
         for terminal_node_id ∈ terminal_node_ids
-            push!(graph_structure, [terminal_node_id, terminal_node_id, 0, 0.0, 0.0, 0.0, 0.0, 0.0, volume_terminal, false, false, true])
+            push!(graph_structure, [terminal_node_id, terminal_node_id, 0, 0.0, 0.0, 0.0, 0.0, 0.0, volume_terminal,"QT_$(terminal_node_id)", "VT_$(terminal_node_id)", false, false, true])
         end
 
     end

@@ -25,6 +25,7 @@ module Simulation_helpers
                         x0,
                         tspan,
                         parameter_values)
+
         sol = solve(
             prob, 
             sol_options.solver, # Rosenbrock23(), # Tsit5(), # CVODE_BDF
@@ -32,7 +33,7 @@ module Simulation_helpers
             dense=false,
             reltol=sol_options.relative_tolerance, 
             abstol=sol_options.absolute_tolerance,
-            dt=sol_options.dt)
+            dt=sol_options.dt,)
 
         return sol
 
@@ -72,10 +73,10 @@ module Simulation_helpers
             elseif model_type ∈ m_types.julia_model
                 MODEL_PATH = normpath(joinpath(@__FILE__, "../../models/julia_models.jl"))
                 include(MODEL_PATH)
-                if endswith(model_type, "python")
+                if endswith(model_type, "_python")
                     f_dxdt = Julia_models.pyf_dxdt!
                     get_ODE_components = Julia_from_pygraph.get_ODE_components
-                elseif endswith(model_type, "julia")
+                elseif endswith(model_type, "_julia")
                     f_dxdt = Julia_models.jf_dxdt!
                     get_ODE_components = Julia_from_jgraph.get_ODE_components
                 end
@@ -84,8 +85,8 @@ module Simulation_helpers
                     file_name = "$(graph_id)_$(model_type)"
                     print("\r...Working with Julia model $(graph_id)...")
                     x0, p = get_ODE_components(tree_id=tree_id, n_node=n_node)
-                    simulations = ODE_solver(ode_system=f_dxdt, x0=x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=p, sol_options=sol_options, model_type=model_type)
-                    (sim_options.save_simulations) && (save_simulations_to_csv(simulations=simulations, column_names=["$x" for x in x0], simulations_path=joinpath(JULIA_RESULTS_DIR, tree_id, graph_id, "simulations", "$(file_name).csv")))
+                    @show simulations = ODE_solver(ode_system=f_dxdt, x0=x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=p, sol_options=sol_options, model_type=model_type)
+                    (sim_options.save_simulations) && (save_simulations_to_csv(simulations=simulations, column_names=["$i" for i in eachindex(x0)], simulations_path=joinpath(JULIA_RESULTS_DIR, tree_id, graph_id, "simulations", "$(file_name).csv")))
                 end
             end
         end
@@ -126,7 +127,13 @@ module Simulation_helpers
             elseif model_type ∈ m_types.julia_model
                 MODEL_PATH = normpath(joinpath(@__FILE__, "../../models/julia_models.jl"))
                 include(MODEL_PATH)
-                f_dxdt = Julia_models.f_dxdt!
+                if endswith(model_type, "_python")
+                    f_dxdt = Julia_models.pyf_dxdt!
+                    get_ODE_components = Julia_from_pygraph.get_ODE_components
+                elseif endswith(model_type, "_julia")
+                    f_dxdt = Julia_models.jf_dxdt!
+                    get_ODE_components = Julia_from_jgraph.get_ODE_components
+                end
                 for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
                     n_species::Array{Int32} = []
                     graph_id = "$(tree_id)_$(n_node)"
@@ -141,7 +148,6 @@ module Simulation_helpers
                     end
                     (bench_options.save_running_times) && (push!(n_species, length(x0)))
                     show(to, sortby=:firstexec)
-                    #(sol_options.krylov) && (model_type="$(model_type)_krylov")
                     (bench_options.save_running_times) && (save_times_as_csv(times=to, n_species=n_species, model_type=model_type, solver_name=sol_options.solver_name))
                     reset_timer!(to::TimerOutput)
                 end
