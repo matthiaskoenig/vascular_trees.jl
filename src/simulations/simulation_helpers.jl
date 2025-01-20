@@ -41,7 +41,7 @@ module Simulation_helpers
 
     function save_simulations_to_csv(; simulations::SciMLBase.ODESolution, column_names::Vector{String}, simulations_path)
         # Convert solution to DataFrame
-        df = DataFrame(simulations)
+        @show df = DataFrame(simulations)
 
         # Write DataFrame to CSV
         header = vcat(["time"], column_names)
@@ -85,7 +85,7 @@ module Simulation_helpers
                     file_name = "$(graph_id)_$(model_type)"
                     print("\r...Working with Julia model $(graph_id)...")
                     x0, p = get_ODE_components(tree_id=tree_id, n_node=n_node)
-                    @show simulations = ODE_solver(ode_system=f_dxdt, x0=x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=p, sol_options=sol_options, model_type=model_type)
+                    simulations = ODE_solver(ode_system=f_dxdt, x0=x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=p, sol_options=sol_options, model_type=model_type)
                     (sim_options.save_simulations) && (save_simulations_to_csv(simulations=simulations, column_names=["$i" for i in eachindex(x0)], simulations_path=joinpath(JULIA_RESULTS_DIR, tree_id, graph_id, "simulations", "$(file_name).csv")))
                 end
             end

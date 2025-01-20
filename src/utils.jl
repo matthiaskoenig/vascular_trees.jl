@@ -18,6 +18,7 @@ module Utils
             preterminal_edges::Vector{Tuple{Int32, Int32}} # edges between the terminal nodes and nodes on the level higher
             flows::Vector{Float64} # flow values
             volumes::Vector{Float64} # volume values
+            element_ids::Vector{String}
             flow_ids::Vector{String}
             volume_ids::Vector{String}
         end

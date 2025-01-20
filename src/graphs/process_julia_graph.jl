@@ -9,12 +9,17 @@ module Process_julia_graph
 
     using DataFrames, JLD2, InteractiveUtils
 
+    """
+    TODO: Get rid of zeros in DataFrame
+    """
+
     # ============ Specify options
     g_options::graph_options = graph_options(
         n_nodes=[10],  #750, 1000, 1250, 1500
         tree_ids=[
+            "Rectangle_single_inflow",
             # "Rectangle_quad",
-            "Rectangle_trio",
+            # "Rectangle_trio",
             ],
     )
 
@@ -57,6 +62,7 @@ module Process_julia_graph
             Tuple.(Tables.namedtupleiterator(preterminal_edges[:, [:source_id, :target_id]])), # preterminal_edges::Vector{Tuple{Int32, Int32}}
             graph_structure.flows, # flows::Vector{Float64}
             graph_structure.volumes, # volumes::Vector{Float64}
+            graph_structure.element_ids,
             graph_structure.flow_ids,
             graph_structure.volume_ids
         )

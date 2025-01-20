@@ -1,6 +1,7 @@
 module Julia_models
 
     export pyf_dxdt!, jf_dxdt!, str_jf_dxdt!
+    
 
     function pyf_dxdt!(dx::Vector{Float64}, x::Vector{Float64}, p::Matrix{Float64}, t::Float64)
         """
@@ -123,13 +124,17 @@ module Julia_models
         flows = p[5]
         volumes = p[6]
 
-        for (ke, element) in enumerate(edges)
+        # for input concentration
+        dx[length(x)] = 0.0
+
+        @inbounds for (ke, element) in enumerate(edges)
             # retrieve information for element
             source_id, target_id = element
             element_volume = volumes[ke]
             element_flow = flows[ke]
             is_preterminal = in(element, preterminals)
             is_terminal = in(element, terminals)
+            is_start = in(element, start)
 
             # species before the element
             pre_elements = findall(x -> x[2]==source_id, edges) 
@@ -137,25 +142,24 @@ module Julia_models
             post_elements = findall(x -> x[1]==target_id, edges)
 
             # write equations
-            # marginal inflow element & in -> inflow & inflow element not connected to terminal
-            if (!is_preterminal .&& !is_terminal) 
-                # dA_marginal/dt = -QAmarginal * A_marginal / VAmarginal;
-                # or
-                # dA/dt = QA * A_pre / VA - Q_post * A / VA;
-                # or
-                # dA/dt = QA * A_marginal / VA - Q_post * A / VA; (QA and VA here are equal to QAmarginal and VAmarginal - done in processing julia graph)
-                
-                # species before
-                if length(pre_elements) != 0
-                    for pre_element ∈ pre_elements
-                        dx[ke] += element_flow * x[pre_element] / element_volume  
-                    end
-                else
-                    dx[ke] += element_flow * x[ke] / element_volume  
-                end
+            # marginal (input) element
+            if source_id == 0
                 # species after
                 for post_element ∈ post_elements
-                    dx[ke] -= flows[post_element] * x[ke] / element_volume
+                    dx[ke] = dx[ke] - flows[post_element] * x[ke] / volumes[post_element]
+                end
+            # in -> inflow & inflow element not connected to terminal
+            elseif (!is_preterminal .&& !is_terminal .&& source_id != 0) 
+                # dA/dt = QA * A_pre / VA - Q_post * A / VA;
+                
+                # species before
+                for pre_element ∈ pre_elements
+                    dx[ke] = dx[ke] + element_flow * x[pre_element]
+                end
+
+                # species after
+                for post_element ∈ post_elements
+                    dx[ke] = dx[ke] - flows[post_element] * x[ke]
                 end
 
             # inflow element connected to terminal
@@ -164,11 +168,11 @@ module Julia_models
                 
                 # species before
                 for pre_element ∈ pre_elements
-                    dx[ke] += flows[ke] * x[pre_element] / element_volume
+                    dx[ke] = dx[ke] + flows[ke] * x[pre_element]
                 end
                 # species after
                 for _ ∈ post_elements
-                    dx[ke] -= flows[ke] * x[ke] / element_volume
+                    dx[ke] = dx[ke] - flows[ke] * x[ke]
                 end
 
             # terminal element
@@ -178,14 +182,21 @@ module Julia_models
     
                 # species before and output
                 for pre_element ∈ pre_elements
-                    (!in(edges[pre_element], terminals)) && (dx[ke] += flows[pre_element] * x[pre_element] / element_volume - flows[pre_element] * x[ke] / element_volume)
+                    (!in(edges[pre_element], terminals)) && (dx[ke] = dx[ke] + flows[pre_element] * x[pre_element]) # - flows[pre_element] * x[ke] / element_volume)
                 end
             end
+
+            if source_id != 0
+                dx[ke] /= element_volume
+            end
+
         end
-        #return dx
+        
+        return dx
     end
 
-    function str_jf_dxdt(dx, 
+    function str_jf_dxdt(dx_str,
+                        dx_vstr, 
                         x, 
                         p, 
                         t)
@@ -194,16 +205,24 @@ module Julia_models
         terminals = p[2]
         start = p[3]
         preterminals = p[4]
-        flow_ids = p[7]
-        volume_ids = p[8]
 
-        for (ke, element) in enumerate(edges)
+        flows = p[5]
+        volumes = p[6]
+
+        flow_ids = p[8]
+        volume_ids = p[9]
+
+
+        @inbounds for (ke, element) in enumerate(edges)
             # retrieve information for element
             source_id, target_id = element
-            element_volume = volume_ids[ke]
-            element_flow = flow_ids[ke]
+            element_volume = volumes[ke]
+            element_flow = flows[ke]
+            element_volume_id = volume_ids[ke]
+            element_flow_id = flow_ids[ke]
             is_preterminal = in(element, preterminals)
             is_terminal = in(element, terminals)
+            is_start = in(element, start)
 
             # species before the element
             pre_elements = findall(x -> x[2]==source_id, edges) 
@@ -211,25 +230,30 @@ module Julia_models
             post_elements = findall(x -> x[1]==target_id, edges)
 
             # write equations
-            # marginal inflow element & in -> inflow & inflow element not connected to terminal
-            if (!is_preterminal .&& !is_terminal) 
-                # dA_marginal/dt = -QAmarginal * A_marginal / VAmarginal;
-                # or
-                # dA/dt = QA * A_pre / VA - Q_post * A / VA;
-                # or
-                # dA/dt = QA * A_marginal / VA - Q_post * A / VA; (QA and VA here are equal to QAmarginal and VAmarginal - done in processing julia graph)
-                
-                # species before
-                if length(pre_elements) != 0
-                    for pre_element ∈ pre_elements
-                        dx[ke] *= "+$element_flow * $(x[pre_element]) / $element_volume"  
-                    end
-                else
-                    dx[ke] *= "+$element_flow * $(x[ke]) / $element_volume"
-                end
+            # marginal (input) element
+            if source_id == 0
                 # species after
                 for post_element ∈ post_elements
-                    dx[ke] *= "-$(flow_ids[post_element]) * $(x[ke]) / $element_volume"
+                    # dx[ke] -= flows[post_element] * x[ke] / volumes[post_element]
+                    dx_str[ke] *= " - $(flow_ids[post_element])*$(x[ke]) / $(volume_ids[post_element])"
+                    dx_vstr[ke] *= " - $(flows[post_element])*$(x[ke]) / $(volumes[post_element])"
+                end
+            # in -> inflow & inflow element not connected to terminal
+            elseif (!is_preterminal .&& !is_terminal .&& source_id != 0) 
+                # dA_marginal/dt = -QAmarginal * A_marginal / VAmarginal;
+
+                # species before
+                for pre_element ∈ pre_elements
+                    # dx[ke] += element_flow * x[pre_element]
+                    dx_str[ke] *= " + $element_flow_id*$(x[pre_element])" 
+                    dx_vstr[ke] *= " + $element_flow*$(x[pre_element])"
+                end
+
+                # species after
+                for post_element ∈ post_elements
+                    # dx[ke] -= flows[post_element] * x[ke]
+                    dx_str[ke] *= " - $(flow_ids[post_element])*$(x[ke])"
+                    dx_vstr[ke] *= " - $(flows[post_element])*$(x[ke])"
                 end
 
             # inflow element connected to terminal
@@ -238,11 +262,15 @@ module Julia_models
                 
                 # species before
                 for pre_element ∈ pre_elements
-                    dx[ke] *= "+$(flow_ids[ke]) * $(x[pre_element]) / $element_volume"
+                    # dx[ke] += flows[ke] * x[pre_element]
+                    dx_str[ke] *= " + $(flow_ids[ke])*$(x[pre_element])"
+                    dx_vstr[ke] *= " + $(flows[ke])*$(x[pre_element])"
                 end
                 # species after
                 for _ ∈ post_elements
-                    dx[ke] *= "-$(flow_ids[ke]) * $(x[ke]) / $element_volume"
+                    # dx[ke] -= flows[ke] * x[ke]
+                    dx_str[ke] *= " - $(flow_ids[ke])*$(x[ke])"
+                    dx_vstr[ke] *= " - $(flows[ke])*$(x[ke])"
                 end
 
             # terminal element
@@ -252,11 +280,21 @@ module Julia_models
     
                 # species before and output
                 for pre_element ∈ pre_elements
-                    (!in(edges[pre_element], terminals)) && (dx[ke] *= "+$(flow_ids[pre_element]) * $(x[pre_element]) / $element_volume - $(flow_ids[pre_element]) * $(x[pre_element]) / $element_volume")
+                    # (!in(edges[pre_element], terminals)) && (dx[ke] += flows[pre_element] * x[pre_element])
+                    if !in(edges[pre_element], terminals)
+                        dx_str[ke] *= " + $(flow_ids[pre_element])*$(x[pre_element])" # - $(flow_ids[pre_element])*$(x[ke])/$element_volume_id")
+                        dx_vstr[ke] *= " + $(flows[pre_element])*$(x[pre_element])"
+                    end
                 end
             end
+
+            # marginal (input) element
+            if source_id != 0
+                dx_str[ke] = "(" * dx_str[ke] * " ) / $element_volume_id"
+                dx_vstr[ke] = "(" * dx_vstr[ke] * " ) / $element_volume"
+            end
         end
-        return dx
+        return dx_str, dx_vstr
     end
 
 end

@@ -36,7 +36,7 @@ module Simulation_runner
 
     # ============ Specify options
     g_options::graph_options = graph_options(
-        n_nodes=[50],  #750, 1000, 1250, 1500
+        n_nodes=[10],  #750, 1000, 1250, 1500
         tree_ids=[
             # "Rectangle_quad",
             "Rectangle_trio",
@@ -57,7 +57,7 @@ module Simulation_runner
     tspan=(0.0, 10.0)
     sim_options::simulations_options = simulations_options(
         tspan=tspan,
-        tpoints=range(tspan[1], stop=tspan[2], length=101),
+        tpoints=range(tspan[1], stop=tspan[2], length=1001),
         save_simulations=true,
         benchmark=false
     )

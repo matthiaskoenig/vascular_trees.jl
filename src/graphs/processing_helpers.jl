@@ -31,8 +31,6 @@ module Processing_helpers
         leftjoin!(graph_structure, edges_attrib, on = :target_id)
         adding_graph_characteristics!(graph_structure)
 
-        @show graph_structure
-
         return graph_structure
     end
 
@@ -59,17 +57,17 @@ module Processing_helpers
             @transform! begin
                 :target_id = Int32.(:target_id)
                 :leaf = Int32.(:leaf)
-                :flows = (:flow ./ 1e6 .* 60) # Change units of the flow [mm3/s --> L/min]
-                :volumes = π .* :radius.^2 .* :length ./ 1e6 # [mm3 --> L]
+                :flows = (:flow / 1000000 * 60) # Change units of the flow [mm3/s --> L/min]
+                :volumes = π .* :radius.^2 .* :length / 1000000 # [mm3 --> L]
             end 
         end
-
-        transform!(edges_attrib, [:target_id] => ByRow(target_id -> ["Q_$(target_id)", "V_$(target_id)"]) => [:flow_ids, :volume_ids])
 
         return edges_attrib
     end
 
     function adding_graph_characteristics!(graph_structure::DataFrame)
+        transform!(graph_structure, [:source_id, :target_id] => ByRow((source_id, target_id) -> ["C_$(source_id)_$(target_id)", "Q_$(source_id)_$(target_id)", "V_$(source_id)_$(target_id)"]) => [:element_ids, :flow_ids, :volume_ids])
+
         graph_structure[!, :preterminal] = .!in.(graph_structure.target_id, [Set(graph_structure.source_id)])
         graph_structure[!, :start] = .!in.(graph_structure.source_id, [Set(graph_structure.target_id)])
         graph_structure[!, :terminal] = [false for _ ∈ 1:nrow(graph_structure)]
@@ -80,7 +78,14 @@ module Processing_helpers
         volume_terminal::Float64 = volume_geometry / n_terminals
         terminal_node_ids = preterminal_edges[:, :target_id]
         for terminal_node_id ∈ terminal_node_ids
-            push!(graph_structure, [terminal_node_id, terminal_node_id, 0, 0.0, 0.0, 0.0, 0.0, 0.0, volume_terminal,"QT_$(terminal_node_id)", "VT_$(terminal_node_id)", false, false, true])
+            push!(graph_structure, [terminal_node_id, terminal_node_id, 0, 0.0, 0.0, 0.0, 0.0, 0.0, volume_terminal,"CT_$(terminal_node_id)", "QT_$(terminal_node_id)", "VT_$(terminal_node_id)", false, false, true])
+        end
+
+        # adding marginal edge (for input)
+        start_edges::SubDataFrame = subset(graph_structure, :start => x -> x .== true, view=true)
+        start_nodes_ids = start_edges[:, :source_id]
+        for start_node_id ∈ start_nodes_ids
+            push!(graph_structure, [0, start_node_id, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,"Marginal", "", "", false, false, false])
         end
 
     end
