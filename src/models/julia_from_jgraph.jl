@@ -7,7 +7,7 @@ module Julia_from_jgraph
     include("./julia_models.jl")
     import .Julia_models: jf_dxdt!, str_jf_dxdt
 
-    using JLD2, OrdinaryDiffEq
+    using JLD2, OrdinaryDiffEq, Plots, DiffEqCallbacks
 
     # ============ Specify options
     g_options::graph_options = graph_options(
@@ -19,46 +19,55 @@ module Julia_from_jgraph
             ],
     )
 
-    function __init__()
-        for tree_id ∈ g_options.tree_ids, n_node ∈ g_options.n_nodes
-            x0, p = get_ODE_components(tree_id=tree_id, n_node=n_node)
-            x0_str::Vector{String} = p[7]
-            dx_str, dx_vstr = str_jf_dxdt(["" for element_id in x0_str], ["" for element_id in x0_str], x0_str, p, 0.0)
-            dx_str = ["d($(element_id))/dt = $(dx_str[ke])" for (ke, element_id) in enumerate(x0_str)]
-            dx = jf_dxdt!([0.0 for _ in eachindex(x0)], x0, p, 0.0)
+    # function __init__()
+    #     for tree_id ∈ g_options.tree_ids, n_node ∈ g_options.n_nodes
+    #         printstyled("------------------------------------------------------------------------------------\n"; color = 124)
+    #         printstyled("   Generating equations for arterial inflow from $tree_id, № of nodes = $(n_node)   \n"; color = 9)
+    #         printstyled("------------------------------------------------------------------------------------\n"; color = 124)
+    #         x0, p = get_ODE_components(tree_id=tree_id, n_node=n_node)
+    #         # x0_str::Vector{String} = p[7]
+    #         # dx_str, dx_vstr = str_jf_dxdt(["" for element_id in x0_str], ["" for element_id in x0_str], x0_str, p, 0.0)
+    #         # dx_str = ["d($(element_id))/dt = $(dx_str[ke])" for (ke, element_id) in enumerate(x0_str)]
+    #         # println("")
+    #         # printstyled("$(x0_str[length(x0_str)])\n"; color = 51)
+    #         # println("Initial value: $(x0[length(x0_str)])")
+    #         # printstyled("Equation: $(dx_str[length(x0_str)])"; color = :magenta)
+    #         # println("")
+    #         # printstyled("Equation: $(dx_vstr[length(x0_str)])\n"; color = :blue)
 
-            printstyled("------------------------------------------------------------------------------------\n"; color = 124)
-            printstyled("   Generating equations for arterial inflow from $tree_id, № of nodes = $(n_node)   \n"; color = 9)
-            printstyled("------------------------------------------------------------------------------------\n"; color = 124)
+    #         # for i in eachindex(dx_str)
+    #         #     if i != length(x0_str)
+    #         #         println("")
+    #         #         printstyled("$(x0_str[i])\n"; color = 51)
+    #         #         println("Initial value: $(x0[i])")
+    #         #         printstyled("Equation: $(dx_str[i])\n"; color = :magenta)
+    #         #         #printstyled("Equation: $(dx_vstr[i])\n"; color = :blue)
+    #         #     end
+    #         # end
 
-            println("")
-            printstyled("$(x0_str[length(x0_str)])\n"; color = 51)
-            println("Initial value: $(x0[length(x0_str)])")
-            printstyled("Equation: $(dx_str[length(x0_str)])"; color = :magenta)
-            println("")
-            printstyled("Equation: $(dx_vstr[length(x0_str)]) = $(dx[length(x0_str)])\n"; color = :blue)
+    #         prob = ODEProblem(jf_dxdt!, 
+    #             x0,
+    #             (0.0, 1.0),
+    #             p)
 
-            for i in eachindex(dx)
-                if i != length(x0_str)
-                    println("")
-                    printstyled("$(x0_str[i])\n"; color = 51)
-                    println("Initial value: $(x0[i])")
-                    printstyled("Equation: $(dx_str[i]) = $(dx[i])\n"; color = :magenta)
-                    printstyled("Equation: $(dx_vstr[i]) = $(dx[i])\n"; color = :blue)
-                end
-            end
+    #         # Events
+    #         function affect!(integrator)
+    #             integrator.u[length(integrator.u)] = 10.0;
+    #         end
+    #         cb_variant2 = PresetTimeCallback(0.5, affect!);
 
-        prob = ODEProblem(jf_dxdt!, 
-            x0,
-            (0.0, 10.0),
-            p)
+    #         sol = solve(
+    #             prob, 
+    #             Tsit5(),
+    #             callback=cb_variant2
+    #             # abstol=1e-10,
+    #             # reltol=1e-10 # Rosenbrock23(), # Tsit5(), # CVODE_BDF
+    #             )
 
-        sol = solve(
-            prob, 
-            Tsit5() # Rosenbrock23(), # Tsit5(), # CVODE_BDF
-            )
-        end
-    end
+    #         display(plot(sol))
+
+    #     end
+    # end
 
     function get_ODE_components(; tree_id::String, n_node::Int32)::Tuple{Vector{Float64}, Tuple}
         graph = load_graph(tree_id, n_node)
@@ -74,7 +83,7 @@ module Julia_from_jgraph
             graph.volume_ids
         )
         x0::Vector{Float64} = zeros(length(p[1]))
-        set_initial_values!(x0, 1.0)
+        # set_initial_values!(x0, 10.0)
         return x0, p
     end
 

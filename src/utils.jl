@@ -47,7 +47,7 @@ module Utils
 
         @with_kw struct benchmark_options
             save_running_times::Bool = false
-            n_iterations::Int16 = 5
+            n_iterations::Int16 = 2
         end
 
         # https://docs.sciml.ai/DiffEqDocs/stable/solvers/split_ode_solve/
@@ -56,7 +56,7 @@ module Utils
             absolute_tolerance::Float64 = 1e-6
             relative_tolerance::Float64 = 1e-6
             dt::Float64 = 0.1
-            solver_name:: String = "Rodas4" # "Tsit5"
+            solver_name:: String = "Tsit5" # "Tsit5"
         end
 
         @with_kw struct model_types
@@ -124,7 +124,7 @@ module Utils
                     push!(n_sp, n_species[n_call])
                 end
             end
-            model_types = [model_type for _ ∈ 1:length(graph_ids)]
+            model_types = ["One_tree" for _ ∈ 1:length(graph_ids)]
             solver_names = [solver_name for _ ∈ 1:length(graph_ids)]
             table = (graph_ids=graph_ids, 
                     labels=labels, 

@@ -17,8 +17,8 @@ module Process_julia_graph
     g_options::graph_options = graph_options(
         n_nodes=[10],  #750, 1000, 1250, 1500
         tree_ids=[
-            "Rectangle_single_inflow",
-            # "Rectangle_quad",
+            # "Rectangle_single_inflow",
+            "Rectangle_quad",
             # "Rectangle_trio",
             ],
     )
