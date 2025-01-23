@@ -2,7 +2,6 @@ module Processing_helpers
     """
     Helper functions used in workflow of julia graph processing.
 
-
     Note on read_edges_attributes function:
     Why id in this df is a target id? In Julia graph all attributes belongs to nodes.
         That is why while writing file edges_df in julia iteration goes through nnodes, but not nedges.

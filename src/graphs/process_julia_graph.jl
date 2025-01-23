@@ -10,6 +10,15 @@ module Process_julia_graph
     using DataFrames, JLD2, InteractiveUtils
 
     """
+    Module for processing julia graph files from SyntheticVascularTrees.jl.
+        Only works with "Rectangle_quad" and "Rectangle_trio". Otherwise "tree_definitions" must be modified in Utils.jl.
+
+    Input: .lg and .csv files for every individual vessel tree (arterial, portal, etc.)
+
+    Output: .JLD2 with graph_frame for every individual vessel tree (arterial, portal, etc.)
+
+    Idea of this module: to get, to store, and to save all the information that we need for correct ODEs from the graph. 
+
     TODO: Get rid of zeros in DataFrame
     """
 
@@ -31,18 +40,23 @@ module Process_julia_graph
         end
     end
 
-    # Main function: workflow
+    # Main function: workflow for whole tree
     function process_julia_graph(tree_id::String, n_node::Int32)
         # get graph id for correct path definition
         graph_id::String = "$(tree_id)_$(n_node)"
         # get directory with graph's files
         GRAPH_DIR::String = normpath(joinpath(@__FILE__, "../../.." , JULIA_RESULTS_DIR, tree_id, graph_id, "julia"))
         for vessel_tree ∈ trees.vascular_trees[tree_id]
-            GRAPH_PATH, EDGES_PATH, NODES_PATH = paths_initialization(GRAPH_DIR, vessel_tree)
-            graph_structure, nodes_attrib = read_graph(GRAPH_PATH, EDGES_PATH, NODES_PATH)
-            graph = create_graph_structure(graph_structure, nodes_attrib, vessel_tree)
-            save_graph!(graph, tree_id, graph_id, vessel_tree)
+            process_individual_tree(GRAPH_DIR, vessel_tree)
         end
+    end
+
+    # Workflow for individual vessel trees
+    function process_individual_tree(GRAPH_DIR::String, vessel_tree::String)
+        GRAPH_PATH, EDGES_PATH, NODES_PATH = paths_initialization(GRAPH_DIR, vessel_tree)
+        graph_structure, nodes_attrib = read_graph(GRAPH_PATH, EDGES_PATH, NODES_PATH)
+        graph = create_graph_structure(graph_structure, nodes_attrib, vessel_tree)
+        save_graph!(graph, tree_id, graph_id, vessel_tree)
     end
 
     function paths_initialization(GRAPH_DIR::String, vessel_tree::String)::Tuple{String, String, String}
