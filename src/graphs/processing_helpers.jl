@@ -22,11 +22,11 @@ module Processing_helpers
     # calculation of terminal volume
     volume_geometry::Float64 = (0.100 * 0.100 * 0.10) / 1000  # [cm^3] -> [l]
 
-    function read_edges(GRAPH_DIR::String)::DataFrame
+    function read_edges(GRAPH_PATH::String, EDGES_PATH::String)::DataFrame
         # read and prepare lg file with information about edges
-        graph_structure::DataFrame = read_graph_skeleton(GRAPH_DIR)
+        graph_structure::DataFrame = read_graph_skeleton(GRAPH_PATH)
         # read and prepare csv file with edges attributes
-        edges_attrib::DataFrame = read_edges_attributes(GRAPH_DIR)
+        edges_attrib::DataFrame = read_edges_attributes(EDGES_PATH)
         # join dfs with graph structure and edges attributes
         leftjoin!(graph_structure, edges_attrib, on = :target_id)
         adding_graph_characteristics!(graph_structure)
@@ -34,8 +34,8 @@ module Processing_helpers
         return graph_structure
     end
 
-    function read_graph_skeleton(GRAPH_DIR::String)::DataFrame
-        graph_skeleton::DataFrame = DataFrame(CSV.File(joinpath(GRAPH_DIR, "A.lg")))
+    function read_graph_skeleton(GRAPH_PATH::String)::DataFrame
+        graph_skeleton::DataFrame = DataFrame(CSV.File(GRAPH_PATH))
         select!(graph_skeleton, Not(names(graph_skeleton, Missing)))
         rename!(graph_skeleton, [:source_id, :target_id])
         transform!(graph_skeleton, names(graph_skeleton, Int64) .=> ByRow(Int32), renamecols=false)
@@ -43,8 +43,8 @@ module Processing_helpers
         return graph_skeleton
     end
 
-    function read_edges_attributes(GRAPH_DIR::String)::DataFrame
-        edges_attrib::DataFrame = DataFrame(CSV.File(joinpath(GRAPH_DIR, "A_edges.csv")))
+    function read_edges_attributes(EDGES_PATH::String)::DataFrame
+        edges_attrib::DataFrame = DataFrame(CSV.File(EDGES_PATH))
         @chain edges_attrib begin
             @rename! begin
                 :target_id = :edge_idx
@@ -90,8 +90,8 @@ module Processing_helpers
 
     end
 
-    function read_nodes_attributes(GRAPH_DIR::String)::DataFrame
-        nodes_attrib::DataFrame = DataFrame(CSV.File(joinpath(GRAPH_DIR, "A_nodes.csv")))
+    function read_nodes_attributes(NODES_PATH::String)::DataFrame
+        nodes_attrib::DataFrame = DataFrame(CSV.File(NODES_PATH))
         @chain nodes_attrib begin
             @rename! begin
                 :ids = :node_idx
