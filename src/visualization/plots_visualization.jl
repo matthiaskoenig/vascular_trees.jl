@@ -104,8 +104,8 @@ module Plots
             mapping(:n_terminals => "Number of terminal nodes, [n]", 
             :time_min_mean => "Time, [min]", 
             :time_min_std, 
-            color=:model_types,
-            layout=:tree_id => "Tree id") * 
+            color=:tree_id,
+            layout=:call_orders => "Tree id") * 
             (visual(Scatter) + visual(Errorbars) + smooth())
         ) 
         subfig1=draw!(f1[1,1], plot1)
@@ -115,8 +115,8 @@ module Plots
             :n_terminals => "Number of terminal nodes, [n]", 
             :allocated_gbytes_mean => "Allocated memory, [GB]", 
             :allocated_gbytes_std, 
-            color=:model_types,
-            layout=:tree_id => "Tree id") * 
+            color=:tree_id,
+            layout=:call_orders => "Tree id") * 
             (visual(Scatter) + visual(Errorbars) + smooth())
         draw!(f1[2,1], plot2)
 

@@ -7,6 +7,7 @@ module Simulation_helpers
     using CSV
     using TimerOutputs
     using ModelingToolkit
+    using Plots
 
     include("../utils.jl")
     import .Utils: JULIA_RESULTS_DIR
@@ -77,10 +78,10 @@ module Simulation_helpers
             elseif model_type ∈ m_types.julia_model
                 MODEL_PATH = normpath(joinpath(@__FILE__, "../../models/julia_models.jl"))
                 include(MODEL_PATH)
-                # if endswith(model_type, "_python")
-                #     f_dxdt = Julia_models.pyf_dxdt!
-                #     get_ODE_components = Julia_from_pygraph.get_ODE_components
-                if endswith(model_type, "_julia")
+                if endswith(model_type, "_python")
+                    f_dxdt = Julia_models.pyf_dxdt!
+                    get_ODE_components = Julia_from_pygraph.get_ODE_components
+                elseif endswith(model_type, "_julia")
                     f_dxdt = Julia_models.jf_dxdt!
                     get_ODE_components = Julia_from_jgraph.get_ODE_components
                 end
@@ -92,9 +93,11 @@ module Simulation_helpers
                     for vessel_tree ∈ trees.vascular_trees[tree_id]
                         x0, p = get_ODE_components(tree_id, n_node, vessel_tree)
                         simulations = ODE_solver(ode_system=f_dxdt, x0=x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=p, sol_options=sol_options, model_type=model_type)
+                        display(plot(simulations))
                         if sim_options.save_simulations
                             file_name = "$(graph_id)_$(vessel_tree)_$(model_type)"
                             save_simulations_to_csv(simulations=simulations, column_names=["$(edge)" for edge in p[3]], simulations_path=joinpath(JULIA_RESULTS_DIR, tree_id, graph_id, "simulations", "$(file_name).csv"))
+                            #save_simulations_to_csv(simulations=simulations, column_names=["$(elements[1])_$(elements[2])" for elements in eachrow(@view p[:, 1:2])], simulations_path=joinpath(JULIA_RESULTS_DIR, tree_id, graph_id, "simulations", "$(file_name).csv"))
                         end
                     end
                 end
@@ -124,7 +127,7 @@ module Simulation_helpers
                         else
                             f_dxdt = Transport_model.f_dxdt
                         end
-                        (!contains(model_type, "MT")) && (@invokelatest f_dxdt(zeros(length(Transport_model.x0)), Transport_model.x0, Transport_model.p, 0.0))
+                        @timeit to "$(graph_id)_precompilation" (!contains(model_type, "MT")) && (@invokelatest f_dxdt(zeros(length(Transport_model.x0)), Transport_model.x0, Transport_model.p, 0.0))
                         for ki in range(1, bench_options.n_iterations, step=1)
                             @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=f_dxdt, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options, model_type=model_type)
                         end
@@ -152,6 +155,7 @@ module Simulation_helpers
                     printstyled("------------------------------------------------------------------------------------\n"; color = 124)
                     for vessel_tree ∈ trees.vascular_trees[tree_id]
                         x0, p = get_ODE_components(tree_id, n_node, vessel_tree)
+                        printstyled("   ODEs solving started   \n"; color = 9)
                         @timeit to "$(graph_id)_$(vessel_tree)" begin
                             for ki in range(1, bench_options.n_iterations, step=1)
                                 @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=f_dxdt, x0=x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=p, sol_options=sol_options, model_type=model_type)
@@ -159,7 +163,7 @@ module Simulation_helpers
                         end
                         (bench_options.save_running_times) && (n_species::Int64 = length(x0))
                         show(to, sortby=:firstexec)
-                        (bench_options.save_running_times) && (save_times_as_csv(times=to, n_node=n_node, tree_id="$(tree_id)_$(vessel_tree)", n_species=n_species, model_type=model_type, solver_name=sol_options.solver_name, n_term=Int32(length(p[2]))))
+                        (bench_options.save_running_times) && (save_times_as_csv(times=to, n_node=n_node, tree_id="$(tree_id)_$(vessel_tree)", n_species=n_species, model_type=model_type, solver_name=sol_options.solver_name, n_term=Int32(length(p[4]))))
                         reset_timer!(to::TimerOutput)
                     end
                 end

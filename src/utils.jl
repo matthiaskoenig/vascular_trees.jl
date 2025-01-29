@@ -14,7 +14,7 @@ module Utils
         @with_kw struct tree_definitions
             vascular_trees::Dict{String, Vector{String}} = Dict(
                 "Rectangle_trio" => ["A", "P", "V"],
-                "Rectangle_quad" => ["A", "P", "V", "B"]
+                "Rectangle_quad" => ["P", "A", "V", "B"]
             )
             inflow_trees::Tuple{String, String} = ("A", "P")
             outflow_trees::Tuple{String, String} = ("V", "B")
@@ -27,13 +27,14 @@ module Utils
             nodes_coordinates::Vector{Tuple{Float64, Float64, Float64}} # position of each node (x, y, z)
             edges::Vector{Tuple{Int32, Int32}} # all edges
             terminal_edges::Vector{Tuple{Int32, Int32}} # edges between terminal nodes (the lowest nodes in network) and themselves
-            start_edge::Vector{Tuple{Int32, Int32}} # MUST be changed to just Tuple # the highest node in network
+            start_edge::Vector{Tuple{Int32, Int32}} # MUST be changed to just Tuple # the highest edge in network not artificially added
             preterminal_edges::Vector{Tuple{Int32, Int32}} # edges between the terminal nodes and nodes on the level higher
             flows::Vector{Float64} # flow values
             volumes::Vector{Float64} # volume values
             element_ids::Vector{String}
             flow_ids::Vector{String}
             volume_ids::Vector{String}
+            group::Vector{Int16}
         end
 
     end
@@ -98,46 +99,54 @@ module Utils
 
         function save_times_as_csv(; times::TimerOutput, n_node::Int32, tree_id::String, n_species::Int64, model_type::String, solver_name::String, n_term::Int32)
 
-            individual_times = TimerOutputs.todict(times)["inner_timers"]
-            tree_ids::Vector{String} = []
-            n_nodes::Vector{Int32} = []
+            total_times = TimerOutputs.todict(times)["inner_timers"]
             n_calls::Vector{Int16} = []
             call_orders::Vector{String} = []
             times_ns::Vector{Float64} = [] 
             allocated_bytes:: Vector{Float64} = []
-            for graph_id ∈ keys(individual_times)
-                without_compilation = get(get(individual_times, graph_id, NaN), "inner_timers", NaN)
-                len = length(keys(without_compilation))
+            for graph_id ∈ keys(total_times)
+                indiv_times = get(get(total_times, graph_id, NaN), "inner_timers", NaN)
+                len = length(keys(indiv_times))
 
-                n_call = get(get(individual_times, graph_id, NaN), "n_calls", NaN)
-                time_ns = get(get(individual_times, graph_id, NaN), "time_ns", NaN) 
-                allocated_mem = get(get(individual_times, graph_id, NaN), "allocated_bytes", NaN)
+                n_call = get(get(total_times, graph_id, NaN), "n_calls", NaN)
+                time_ns = get(get(total_times, graph_id, NaN), "time_ns", NaN) 
+                allocated_mem = get(get(total_times, graph_id, NaN), "allocated_bytes", NaN)
                 push!(n_calls, n_call)
-                push!(call_orders, "Time with f_dxdt precompilation, first call")
+                push!(call_orders, "Total time (all iterations)")
                 push!(times_ns, time_ns)
                 push!(allocated_bytes, allocated_mem)
-                push!(tree_ids, tree_id)
-                push!(n_nodes, n_node)
-                for (ksb, subgraph_id) ∈ enumerate(keys(without_compilation))
-                    n_call_minor = get(get(without_compilation, subgraph_id, NaN), "n_calls", NaN)
-                    time_ns = get(get(without_compilation, subgraph_id, NaN), "time_ns", NaN)
-                    allocated_mem = get(get(without_compilation, subgraph_id, NaN), "allocated_bytes", NaN)
+                time_with_precomp = 0
+                mem_with_precomp = 0
+                for (ksb, subgraph_id) ∈ enumerate(keys(indiv_times))
+                    n_call_minor = get(get(indiv_times, subgraph_id, NaN), "n_calls", NaN)
+                    time_ns = get(get(indiv_times, subgraph_id, NaN), "time_ns", NaN)
+                    allocated_mem = get(get(indiv_times, subgraph_id, NaN), "allocated_bytes", NaN)
                     push!(n_calls, n_call_minor)
-                    if ksb == 1
-                        push!(call_orders, "Time without f_dxdt precompilation, first call")
+                    if endswith(subgraph_id, "_precompilation")
+                        push!(call_orders, "Precompilation")
+                        time_with_precomp += time_ns
+                        mem_with_precomp += allocated_mem
+                    elseif endswith(subgraph_id, "_1")
+                        push!(call_orders, "First call")
+                        time_with_precomp += time_ns
+                        mem_with_precomp += allocated_mem
                     else
-                        push!(call_orders, "Time without f_dxdt precompilation, call number > 1 (n=$(len-1))")
+                        push!(call_orders, "Call number > 1 (n=$(len-1))")
                     end
                     push!(times_ns, time_ns)
                     push!(allocated_bytes, allocated_mem)
-                    push!(tree_ids, tree_id)
-                    push!(n_nodes, n_node)
                 end
+                push!(n_calls, 1)
+                push!(call_orders, "First call + precompilation")
+                push!(times_ns, time_with_precomp)
+                push!(allocated_bytes, mem_with_precomp)
             end
-            n_sp::Vector{Int64} = [n_species for _ ∈ 1:length(tree_ids)]
-            model_types = [ "One_tree" for _ ∈ 1:length(tree_ids)] #
-            solver_names = [solver_name for _ ∈ 1:length(tree_ids)]
-            n_terminals::Vector{Int32} = [n_term for _ ∈ 1:length(tree_ids)]
+            tree_ids::Vector{String} = ["$(tree_id)_not!" for _ ∈ eachindex(allocated_bytes)]
+            n_nodes::Vector{Int32} = [n_node for _ ∈ eachindex(allocated_bytes)]
+            n_sp::Vector{Int64} = [n_species for _ ∈ eachindex(allocated_bytes)]
+            model_types = [model_type for _ ∈ eachindex(allocated_bytes)] #
+            solver_names = [solver_name for _ ∈ eachindex(allocated_bytes)]
+            n_terminals::Vector{Int32} = [n_term for _ ∈ eachindex(allocated_bytes)]
             table = (n_calls=n_calls, 
                     call_orders=call_orders, 
                     times_min=times_ns/60*10^-9, 
@@ -158,4 +167,5 @@ module Utils
         end
 
     end
+
 end

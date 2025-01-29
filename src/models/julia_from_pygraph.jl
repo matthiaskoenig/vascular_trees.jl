@@ -33,19 +33,18 @@ module Julia_from_pygraph
     export get_ODE_components
 
     # function __init__()
-    #     x0, p = get_ODE_components(tree_id="Rectangle_quad", n_node=Int32(100))
+    #     x0, p = get_ODE_components("Rectangle_quad", Int32(10))
     #     dx::Vector{Float64} = zeros(size(p, 1))
-    #     @code_warntype f_dxdt!(dx, x0, p, 0.0)
     # end
 
-    function get_ODE_components(; tree_id::String, n_node::Int32)::Tuple{Vector{Float64}, Matrix{Float64}}
+    function get_ODE_components(tree_id::String, n_node::Int32)::Tuple{Vector{Float64}, Matrix{Float64}}
         """
         Summarized workflow.
         """
         edges_df, graph = read_graph(tree_id=tree_id, n_node=n_node)
         p = collect_graph_characteristics(edges_df=edges_df, graph=graph)
         x0::Vector{Float64} = zeros(size(p, 1))
-        set_initial_values!(x0, p, 10.0)
+        set_initial_values!(x0, p, 1.0)
         return x0, p
     end
 
@@ -99,9 +98,11 @@ module Julia_from_pygraph
     end
 
     function modify_adjacency_matrix!(A::Matrix{Float64}, graph::MetaDiGraph{Int64, Float64})
-        @inbounds for (index, value) in pairs(IndexCartesian(), A)
+        @inbounds for (index, _) in pairs(IndexCartesian(), A)
             source_id, target_id = Tuple.(index)
-            ((target_id == source_id) && (startswith(props(graph, target_id)[:name], "T_"))) && (value = 1.0)
+            if (target_id == source_id) && (startswith(props(graph, target_id)[:name], "T_"))
+                A[index] = 1.0
+            end
         end
     end
 
@@ -129,7 +130,7 @@ module Julia_from_pygraph
                 volume_values[ke] = volume_terminal
                 is_inflow[ke] = 0.0
                 # mark elements connected to terminal nodes
-                source_for_terminal[findfirst(x -> x==source_id, target)] = 1.0
+                source_for_terminal[findfirst(x -> x==source_id, targets)] = 1.0
                 target_for_terminal[findfirst(x -> x==target_id, sources)] = 1.0
             else 
                 # other edges

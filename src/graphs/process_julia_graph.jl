@@ -24,7 +24,7 @@ module Process_julia_graph
 
     # ============ Specify options
     g_options::graph_options = graph_options(
-        n_nodes=[10, 30, 50, 100, 250, 500, 750, 1000, 1250, 1500, 1750],  #750, 1000, 1250, 1500
+        n_nodes=[300000, 400000, 500000, 1000000],  #750, 1000, 1250, 1500
         tree_ids=[
             "Rectangle_quad",
             "Rectangle_trio",
@@ -44,15 +44,19 @@ module Process_julia_graph
     function process_julia_graph(tree_id::String, n_node::Int32)
         # get graph id for correct path definition
         graph_id::String = "$(tree_id)_$(n_node)"
+        println()
+        printstyled("------------------------------------------------------------------------------------\n"; color = 124)
+        printstyled("   Processing $(graph_id)_$(tree_id)   \n"; color = 9)
+        printstyled("------------------------------------------------------------------------------------\n"; color = 124)
         # get directory with graph's files
         GRAPH_DIR::String = normpath(joinpath(@__FILE__, "../../.." , JULIA_RESULTS_DIR, tree_id, graph_id, "julia"))
         for vessel_tree ∈ trees.vascular_trees[tree_id]
-            process_individual_tree(GRAPH_DIR, vessel_tree)
+            process_individual_tree(GRAPH_DIR, vessel_tree, tree_id, graph_id)
         end
     end
 
     # Workflow for individual vessel trees
-    function process_individual_tree(GRAPH_DIR::String, vessel_tree::String)
+    function process_individual_tree(GRAPH_DIR::String, vessel_tree::String, tree_id::String, graph_id::String)
         GRAPH_PATH, EDGES_PATH, NODES_PATH = paths_initialization(GRAPH_DIR, vessel_tree)
         graph_structure, nodes_attrib = read_graph(GRAPH_PATH, EDGES_PATH, NODES_PATH)
         graph = create_graph_structure(graph_structure, nodes_attrib, vessel_tree)
@@ -90,6 +94,9 @@ module Process_julia_graph
         terminals::Vector{Tuple{Int32, Int32}} = Tuple.(Tables.namedtupleiterator(terminal_edges[:, [:source_id, :target_id]]))
         start::Vector{Tuple{Int32, Int32}} = Tuple.(Tables.namedtupleiterator(start_edge[:, [:source_id, :target_id]]))
         preterminals::Vector{Tuple{Int32, Int32}} = Tuple.(Tables.namedtupleiterator(preterminal_edges[:, [:source_id, :target_id]]))
+        groups = Vector{Int16}(undef, length(edges))
+
+        is_inflow ? get_inflow_edges_groups!(groups, edges, terminals, preterminals) : get_outflow_edges_groups!(groups, edges, terminals, preterminals)
 
         # collect all needed information and store it in one structure
         graph::graph_frame = graph_frame(
@@ -105,9 +112,55 @@ module Process_julia_graph
             graph_structure.volumes, # volumes::Vector{Float64}
             graph_structure.element_ids,
             graph_structure.flow_ids,
-            graph_structure.volume_ids
+            graph_structure.volume_ids,
+            groups 
         )
         return graph
+    end
+
+    function get_inflow_edges_groups!(groups::Vector{Int16}, edges::Vector{Tuple{Int32, Int32}}, terminals::Vector{Tuple{Int32, Int32}}, preterminals::Vector{Tuple{Int32, Int32}})
+        @inbounds for (ke, element) in enumerate(edges)
+            # retrieve information for element
+            source_id, target_id = element
+            is_preterminal = in(element, preterminals)
+            is_terminal = in(element, terminals)
+            # in -> inflow & inflow element not connected to terminal
+            if (!is_preterminal .&& !is_terminal .&& source_id != 0)
+                groups[ke] = Int16(1)
+            # inflow element connected to terminal
+            elseif (is_preterminal)
+                groups[ke] = Int16(2)
+            # terminal element
+            elseif (is_terminal)
+                groups[ke] = Int16(3)
+            # marginal (input) element
+            elseif source_id == 0
+                groups[ke] = Int16(0)
+            end
+        end
+    end
+
+    function get_outflow_edges_groups!(groups::Vector{Int16}, edges::Vector{Tuple{Int32, Int32}}, terminals::Vector{Tuple{Int32, Int32}}, preterminals::Vector{Tuple{Int32, Int32}})
+        @inbounds for (ke, element) in enumerate(edges)
+            # retrieve information for element
+            source_id, target_id = element
+            is_preterminal = in(element, preterminals)
+            is_terminal = in(element, terminals)
+
+            # outflow -> out & outflow element not connected to terminal
+            if (!is_preterminal .&& !is_terminal .&& target_id != 0)
+                groups[ke] = Int16(1)
+            # outflow element connected to terminal
+            elseif (is_preterminal) 
+                groups[ke] = Int16(2)
+            # terminal element
+            elseif (is_terminal)
+                groups[ke] = Int16(3)
+            # marginal (outflow) element
+            elseif target_id == 0
+                groups[ke] = 0
+            end
+        end
     end
 
     function save_graph!(graph::graph_frame, tree_id::String, graph_id::String, vessel_tree::String)

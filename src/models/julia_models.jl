@@ -29,6 +29,7 @@ module Julia_models
             pre_elements = findall(x -> x==source_id, @view elements[:, 2]) 
             # species after the element
             post_elements = findall(x -> x==target_id, @view elements[:, 1]) 
+            dx[ke] = 0
         
             # write equations
             # marginal inflow element & in -> inflow & inflow element not connected to terminal
@@ -38,7 +39,6 @@ module Julia_models
                 # dA/dt = QA * A_pre / VA - Q_post * A / VA;
                 # or
                 # dA/dt = QA * A_marginal / VA - Q_post * A / VA; (QA and VA here are equal to QAmarginal and VAmarginal - done in processing julia graph)
-                
                 # species before
                 if length(pre_elements) != 0
                     for pre_element ∈ pre_elements
@@ -55,7 +55,6 @@ module Julia_models
             # inflow element connected to terminal
             elseif (element_source_for_terminal == 1.0 .&& element_is_inflow == 1.0 .&& length(pre_elements) != 0) 
                 # dA/dt = QA * A_pre / VA - QA * A / VA;
-                
                 # species before
                 for pre_element ∈ pre_elements
                     dx[ke] = flows[ke] * x[pre_element] / element_volume
@@ -71,7 +70,7 @@ module Julia_models
     
                 # species before
                 for pre_element ∈ pre_elements
-                    if elements[pre_element][1] != elements[pre_element][2]
+                    if elements[pre_element, 1] != elements[pre_element, 2]
                         dx[ke] = flows[pre_element] * x[pre_element] / element_volume
                     end
                 end
@@ -81,7 +80,7 @@ module Julia_models
                 end
     
             # outflow element connected to terminal
-            elseif (element_target_for_terminal == 0.0 .&& element_is_inflow == 0.0 .&& source_id != target_id)
+            elseif (element_target_for_terminal == 1.0 .&& element_is_inflow == 0.0 .&& source_id != target_id)
                 # dV/dt = QV * T / VT - QV * V / VV;
     
                 # species before
@@ -113,22 +112,23 @@ module Julia_models
         #@show dx
     end
 
-    function jf_dxdt!(dx::Vector{Float64}, 
+    function jf_dxdt!(dx::Vector{Float64},
                         x::Vector{Float64}, 
-                        p::Tuple{Bool, Vector{Tuple{Int32, Int32}}, Vector{Tuple{Int32, Int32}}, Vector{Tuple{Int32, Int32}}, Vector{Float64}, Vector{Float64}}, 
+                        p::Tuple{String, Bool, Vector{Tuple{Int32, Int32}}, Vector{Tuple{Int32, Int32}}, Vector{Float64}, Vector{Float64}, Vector{Int16}}, 
                         t::Union{Tuple{Float64, Float64}, Float64})
 
-        is_inflow = p[1]
-        edges = p[2]
-        terminals = p[3]
-        preterminals = p[4]
+        is_inflow = p[2]
+        edges = p[3]
+        terminals = p[4]
+        #preterminals = p[5]
         flows = p[5]
         volumes = p[6]
+        groups = p[7]
         
         if is_inflow
-            jf_inflow!(dx, x, edges, terminals, preterminals, flows, volumes, t)
+            jf_inflow!(dx, x, edges, terminals, flows, volumes, groups, t)
         else
-            jf_outflow!(dx, x, edges, terminals, preterminals, flows, volumes, t)
+            jf_outflow!(dx, x, edges, terminals, flows, volumes, groups, t)
         end
         # println()
         # println(size(dx))
@@ -140,9 +140,9 @@ module Julia_models
                         x::Vector{Float64},
                         edges::Vector{Tuple{Int32, Int32}},
                         terminals::Vector{Tuple{Int32, Int32}},
-                        preterminals::Vector{Tuple{Int32, Int32}},
                         flows::Vector{Float64},
                         volumes::Vector{Float64},
+                        groups::Vector{Int16},
                         t::Union{Tuple{Float64, Float64}, Float64})
 
         @inbounds for (ke, element) in enumerate(edges)
@@ -150,8 +150,9 @@ module Julia_models
             source_id, target_id = element
             element_volume = volumes[ke]
             element_flow = flows[ke]
-            is_preterminal = in(element, preterminals)
-            is_terminal = in(element, terminals)
+            # is_preterminal = in(element, preterminals)
+            # is_terminal = in(element, terminals)
+            group = groups[ke]
 
             dx[ke] = 0.0
 
@@ -162,37 +163,37 @@ module Julia_models
 
             # write equations
             # marginal (input) element
-            if source_id == 0
+            if group == 0 # source_id == 0
                 # constant
                 dx[ke] = 0.0
             # in -> inflow & inflow element not connected to terminal
-            elseif (!is_preterminal .&& !is_terminal .&& source_id != 0) 
+            elseif group == 1 #(!is_preterminal .&& !is_terminal .&& source_id != 0) 
                 # dA/dt = QA * A_pre / VA - Q_post * A / VA;
                     
                 # species before
-                for pre_element ∈ pre_elements
-                    dx[ke] += element_flow * x[pre_element]
-                end
+                #for pre_element ∈ pre_elements
+                dx[ke] += sum(element_flow .* x[pre_elements])
+                #end
                 # species after
-                for post_element ∈ post_elements
-                    dx[ke] -= flows[post_element] * x[ke]
-                end
+                # for post_element ∈ post_elements
+                dx[ke] -= sum(flows[post_elements] .* x[ke])
+                # end
 
             # inflow element connected to terminal
-            elseif (is_preterminal) 
+            elseif group == 2 # (is_preterminal) 
                 # dA/dt = QA * A_pre / VA - QA * A / VA;
                 
                 # species before
-                for pre_element ∈ pre_elements
-                    dx[ke] += element_flow * x[pre_element]
-                end
+                #for pre_element ∈ pre_elements
+                dx[ke] += sum(element_flow .* x[pre_elements])
+                #end
                 # species after
-                for _ ∈ post_elements
-                    dx[ke] -= element_flow * x[ke]
-                end
+                #for _ ∈ post_elements
+                dx[ke] -= element_flow .* x[ke] .* length(post_elements)
+                #end
 
             # terminal element
-            elseif (is_terminal)
+            elseif group == 3 # (is_terminal)
                 # THIS IS DIFFERENT THAN IN OTHER MODELS
                 # dT/dt = QA * A / VT - QA * T / VT
     
@@ -206,16 +207,15 @@ module Julia_models
                 dx[ke] = dx[ke] / element_volume
             end
         end
-
     end
 
     function jf_outflow!(dx::Vector{Float64},
                         x::Vector{Float64},
                         edges::Vector{Tuple{Int32, Int32}},
                         terminals::Vector{Tuple{Int32, Int32}},
-                        preterminals::Vector{Tuple{Int32, Int32}},
                         flows::Vector{Float64},
                         volumes::Vector{Float64},
+                        groups::Vector{Int16},
                         t::Union{Tuple{Float64, Float64}, Float64})
 
         @inbounds for (ke, element) in enumerate(edges)
@@ -223,9 +223,10 @@ module Julia_models
             source_id, target_id = element
             element_volume = volumes[ke]
             element_flow = flows[ke]
-            is_preterminal = in(element, preterminals)
-            is_terminal = in(element, terminals)
+            # is_preterminal = in(element, preterminals)
+            # is_terminal = in(element, terminals)
             # is_start = in(element, start)
+            group = groups[ke]
 
             dx[ke] = 0.0
 
@@ -236,40 +237,40 @@ module Julia_models
 
             # write equations
             # marginal (outflow) element
-            if target_id == 0
+            if group == 0 #target_id == 0
                 # species before
-                for pre_element ∈ pre_elements
-                    dx[ke] += flows[pre_element] * x[pre_element]
-                end
+                #for pre_element ∈ pre_elements
+                dx[ke] = sum((flows[pre_elements] .* x[pre_elements] .- flows[pre_elements] .* x[pre_elements]) ./ volumes[pre_elements])
+                #end
             # outflow -> out & outflow element not connected to terminal
-            elseif (!is_preterminal .&& !is_terminal .&& target_id != 0) 
+            elseif group == 1 #(!is_preterminal .&& !is_terminal .&& target_id != 0) 
                 # dV/dt = QV_pre * V_pre / VV - Q * V / VV;
                     
                 # species before
-                for pre_element ∈ pre_elements
-                    dx[ke] += flows[pre_element] * x[pre_element]
-                end
+                #for pre_element ∈ pre_elements
+                dx[ke] += sum(flows[pre_elements] .* x[pre_elements]) #flows[pre_element] * x[pre_element]
+                #end
 
                 # species after
-                for _ ∈ post_elements
-                    dx[ke] -= element_flow * x[ke]
-                end
+                #for _ ∈ post_elements
+                dx[ke] -= element_flow .* x[ke] .* length(post_elements)
+                #end
 
             # outflow element connected to terminal
-            elseif (is_preterminal) 
+            elseif group == 2 #(is_preterminal) 
                 # dV/dt = QV * T / VV - QV * V / VV;
                 
                 # species before
-                for pre_element ∈ pre_elements
-                    dx[ke] += element_flow * x[pre_element]
-                end
+                #for pre_element ∈ pre_elements
+                dx[ke] += sum(element_flow .* x[pre_elements])
+                #end
                 # species after
-                for _ ∈ post_elements
-                    dx[ke] -= element_flow * x[ke]
-                end
+                #for _ ∈ post_elements
+                dx[ke] -= element_flow .* x[ke] .* length(post_elements)
+                #end
 
             # terminal element
-            elseif (is_terminal)
+            elseif group == 3 #(is_terminal)
                 # THIS IS DIFFERENT THAN IN OTHER MODELS
                 # dT/dt = 0
                 # species before and output

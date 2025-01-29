@@ -36,28 +36,28 @@ module Simulation_runner
 
     # ============ Specify options
     g_options::graph_options = graph_options(
-        n_nodes=[10, 30, 50, 100, 250, 500, 750, 1000, 1250, 1500, 1750],  # 10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000, 200000, 300000, 400000, 500000, 1000000
+        n_nodes=[10, 30, 50, 100, 250, 500, 750, 1000, 1250, 1500, 1750],  # 10, 30, 50, 100, 250, 500, 750, 1000, 1250, 1500, 1750, 10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000, 200000, 300000, 400000, 500000, 1000000
         tree_ids=[
             "Rectangle_quad",
-            "Rectangle_trio",
+            # "Rectangle_trio",
             ],
         model_types=[
             # "loop!_python", # not working
             "loop!_julia",
-            "vectorized!_cleaned_typed",
+            # "vectorized!_cleaned_typed",
             # "vectorized_typed",
             # "vectorized", 
             # "vectorized!", 
             # "vectorized_cleaned", 
             # "vectorized!_cleaned",
-            "symbolic_MT",
+            # "symbolic_MT",
             ] 
     )
 
     tspan=(0.0, 10.0/60)
     sim_options::simulations_options = simulations_options(
         tspan=tspan,
-        tpoints=range(tspan[1], stop=tspan[2], length=1001),
+        tpoints=range(tspan[1], stop=tspan[2], length=500),
         save_simulations=false,
         benchmark=true
     )
