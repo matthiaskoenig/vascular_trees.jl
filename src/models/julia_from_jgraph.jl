@@ -3,6 +3,7 @@ module Julia_from_jgraph
     import .Utils: JULIA_RESULTS_DIR
     import .Utils.Definitions: tree_definitions, graph_frame
     import .Utils.Options: graph_options
+    using LinearSolve
 
     include("./julia_models.jl")
     import .Julia_models: jf_dxdt!, str_jf_dxdt
@@ -32,26 +33,6 @@ module Julia_from_jgraph
             printstyled("------------------------------------------------------------------------------------\n"; color = 124)
             vessel_tree = "A"
             x0, p = get_ODE_components(tree_id, n_node, vessel_tree)
-            # x0_str::Vector{String} = p[7]
-            # dx_str, dx_vstr = str_jf_dxdt(["" for element_id in x0_str], ["" for element_id in x0_str], x0_str, p, 0.0)
-            # dx_str = ["d($(element_id))/dt = $(dx_str[ke])" for (ke, element_id) in enumerate(x0_str)]
-            # println("")
-            # printstyled("$(x0_str[length(x0_str)])\n"; color = 51)
-            # println("Initial value: $(x0[length(x0_str)])")
-            # printstyled("Equation: $(dx_str[length(x0_str)])"; color = :magenta)
-            # println("")
-            # printstyled("Equation: $(dx_vstr[length(x0_str)])\n"; color = :blue)
-
-            # for i in eachindex(dx_str)
-            #     if i != length(x0_str)
-            #         println("")
-            #         printstyled("$(x0_str[i])\n"; color = 51)
-            #         println("Initial value: $(x0[i])")
-            #         printstyled("Equation: $(dx_str[i])\n"; color = :magenta)
-            #         #printstyled("Equation: $(dx_vstr[i])\n"; color = :blue)
-            #     end
-            # end
-
             prob = ODEProblem(jf_dxdt!, 
                 x0,
                 (0.0, 10.0/60.0),
