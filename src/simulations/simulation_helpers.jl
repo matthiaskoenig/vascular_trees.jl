@@ -2,12 +2,13 @@ module Simulation_helpers
 
     export create_simulations, create_benchmarked_simulations
 
-    using OrdinaryDiffEq
+    using OrdinaryDiffEq, DiffEqCallbacks
     using DataFrames
     using CSV
     using TimerOutputs
     using ModelingToolkit
     using Plots
+    using Sundials, LinearSolve
 
     include("../utils.jl")
     import .Utils: JULIA_RESULTS_DIR
@@ -24,7 +25,7 @@ module Simulation_helpers
     m_types::model_types = model_types()
     trees::tree_definitions = tree_definitions()
 
-    function ODE_solver(; ode_system, x0, tspan, tpoints, parameter_values, sol_options, model_type)::SciMLBase.ODESolution
+    function ODE_solver(ode_system, x0, tspan, tpoints, parameter_values, sol_options, model_type, cbs)::SciMLBase.ODESolution
 
         prob = ODEProblem(ode_system, 
                         x0,
@@ -38,7 +39,8 @@ module Simulation_helpers
             dense=false,
             reltol=sol_options.relative_tolerance, 
             abstol=sol_options.absolute_tolerance,
-            dt=sol_options.dt,)
+            dt=sol_options.dt,
+            callback=cbs)
 
         return sol
 
@@ -76,6 +78,7 @@ module Simulation_helpers
                 end
 
             elseif model_type ∈ m_types.julia_model
+
                 MODEL_PATH = normpath(joinpath(@__FILE__, "../../models/julia_models.jl"))
                 include(MODEL_PATH)
                 if endswith(model_type, "_python")
@@ -92,7 +95,7 @@ module Simulation_helpers
                     printstyled("------------------------------------------------------------------------------------\n"; color = 124)
                     for vessel_tree ∈ trees.vascular_trees[tree_id]
                         x0, p = get_ODE_components(tree_id, n_node, vessel_tree)
-                        simulations = ODE_solver(ode_system=f_dxdt, x0=x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=p, sol_options=sol_options, model_type=model_type)
+                        simulations = ODE_solver(f_dxdt, x0, sim_options.tspan, sim_options.tpoints, p, sol_options, model_type, cbs)
                         display(plot(simulations))
                         if sim_options.save_simulations
                             file_name = "$(graph_id)_$(vessel_tree)_$(model_type)"
@@ -139,6 +142,20 @@ module Simulation_helpers
                 end
 
             elseif model_type ∈ m_types.julia_model
+                dose = 1.0
+                dose_times = [0.001]
+    
+                # Events
+                function affect1!(integrator)
+                    integrator.p[5][length(integrator.u)] = dose;
+                end
+                function affect2!(integrator)
+                    integrator.p[5][length(integrator.u)] = 0.0;
+                end
+                cb_variant1 = PresetTimeCallback(dose_times, affect1!)
+                cb_variant2 = PresetTimeCallback(10.0 / 60, affect2!)
+                # All Callbacks together
+                cbs = CallbackSet(cb_variant1, cb_variant2)
                 MODEL_PATH = normpath(joinpath(@__FILE__, "../../models/julia_models.jl"))
                 include(MODEL_PATH)
                 # if endswith(model_type, "_python")
@@ -158,7 +175,7 @@ module Simulation_helpers
                         printstyled("   ODEs solving started   \n"; color = 9)
                         @timeit to "$(graph_id)_$(vessel_tree)" begin
                             for ki in range(1, bench_options.n_iterations, step=1)
-                                @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=f_dxdt, x0=x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=p, sol_options=sol_options, model_type=model_type)
+                                @timeit to "$(graph_id)_$ki" ODE_solver(f_dxdt, x0, sim_options.tspan, sim_options.tpoints, p, sol_options, model_type, cbs)
                             end
                         end
                         (bench_options.save_running_times) && (n_species::Int64 = length(x0))

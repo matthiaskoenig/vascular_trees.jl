@@ -14,7 +14,7 @@ module Utils
         @with_kw struct tree_definitions
             vascular_trees::Dict{String, Vector{String}} = Dict(
                 "Rectangle_trio" => ["A", "P", "V"],
-                "Rectangle_quad" => ["P", "A", "V", "B"]
+                "Rectangle_quad" => ["A"] # ["P", "A", "V", "B"]
             )
             inflow_trees::Tuple{String, String} = ("A", "P")
             outflow_trees::Tuple{String, String} = ("V", "B")
@@ -45,6 +45,7 @@ module Utils
 
         using OrdinaryDiffEq
         using Revise # this package must not be in final version
+        using Sundials, LinearSolve
 
         @with_kw struct graph_options
             n_nodes::Vector{Int32}
@@ -66,11 +67,11 @@ module Utils
 
         # https://docs.sciml.ai/DiffEqDocs/stable/solvers/split_ode_solve/
         @with_kw struct solver_options
-            solver = Tsit5()
+            solver = CVODE_BDF() #QNDF(linsolve = KrylovJL_GMRES())
             absolute_tolerance::Float64 = 1e-6
             relative_tolerance::Float64 = 1e-6
             dt::Float64 = 0.1
-            solver_name:: String = "Tsit5" # "Tsit5"
+            solver_name:: String = "CVODE_BDF" # "Tsit5"
         end
 
         @with_kw struct model_types
@@ -141,7 +142,7 @@ module Utils
                 push!(times_ns, time_with_precomp)
                 push!(allocated_bytes, mem_with_precomp)
             end
-            tree_ids::Vector{String} = ["$(tree_id)_not!" for _ ∈ eachindex(allocated_bytes)]
+            tree_ids::Vector{String} = ["$(tree_id)" for _ ∈ eachindex(allocated_bytes)]
             n_nodes::Vector{Int32} = [n_node for _ ∈ eachindex(allocated_bytes)]
             n_sp::Vector{Int64} = [n_species for _ ∈ eachindex(allocated_bytes)]
             model_types = [model_type for _ ∈ eachindex(allocated_bytes)] #

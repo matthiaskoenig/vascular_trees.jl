@@ -49,7 +49,7 @@ module Processing_helpers
                 :target_id = :edge_idx
                 :leaf = :leaf_count
                 :radius = :radius_in_mm
-                :flow = :flow_in_mm3_per_s # units are changed below
+                :flow = :flow_in_mm3_per_s # units are changed below [mm3/s]
                 :length = :length_in_mm 
                 :pressure_drop = :pressure_drop_in_kg_per_mm_s2
             end
@@ -57,7 +57,7 @@ module Processing_helpers
                 :target_id = Int32.(:target_id)
                 :leaf = Int32.(:leaf)
                 :flows = (:flow / 1000000 * 60) # Change units of the flow [mm3/s --> L/min]
-                :volumes = π .* :radius.^2 .* :length / 1000000 # [mm3 --> L]
+                :volumes = π .* :radius.^2 .* :length  / 1000000 # [mm3 --> L]
             end 
         end
 
@@ -70,6 +70,7 @@ module Processing_helpers
         graph_structure[!, :preterminal] = .!in.(graph_structure.target_id, [Set(graph_structure.source_id)])
         graph_structure[!, :start] = .!in.(graph_structure.source_id, [Set(graph_structure.target_id)])
         graph_structure[!, :terminal] = [false for _ ∈ 1:nrow(graph_structure)]
+        @show graph_structure
 
         # adding self edges for terminal nodes
         preterminal_edges::SubDataFrame = subset(graph_structure, :preterminal => x -> x .== true, view=true)

@@ -54,7 +54,7 @@ module Simulation_runner
             ] 
     )
 
-    tspan=(0.0, 10.0/60)
+    tspan=(0.0, 10.0/59)
     sim_options::simulations_options = simulations_options(
         tspan=tspan,
         tpoints=range(tspan[1], stop=tspan[2], length=500),

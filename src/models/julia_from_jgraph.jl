@@ -13,7 +13,7 @@ module Julia_from_jgraph
 
     # ============ Specify options
     g_options::graph_options = graph_options(
-        n_nodes=[10],  #750, 1000, 1250, 1500
+        n_nodes=[250],  #750, 1000, 1250, 1500
         tree_ids=[
             # "Rectangle_single_inflow",
             "Rectangle_quad",
@@ -26,53 +26,36 @@ module Julia_from_jgraph
 
     function __init__()
         for tree_id ∈ g_options.tree_ids, n_node ∈ g_options.n_nodes
-            to = TimerOutput()
+            
             printstyled("------------------------------------------------------------------------------------\n"; color = 124)
             printstyled("   $(tree_id), № of nodes = $(n_node)   \n"; color = 9)
             printstyled("------------------------------------------------------------------------------------\n"; color = 124)
             vessel_tree = "A"
             x0, p = get_ODE_components(tree_id, n_node, vessel_tree)
-            # x0_str::Vector{String} = p[7]
-            # dx_str, dx_vstr = str_jf_dxdt(["" for element_id in x0_str], ["" for element_id in x0_str], x0_str, p, 0.0)
-            # dx_str = ["d($(element_id))/dt = $(dx_str[ke])" for (ke, element_id) in enumerate(x0_str)]
-            # println("")
-            # printstyled("$(x0_str[length(x0_str)])\n"; color = 51)
-            # println("Initial value: $(x0[length(x0_str)])")
-            # printstyled("Equation: $(dx_str[length(x0_str)])"; color = :magenta)
-            # println("")
-            # printstyled("Equation: $(dx_vstr[length(x0_str)])\n"; color = :blue)
-
-            # for i in eachindex(dx_str)
-            #     if i != length(x0_str)
-            #         println("")
-            #         printstyled("$(x0_str[i])\n"; color = 51)
-            #         println("Initial value: $(x0[i])")
-            #         printstyled("Equation: $(dx_str[i])\n"; color = :magenta)
-            #         #printstyled("Equation: $(dx_vstr[i])\n"; color = :blue)
-            #     end
-            # end
 
             prob = ODEProblem(jf_dxdt!, 
                 x0,
                 (0.0, 10.0/60.0),
                 p)
                 
+            # dose = 1.0
+            # dose_times = [0.001]
 
-        # #     # Events
-        # #     # function affect!(integrator)
-        # #     #     integrator.u[length(integrator.u)] = 10.0;
-        # #     # end
-        # #     # cb_variant2 = PresetTimeCallback(0.5, affect!);
+            # # Events
+            # function affect1!(integrator)
+            #     integrator.p[5][length(integrator.u)] = dose;
+            # end
+            # function affect2!(integrator)
+            #     integrator.p[5][length(integrator.u)] = 0.0;
+            #     # integrator.u[length(integrator.u)] = 0.0;
+            # end
+            # cb_variant1 = PresetTimeCallback(dose_times, affect1!)
+            # cb_variant2 = PresetTimeCallback(10.0 / 60, affect2!)
 
-            @timeit to "time" sol = solve(
-                prob, 
-                Tsit5(),
-                # CVODE_BDF(),
-                # callback=cb_variant2
-                abstol=1e-6,
-                reltol=1e-6 # Rosenbrock23(), # Tsit5(), # CVODE_BDF
-                )
-            show(to, sortby=:firstexec)
+            # # All Callbacks together
+            # cbs = CallbackSet(cb_variant1, cb_variant2)
+
+            to = TimerOutput()
 
             @timeit to "time1" sol = solve(
                 prob, 
@@ -80,12 +63,34 @@ module Julia_from_jgraph
                 # CVODE_BDF(),
 
                 # callback=cb_variant2
-                abstol=1e-6,
-                reltol=1e-6 # Rosenbrock23(), # Tsit5(), # CVODE_BDF
+                abstol=1e-2,
+                reltol=1e-2, # Rosenbrock23(), # Tsit5(), # CVODE_BDF,
+                saveat=10
                 )
+
+            # @timeit to "time" sol = solve(
+            #     prob, 
+            #     #Rosenbrock23(autodiff=false),
+            #     Tsit5(),
+            #     # callback=cbs,
+            #     abstol=1e-2,
+            #     reltol=1e-2, # Rosenbrock23(), # Tsit5(), # CVODE_BDF #Rodas5
+            #     saveat=10
+            #     )
+            # @timeit to "time1" sol = solve(
+            #     prob, 
+            #     #Rosenbrock23(autodiff=false),
+            #     Tsit5(),
+            #     callback=cbs,
+            #     abstol=1e-6,
+            #     reltol=1e-6 # Rosenbrock23(), # Tsit5(), # CVODE_BDF #Rodas5
+            #     )
+
+            display(sol.DEStats)
+
             show(to, sortby=:firstexec)
 
-            # display(plot(sol))
+            display(plot(sol))
 
         end
     end
@@ -113,7 +118,7 @@ module Julia_from_jgraph
             graph.group
         )
         x0::Vector{Float64} = zeros(length(p[3]))
-        (p[1] == "A") && (set_initial_values!(x0, 1.0))
+        # (p[1] == "A") && (set_initial_values!(x0, 1.0))
         # set_initial_values!(x0, 1.0, p)
         return x0, p
     end

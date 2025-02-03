@@ -1,6 +1,9 @@
 module Julia_models
 
     export pyf_dxdt!, jf_dxdt!, str_jf_dxdt!
+
+    injection_time = 10.0 / 60 # [min]
+    f_intervention(t) = 1 * (t^10 / ((0.5*10/60)^10 + t^10)) # amount per time = mmole / min
     
 
     function pyf_dxdt!(dx::Vector{Float64}, x::Vector{Float64}, p::Matrix{Float64}, t::Float64)
@@ -112,15 +115,15 @@ module Julia_models
         #@show dx
     end
 
-    function jf_dxdt!(dx::Vector{Float64},
-                        x::Vector{Float64}, 
-                        p::Tuple{String, Bool, Vector{Tuple{Int32, Int32}}, Vector{Tuple{Int32, Int32}}, Vector{Float64}, Vector{Float64}, Vector{Int16}}, 
-                        t::Union{Tuple{Float64, Float64}, Float64})
+    function jf_dxdt!(dx,
+                        x, 
+                        p, 
+                        t) #::Vector{Float64}, ::Vector{Float64}, ::Tuple{String, Bool, Vector{Tuple{Int32, Int32}}, Vector{Tuple{Int32, Int32}}, Vector{Float64}, Vector{Float64}, Vector{Int16}}, ::Union{Tuple{Float64, Float64}, Float64}
 
         is_inflow = p[2]
         edges = p[3]
         terminals = p[4]
-        #preterminals = p[5]
+        # preterminals = p[5]
         flows = p[5]
         volumes = p[6]
         groups = p[7]
@@ -136,14 +139,24 @@ module Julia_models
         # println()
     end
 
-    function jf_inflow!(dx::Vector{Float64},
-                        x::Vector{Float64},
-                        edges::Vector{Tuple{Int32, Int32}},
-                        terminals::Vector{Tuple{Int32, Int32}},
-                        flows::Vector{Float64},
-                        volumes::Vector{Float64},
-                        groups::Vector{Int16},
-                        t::Union{Tuple{Float64, Float64}, Float64})
+    function jf_inflow!(dx,
+                        x,
+                        edges,
+                        terminals,
+                        flows,
+                        volumes,
+                        groups,
+                        t)
+                        # (dx::Vector{Float64},
+                        # x::Vector{Float64},
+                        # edges::Vector{Tuple{Int32, Int32}},
+                        # terminals::Vector{Tuple{Int32, Int32}},
+                        # flows::Vector{Float64},
+                        # volumes::Vector{Float64},
+                        # groups::Vector{Int16},
+                        # t::Union{Tuple{Float64, Float64}, Float64})
+
+        x[length(x)] = f_intervention(t)
 
         @inbounds for (ke, element) in enumerate(edges)
             # retrieve information for element
@@ -171,26 +184,18 @@ module Julia_models
                 # dA/dt = QA * A_pre / VA - Q_post * A / VA;
                     
                 # species before
-                #for pre_element ∈ pre_elements
                 dx[ke] += sum(element_flow .* x[pre_elements])
-                #end
                 # species after
-                # for post_element ∈ post_elements
                 dx[ke] -= sum(flows[post_elements] .* x[ke])
-                # end
 
             # inflow element connected to terminal
             elseif group == 2 # (is_preterminal) 
                 # dA/dt = QA * A_pre / VA - QA * A / VA;
                 
                 # species before
-                #for pre_element ∈ pre_elements
                 dx[ke] += sum(element_flow .* x[pre_elements])
-                #end
                 # species after
-                #for _ ∈ post_elements
                 dx[ke] -= element_flow .* x[ke] .* length(post_elements)
-                #end
 
             # terminal element
             elseif group == 3 # (is_terminal)
@@ -239,35 +244,25 @@ module Julia_models
             # marginal (outflow) element
             if group == 0 #target_id == 0
                 # species before
-                #for pre_element ∈ pre_elements
                 dx[ke] = sum((flows[pre_elements] .* x[pre_elements] .- flows[pre_elements] .* x[pre_elements]) ./ volumes[pre_elements])
-                #end
             # outflow -> out & outflow element not connected to terminal
             elseif group == 1 #(!is_preterminal .&& !is_terminal .&& target_id != 0) 
                 # dV/dt = QV_pre * V_pre / VV - Q * V / VV;
                     
                 # species before
-                #for pre_element ∈ pre_elements
                 dx[ke] += sum(flows[pre_elements] .* x[pre_elements]) #flows[pre_element] * x[pre_element]
-                #end
 
                 # species after
-                #for _ ∈ post_elements
                 dx[ke] -= element_flow .* x[ke] .* length(post_elements)
-                #end
 
             # outflow element connected to terminal
             elseif group == 2 #(is_preterminal) 
                 # dV/dt = QV * T / VV - QV * V / VV;
                 
                 # species before
-                #for pre_element ∈ pre_elements
                 dx[ke] += sum(element_flow .* x[pre_elements])
-                #end
                 # species after
-                #for _ ∈ post_elements
                 dx[ke] -= element_flow .* x[ke] .* length(post_elements)
-                #end
 
             # terminal element
             elseif group == 3 #(is_terminal)
