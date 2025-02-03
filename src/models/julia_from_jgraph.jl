@@ -3,6 +3,7 @@ module Julia_from_jgraph
     import .Utils: JULIA_RESULTS_DIR
     import .Utils.Definitions: tree_definitions, graph_frame
     import .Utils.Options: graph_options
+    using LinearSolve
 
     include("./julia_models.jl")
     import .Julia_models: jf_dxdt!, str_jf_dxdt
@@ -26,18 +27,18 @@ module Julia_from_jgraph
 
     function __init__()
         for tree_id ∈ g_options.tree_ids, n_node ∈ g_options.n_nodes
-            
+
             printstyled("------------------------------------------------------------------------------------\n"; color = 124)
             printstyled("   $(tree_id), № of nodes = $(n_node)   \n"; color = 9)
             printstyled("------------------------------------------------------------------------------------\n"; color = 124)
             vessel_tree = "A"
             x0, p = get_ODE_components(tree_id, n_node, vessel_tree)
 
-            prob = ODEProblem(jf_dxdt!, 
+            prob = ODEProblem(jf_dxdt!,
                 x0,
                 (0.0, 10.0/60.0),
                 p)
-                
+
             # dose = 1.0
             # dose_times = [0.001]
 
@@ -58,7 +59,7 @@ module Julia_from_jgraph
             to = TimerOutput()
 
             @timeit to "time1" sol = solve(
-                prob, 
+                prob,
                 Tsit5(),
                 # CVODE_BDF(),
 
@@ -69,7 +70,7 @@ module Julia_from_jgraph
                 )
 
             # @timeit to "time" sol = solve(
-            #     prob, 
+            #     prob,
             #     #Rosenbrock23(autodiff=false),
             #     Tsit5(),
             #     # callback=cbs,
@@ -78,7 +79,7 @@ module Julia_from_jgraph
             #     saveat=10
             #     )
             # @timeit to "time1" sol = solve(
-            #     prob, 
+            #     prob,
             #     #Rosenbrock23(autodiff=false),
             #     Tsit5(),
             #     callback=cbs,
