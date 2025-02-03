@@ -24,7 +24,7 @@ module Process_julia_graph
 
     # ============ Specify options
     g_options::graph_options = graph_options(
-        n_nodes=[10, 30, 50, 100, 250, 500, 750, 1000],  #10, 30, 50, 100, 250, 500, 750, 1000, 1250, 1500, 1750   300000, 400000, 500000, 1000000
+        n_nodes=[10],  #10, 30, 50, 100, 250, 500, 750, 1000, 1250, 1500, 1750   300000, 400000, 500000, 1000000
         tree_ids=[
             "Rectangle_quad",
             # "Rectangle_trio",

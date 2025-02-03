@@ -34,9 +34,9 @@ module Julia_from_jgraph
             vessel_tree = "A"
             x0, p = get_ODE_components(tree_id, n_node, vessel_tree)
 
-            prob = ODEProblem(jf_dxdt!,
+            prob = ODEProblem{true, SciMLBase.DEStats}(jf_dxdt!,
                 x0,
-                (0.0, 10.0/60.0),
+                (0.0, 10.0/60.0/2),
                 p)
 
             # dose = 1.0
@@ -64,8 +64,8 @@ module Julia_from_jgraph
                 # CVODE_BDF(),
 
                 # callback=cb_variant2
-                abstol=1e-2,
-                reltol=1e-2, # Rosenbrock23(), # Tsit5(), # CVODE_BDF,
+                abstol=1e-6,
+                reltol=1e-6, # Rosenbrock23(), # Tsit5(), # CVODE_BDF,
                 saveat=10
                 )
 
@@ -87,7 +87,7 @@ module Julia_from_jgraph
             #     reltol=1e-6 # Rosenbrock23(), # Tsit5(), # CVODE_BDF #Rodas5
             #     )
 
-            display(sol.DEStats)
+            display(sol.stats)
 
             show(to, sortby=:firstexec)
 

@@ -56,8 +56,8 @@ module Processing_helpers
             @transform! begin
                 :target_id = Int32.(:target_id)
                 :leaf = Int32.(:leaf)
-                :flows = (:flow / 1000000 * 60) # Change units of the flow [mm3/s --> L/min]
-                :volumes = π .* :radius.^2 .* :length  / 1000000 # [mm3 --> L]
+                :flows = (:flow) # Change units of the flow [mm3/s --> L/min]  / 1000000 * 60
+                :volumes = π .* :radius.^2 .* :length# [mm3 --> L]   / 1000000 
             end 
         end
 
