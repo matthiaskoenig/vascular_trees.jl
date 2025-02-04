@@ -124,9 +124,11 @@ module Julia_models
         flows = p[5]
         volumes = p[6]
         groups = p[7]
+        pre_element = p[8]
+        post_element = p[9]
         
         if is_inflow
-            jf_inflow!(dx, x, edges, terminals, flows, volumes, groups, t)
+            jf_inflow!(dx, x, edges, terminals, flows, volumes, groups, pre_element, post_element, t)
         else
             jf_outflow!(dx, x, edges, terminals, flows, volumes, groups, t)
         end
@@ -136,6 +138,7 @@ module Julia_models
         # println()
     end
 
+<<<<<<< Updated upstream
     function jf_inflow!(dx::Vector{Float64},
                         x::Vector{Float64},
                         edges::Vector{Tuple{Int32, Int32}},
@@ -144,8 +147,30 @@ module Julia_models
                         volumes::Vector{Float64},
                         groups::Vector{Int16},
                         t::Union{Tuple{Float64, Float64}, Float64})
+=======
+    function jf_inflow!(dx,
+                        x,
+                        edges,
+                        terminals,
+                        flows,
+                        volumes,
+                        groups,
+                        pre_element,
+                        post_element,
+                        t)
+                        # (dx::Vector{Float64},
+                        # x::Vector{Float64},
+                        # edges::Vector{Tuple{Int32, Int32}},
+                        # terminals::Vector{Tuple{Int32, Int32}},
+                        # flows::Vector{Float64},
+                        # volumes::Vector{Float64},
+                        # groups::Vector{Int16},
+                        # t::Union{Tuple{Float64, Float64}, Float64})
 
-        @inbounds for (ke, element) in enumerate(edges)
+        #x[length(x)] = f_intervention(t)
+>>>>>>> Stashed changes
+
+        for (ke, element) in enumerate(edges)
             # retrieve information for element
             source_id, target_id = element
             element_volume = volumes[ke]
@@ -153,13 +178,15 @@ module Julia_models
             # is_preterminal = in(element, preterminals)
             # is_terminal = in(element, terminals)
             group = groups[ke]
+            pre_elements = pre_element[ke]
+            post_elements = post_element[ke]
 
             dx[ke] = 0.0
 
             # species before the element
-            pre_elements = findall(x -> x[2]==source_id, edges) 
+            # pre_elements = findfirst(x -> x[2]==source_id, edges) 
             # species after the element
-            post_elements = findall(x -> x[1]==target_id, edges)
+            #post_elements = findall(x -> x[1]==target_id, edges)
 
             # write equations
             # marginal (input) element
@@ -198,15 +225,16 @@ module Julia_models
                 # dT/dt = QA * A / VT - QA * T / VT
     
                 # species before and output
-                for pre_element ∈ pre_elements
-                    (!in(edges[pre_element], terminals)) && (dx[ke] = flows[pre_element] * x[pre_element] - flows[pre_element] * x[ke])
+                for pre ∈ pre_elements
+                    (!in(edges[pre], terminals)) && (dx[ke] = flows[pre] * x[pre] - flows[pre] * x[ke])
                 end
             end
 
-            if source_id != 0
+            if group != 0
                 dx[ke] = dx[ke] / element_volume
             end
         end
+
     end
 
     function jf_outflow!(dx::Vector{Float64},

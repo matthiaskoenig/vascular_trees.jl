@@ -96,7 +96,15 @@ module Process_julia_graph
         preterminals::Vector{Tuple{Int32, Int32}} = Tuple.(Tables.namedtupleiterator(preterminal_edges[:, [:source_id, :target_id]]))
         groups = Vector{Int16}(undef, length(edges))
 
-        is_inflow ? get_inflow_edges_groups!(groups, edges, terminals, preterminals) : get_outflow_edges_groups!(groups, edges, terminals, preterminals)
+        if is_inflow
+            get_inflow_edges_groups!(groups, edges, terminals, preterminals)
+            pre_elements = zeros(Int64, length(edges))
+            post_elements = [[] for _ in eachindex(edges)]
+            get_preelements!(pre_elements, edges)
+            get_postelements!(post_elements, edges)
+        else
+            get_outflow_edges_groups!(groups, edges, terminals, preterminals)
+        end
 
         # collect all needed information and store it in one structure
         graph::graph_frame = graph_frame(
@@ -113,7 +121,9 @@ module Process_julia_graph
             graph_structure.element_ids,
             graph_structure.flow_ids,
             graph_structure.volume_ids,
-            groups 
+            groups,
+            pre_elements,
+            post_elements
         )
         return graph
     end
@@ -137,6 +147,31 @@ module Process_julia_graph
             elseif source_id == 0
                 groups[ke] = Int16(0)
             end
+        end
+    end
+
+    function get_preelements!(pre_elements, edges)
+        for (ke, element) in enumerate(edges)
+            source_id, target_id = element
+            for (ked, edge) in enumerate(edges)
+                if (edge[2] == source_id != edge[1])  
+                    pre_elements[ke] = ked
+                    continue
+                end
+            end
+        end
+    end
+
+    function get_postelements!(post_elements, edges)
+        for (ke, element) in enumerate(edges)
+            post_element = []
+            source_id, target_id = element
+            for (ked, edge) in enumerate(edges)
+                if (edge[1] == target_id)
+                    push!(post_element, ked)
+                end
+            end
+            append!(post_elements[ke], post_element)
         end
     end
 

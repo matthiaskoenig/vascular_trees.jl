@@ -35,6 +35,8 @@ module Utils
             flow_ids::Vector{String}
             volume_ids::Vector{String}
             group::Vector{Int16}
+            pre_elements::Vector{Int64}
+            post_elements::Vector{Vector{Int64}}
         end
 
     end

@@ -74,16 +74,47 @@ module Julia_from_jgraph
                 )
             show(to, sortby=:firstexec)
 
+<<<<<<< Updated upstream
             @timeit to "time1" sol = solve(
                 prob, 
+=======
+            sol = solve(
+                prob,
+>>>>>>> Stashed changes
                 Tsit5(),
                 # CVODE_BDF(),
 
                 # callback=cb_variant2
                 abstol=1e-6,
+<<<<<<< Updated upstream
                 reltol=1e-6 # Rosenbrock23(), # Tsit5(), # CVODE_BDF
                 )
             show(to, sortby=:firstexec)
+=======
+                reltol=1e-6, # Rosenbrock23(), # Tsit5(), # CVODE_BDF,
+                )
+
+            # @timeit to "time" sol = solve(
+            #     prob,
+            #     #Rosenbrock23(autodiff=false),
+            #     Tsit5(),
+            #     # callback=cbs,
+            #     abstol=1e-6,
+            #     reltol=1e-6, # Rosenbrock23(), # Tsit5(), # CVODE_BDF #Rodas5
+            #     )
+            # @timeit to "time1" sol = solve(
+            #     prob,
+            #     #Rosenbrock23(autodiff=false),
+            #     Tsit5(),
+            #     callback=cbs,
+            #     abstol=1e-6,
+            #     reltol=1e-6 # Rosenbrock23(), # Tsit5(), # CVODE_BDF #Rodas5
+            #     )
+
+            # display(sol.stats)
+
+            # show(to, sortby=:firstexec)
+>>>>>>> Stashed changes
 
             # display(plot(sol))
 
@@ -98,7 +129,7 @@ module Julia_from_jgraph
 
         printstyled("   Generating ODE components for $(vessel_tree)   \n"; color = 130)
         graph = load_graph(GRAPH_PATH)
-        p::Tuple{String, Bool, Vector{Tuple{Int32, Int32}}, Vector{Tuple{Int32, Int32}}, Vector{Float64}, Vector{Float64}, Vector{Int16}} = (
+        p = (
             graph.vascular_tree_id,
             graph.is_inflow,
             graph.edges,
@@ -110,7 +141,9 @@ module Julia_from_jgraph
             # graph.element_ids,
             # graph.flow_ids,
             # graph.volume_ids
-            graph.group
+            graph.group,
+            graph.pre_elements,
+            graph.post_elements
         )
         x0::Vector{Float64} = zeros(length(p[3]))
         (p[1] == "A") && (set_initial_values!(x0, 1.0))
