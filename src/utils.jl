@@ -6,7 +6,7 @@ module Utils
 
     
     module Definitions
-        export tree_definitions, graph_frame
+        export tree_definitions, graph_frame, ODE_groups
 
         using Parameters
         using Revise
@@ -14,7 +14,7 @@ module Utils
         @with_kw struct tree_definitions
             vascular_trees::Dict{String, Vector{String}} = Dict(
                 "Rectangle_trio" => ["A", "P", "V"],
-                "Rectangle_quad" => ["P", "A", "V", "B"]
+                "Rectangle_quad" => ["A"] #["P", "A", "V", "B"]
             )
             inflow_trees::Tuple{String, String} = ("A", "P")
             outflow_trees::Tuple{String, String} = ("V", "B")
@@ -34,9 +34,16 @@ module Utils
             element_ids::Vector{String}
             flow_ids::Vector{String}
             volume_ids::Vector{String}
-            group::Vector{Int16}
+            ODE_groups::Vector{Int16}
             pre_elements::Vector{Int64}
             post_elements::Vector{Vector{Int64}}
+        end
+
+        @with_kw struct ODE_groups
+            marginal::Int16 = 0
+            preterminal::Int16 = 2
+            terminal::Int16 = 3
+            other::Int16 = 1
         end
 
     end

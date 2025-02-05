@@ -5,7 +5,7 @@ module Julia_from_jgraph
     import .Utils.Options: graph_options
 
     include("./julia_models.jl")
-    import .Julia_models: jf_dxdt!, str_jf_dxdt
+    import .Julia_models: jf_dxdt!
 
     using JLD2, OrdinaryDiffEq, Plots, DiffEqCallbacks
     using TimerOutputs
@@ -13,9 +13,8 @@ module Julia_from_jgraph
 
     # ============ Specify options
     g_options::graph_options = graph_options(
-        n_nodes=[10],  #750, 1000, 1250, 1500
+        n_nodes=[1000],  #750, 1000, 1250, 1500
         tree_ids=[
-            # "Rectangle_single_inflow",
             "Rectangle_quad",
             # "Rectangle_trio",
             ],
@@ -32,39 +31,11 @@ module Julia_from_jgraph
             printstyled("------------------------------------------------------------------------------------\n"; color = 124)
             vessel_tree = "A"
             x0, p = get_ODE_components(tree_id, n_node, vessel_tree)
-            # x0_str::Vector{String} = p[7]
-            # dx_str, dx_vstr = str_jf_dxdt(["" for element_id in x0_str], ["" for element_id in x0_str], x0_str, p, 0.0)
-            # dx_str = ["d($(element_id))/dt = $(dx_str[ke])" for (ke, element_id) in enumerate(x0_str)]
-            # println("")
-            # printstyled("$(x0_str[length(x0_str)])\n"; color = 51)
-            # println("Initial value: $(x0[length(x0_str)])")
-            # printstyled("Equation: $(dx_str[length(x0_str)])"; color = :magenta)
-            # println("")
-            # printstyled("Equation: $(dx_vstr[length(x0_str)])\n"; color = :blue)
-
-            # for i in eachindex(dx_str)
-            #     if i != length(x0_str)
-            #         println("")
-            #         printstyled("$(x0_str[i])\n"; color = 51)
-            #         println("Initial value: $(x0[i])")
-            #         printstyled("Equation: $(dx_str[i])\n"; color = :magenta)
-            #         #printstyled("Equation: $(dx_vstr[i])\n"; color = :blue)
-            #     end
-            # end
-
             prob = ODEProblem(jf_dxdt!, 
                 x0,
                 (0.0, 10.0/60.0),
                 p)
-                
-
-        # #     # Events
-        # #     # function affect!(integrator)
-        # #     #     integrator.u[length(integrator.u)] = 10.0;
-        # #     # end
-        # #     # cb_variant2 = PresetTimeCallback(0.5, affect!);
-
-            @timeit to "time" sol = solve(
+            @timeit to "1" sol = solve(
                 prob, 
                 Tsit5(),
                 # CVODE_BDF(),
@@ -72,52 +43,9 @@ module Julia_from_jgraph
                 abstol=1e-6,
                 reltol=1e-6 # Rosenbrock23(), # Tsit5(), # CVODE_BDF
                 )
+
             show(to, sortby=:firstexec)
-
-<<<<<<< Updated upstream
-            @timeit to "time1" sol = solve(
-                prob, 
-=======
-            sol = solve(
-                prob,
->>>>>>> Stashed changes
-                Tsit5(),
-                # CVODE_BDF(),
-
-                # callback=cb_variant2
-                abstol=1e-6,
-<<<<<<< Updated upstream
-                reltol=1e-6 # Rosenbrock23(), # Tsit5(), # CVODE_BDF
-                )
-            show(to, sortby=:firstexec)
-=======
-                reltol=1e-6, # Rosenbrock23(), # Tsit5(), # CVODE_BDF,
-                )
-
-            # @timeit to "time" sol = solve(
-            #     prob,
-            #     #Rosenbrock23(autodiff=false),
-            #     Tsit5(),
-            #     # callback=cbs,
-            #     abstol=1e-6,
-            #     reltol=1e-6, # Rosenbrock23(), # Tsit5(), # CVODE_BDF #Rodas5
-            #     )
-            # @timeit to "time1" sol = solve(
-            #     prob,
-            #     #Rosenbrock23(autodiff=false),
-            #     Tsit5(),
-            #     callback=cbs,
-            #     abstol=1e-6,
-            #     reltol=1e-6 # Rosenbrock23(), # Tsit5(), # CVODE_BDF #Rodas5
-            #     )
-
-            # display(sol.stats)
-
-            # show(to, sortby=:firstexec)
->>>>>>> Stashed changes
-
-            # display(plot(sol))
-
+            display(plot(sol))
         end
     end
 
