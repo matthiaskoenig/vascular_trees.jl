@@ -9,8 +9,8 @@ x0 = [10.0, 10.0]
 
 #Define the problem
 function odes(dx, x, p, t)
-    dx[1] = - p[1] * x[1]
-    dx[2] = - p[2] * x[2]
+    dx[1] = -p[1] * x[1]
+    dx[2] = -p[2] * x[2]
 end
 
 # Ode integration

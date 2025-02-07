@@ -6,7 +6,7 @@ using OrdinaryDiffEq
 using ModelingToolkit
 using Sundials
 
-prn, cb = load_SBML("src/sbml/dapagliflozin_body_flat.xml", massaction=false)
+prn, cb = load_SBML("src/sbml/dapagliflozin_body_flat.xml", massaction = false)
 # prn, cb = load_SBML("src/sbml/dapagliflozin_intestine.xml", massaction=false)
 
 # information about system
