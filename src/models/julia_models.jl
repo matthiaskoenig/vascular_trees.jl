@@ -4,187 +4,81 @@ export jf_dxdt!
 
 function jf_dxdt!(dx, x, p, t)
 
-    is_inflow = p[2][1]
-    all_edges = p[3]
-    flows = p[4]
-    volumes = p[5]
-    ODE_groups = p[6]
-    pre_element = p[7]
-    post_element = p[8]
+    is_inflow = p[2]
+    flows = p[3]
+    volumes = p[4]
+    ODE_groups = p[5]
+    pre_elements = p[6]
+    post_elements = p[7]
 
     if is_inflow == 1
-        jf_inflow!(
-            dx,
-            x,
-            all_edges,
-            flows,
-            volumes,
-            ODE_groups,
-            pre_element,
-            post_element,
-            t,
-        )
-    # else
-    #     jf_outflow!(dx, x, all_edges, flows, volumes, ODE_groups, t)
+        jf_inflow!(dx, x, flows, volumes, ODE_groups, pre_elements, post_elements, t)
+    else
+        jf_outflow!(dx, x, flows, volumes, ODE_groups, pre_elements, post_elements, t)
     end
-    # println()
-    # println(size(dx))
-    # show(dx)
-    # println()
 end
 
-function jf_inflow!(
-    dx::Vector{Float64},
-    x::Vector{Float64},
-    all_edges::Vector{Tuple{Int32, Int32}},
-    flows::Vector{Float64},
-    volumes::Vector{Float64},
-    ODE_groups::Vector{Int16},
-    pre_element::Vector,
-    post_element::Vector,
-    t,
-)
-    # (dx::Vector{Float64},
-    # x::Vector{Float64},
-    # edges::Vector{Tuple{Int32, Int32}},
-    # terminals::Vector{Tuple{Int32, Int32}},
-    # flows::Vector{Float64},
-    # volumes::Vector{Float64},
-    # groups::Vector{Int16},
-    # t::Union{Tuple{Float64, Float64}, Float64})
-
+function jf_inflow!(dx, x, flows, volumes, ODE_groups, pre_elements, post_elements, t)
     #x[length(x)] = f_intervention(t)
-
-    for ke in eachindex(all_edges)
+    dx .= 0.0
+    for (ke, group) in enumerate(ODE_groups)
         # retrieve information for element
-        element_volume = volumes[ke]
         element_flow = flows[ke]
-        # is_preterminal = in(element, preterminals)
-        # is_terminal = in(element, terminals)
-        group = ODE_groups[ke]
-        pre_elements = pre_element[ke]
-        post_elements = post_element[ke]
-        dx[ke] = 0.0
-
-        # write equations
-        # marginal (input) element
-        if group == 0 # source_id == 0
-            # constant
-            dx[ke] = 0.0
-            # in -> inflow & inflow element not connected to terminal
-        elseif group == 1 #(!is_preterminal .&& !is_terminal .&& source_id != 0) 
+        pre_element = pre_elements[ke]
+        post_element = post_elements[ke]
+        # in -> inflow & inflow element not connected to terminal
+        if group == 1 #(!is_preterminal .&& !is_terminal .&& source_id != 0) 
             # dA/dt = QA * A_pre / VA - Q_post * A / VA;
-
-            # species before
-            dx[ke] += sum(element_flow .* x[pre_elements])
-            # species after
-            dx[ke] -= sum(flows[post_elements] .* x[ke])
-
+            # species before and after
+            dx[ke] +=
+                sum(element_flow .* x[pre_element]) - sum(flows[post_element] .* x[ke])
             # inflow element connected to terminal
         elseif group == 2 # (is_preterminal) 
             # dA/dt = QA * A_pre / VA - QA * A / VA;
-
-            # species before
-            dx[ke] += sum(element_flow .* x[pre_elements])
-            # species after
-            dx[ke] -= element_flow * x[ke] * length(post_elements)
-
+            # species before and after
+            dx[ke] +=
+                sum(element_flow .* x[pre_element]) -
+                element_flow * x[ke] * length(post_element)
             # terminal element
         elseif group == 3 # (is_terminal)
             # THIS IS DIFFERENT THAN IN OTHER MODELS
             # dT/dt = QA * A / VT - QA * T / VT
-
             # species before and output
-            dx[ke] += sum(flows[pre_elements] .* x[pre_elements] .- flows[pre_elements] .* x[ke])
-        end
-
-        if group != 0
-            dx[ke] = dx[ke] / element_volume
+            dx[ke] +=
+                sum(flows[pre_element] .* x[pre_element] .- flows[pre_element] .* x[ke])
         end
     end
-
+    dx .= dx ./ volumes
 end
 
-function jf_outflow!(
-    dx::Vector{Float64},
-    x::Vector{Float64},
-    edges::Vector{Tuple{Int32,Int32}},
-    flows::Vector{Float64},
-    volumes::Vector{Float64},
-    groups::Vector{Int16},
-    t::Union{Tuple{Float64,Float64},Float64},
-)
-
-    @inbounds for (ke, element) in enumerate(edges)
+function jf_outflow!(dx, x, flows, volumes, ODE_groups, pre_elements, post_elements, t)
+    dx .= 0.0
+    @inbounds for (ke, group) in enumerate(ODE_groups)
         # retrieve information for element
-        source_id, target_id = element
-        element_volume = volumes[ke]
         element_flow = flows[ke]
-        # is_preterminal = in(element, preterminals)
-        # is_terminal = in(element, terminals)
-        # is_start = in(element, start)
-        group = groups[ke]
-
-        dx[ke] = 0.0
-
-        # species before the element
-        pre_elements = findall(x -> x[2] == source_id, edges)
-        # species after the element
-        post_elements = findall(x -> x[1] == target_id, edges)
+        pre_element = pre_elements[ke]
+        post_element = post_elements[ke]
 
         # write equations
         # marginal (outflow) element
         if group == 0 #target_id == 0
             # species before
-            #for pre_element ∈ pre_elements
-            dx[ke] = sum(
-                (
-                    flows[pre_elements] .* x[pre_elements] .-
-                    flows[pre_elements] .* x[pre_elements]
-                ) ./ volumes[pre_elements],
-            )
-            #end
+            dx[ke] +=
+                sum(flows[pre_element] .* x[pre_element] .- flows[pre_element] .* x[ke])
             # outflow -> out & outflow element not connected to terminal
         elseif group == 1 #(!is_preterminal .&& !is_terminal .&& target_id != 0) 
             # dV/dt = QV_pre * V_pre / VV - Q * V / VV;
-
-            # species before
-            #for pre_element ∈ pre_elements
-            dx[ke] += sum(flows[pre_elements] .* x[pre_elements]) #flows[pre_element] * x[pre_element]
-            #end
-
-            # species after
-            #for _ ∈ post_elements
-            dx[ke] -= element_flow .* x[ke] .* length(post_elements)
-            #end
-
+            dx[ke] +=
+                sum(flows[pre_element] .* x[pre_element]) -
+                element_flow .* x[ke] .* length(post_element)
             # outflow element connected to terminal
         elseif group == 2 #(is_preterminal) 
             # dV/dt = QV * T / VV - QV * V / VV;
-
-            # species before
-            #for pre_element ∈ pre_elements
-            dx[ke] += sum(element_flow .* x[pre_elements])
-            #end
-            # species after
-            #for _ ∈ post_elements
-            dx[ke] -= element_flow .* x[ke] .* length(post_elements)
-            #end
-
-            # terminal element
-        elseif group == 3 #(is_terminal)
-            # THIS IS DIFFERENT THAN IN OTHER MODELS
-            # dT/dt = 0
-            # species before and output
-            for pre_element ∈ pre_elements
-                (!in(edges[pre_element], terminals)) && (dx[ke] = 0.0)
-            end
-        end
-
-        if target_id != 0
-            dx[ke] = dx[ke] / element_volume
+            dx[ke] +=
+                sum(element_flow .* x[pre_element]) -
+                element_flow .* x[ke] .* length(post_element)
         end
     end
+    dx .= dx ./ volumes
 end
-
 end

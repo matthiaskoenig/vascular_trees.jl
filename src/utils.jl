@@ -1,8 +1,9 @@
 module Utils
 
-    RESULTS_DIR = "results"
-    JULIA_RESULTS_DIR = RESULTS_DIR * "/julia_vessel_trees"
-    BENCHMARKING_RESULTS_PATH = joinpath(JULIA_RESULTS_DIR, "jrunning_times.csv")
+    RESULTS_DIR::String = "results"
+    JULIA_RESULTS_DIR::String = RESULTS_DIR * "/julia_vessel_trees"
+    BENCHMARKING_RESULTS_PATH::String = joinpath(JULIA_RESULTS_DIR, "jrunning_times.csv")
+    MODEL_PATH::String = "/models/julia_models.jl"
 
 
     module Definitions
@@ -14,7 +15,7 @@ module Utils
         @with_kw struct tree_definitions
             vascular_trees::Dict{String,Vector{String}} = Dict(
                 "Rectangle_trio" => ["A", "P", "V"],
-                "Rectangle_quad" => ["A"] #["P", "A", "V", "B"]
+                "Rectangle_quad" => ["P", "A", "V", "B"]
             )
             inflow_trees::Tuple{String,String} = ("A", "P")
             outflow_trees::Tuple{String,String} = ("V", "B")
@@ -31,7 +32,7 @@ module Utils
 
     module Options
         export graph_options,
-            simulations_options, benchmark_options, solver_options, edge_options, model_types
+            simulations_options, benchmark_options, solver_options, edge_options
         using Parameters
 
         using OrdinaryDiffEq
@@ -52,7 +53,7 @@ module Utils
 
         @with_kw struct benchmark_options
             save_running_times::Bool = false
-            n_iterations::Int16 = 2
+            n_iterations::Int16 = 1
         end
 
         # https://docs.sciml.ai/DiffEqDocs/stable/solvers/split_ode_solve/
@@ -62,22 +63,6 @@ module Utils
             relative_tolerance::Float64 = 1e-6
             dt::Float64 = 0.1
             solver_name::String = "Tsit5" # "Tsit5"
-        end
-
-        @with_kw struct model_types
-            templates::Vector{String} = [
-                "vectorized!_cleaned_typed",
-                "vectorized_typed",
-                "vectorized",
-                "vectorized!",
-                "vectorized_cleaned",
-                "vectorized!_cleaned",
-                "symbolic_MT",
-            ]
-            julia_model::Vector{String} = [
-                "loop!_python", #not working
-                "loop!_julia",
-            ]
         end
 
     end
@@ -94,8 +79,7 @@ module Utils
             times::TimerOutput,
             n_node::Int32,
             tree_id::String,
-            n_species::Int64,
-            model_type::String,
+            n_species::Int64
             solver_name::String,
             n_term::Int32,
         )
@@ -145,7 +129,6 @@ module Utils
             tree_ids::Vector{String} = ["$(tree_id)_not!" for _ ∈ eachindex(allocated_bytes)]
             n_nodes::Vector{Int32} = [n_node for _ ∈ eachindex(allocated_bytes)]
             n_sp::Vector{Int64} = [n_species for _ ∈ eachindex(allocated_bytes)]
-            model_types = [model_type for _ ∈ eachindex(allocated_bytes)] #
             solver_names = [solver_name for _ ∈ eachindex(allocated_bytes)]
             n_terminals::Vector{Int32} = [n_term for _ ∈ eachindex(allocated_bytes)]
             table = (
@@ -154,7 +137,6 @@ module Utils
                 times_min = times_ns / 60 * 10^-9,
                 n_species = n_sp,
                 allocated_gbytes = allocated_bytes / 10^9,
-                model_types = model_types,
                 solver_names = solver_names,
                 n_node = n_nodes,
                 tree_id = tree_ids,
@@ -169,23 +151,6 @@ module Utils
             CSV.write(BENCHMARKING_RESULTS_PATH, table; kwargs...)
         end
 
-    end
-
-    module Nice_printing
-        export print_graph_info
-
-        function print_graph_info(graph_id::String, tree_id::String)
-            println()
-            printstyled(
-                "------------------------------------------------------------------------------------\n";
-                color = 124,
-            )
-            printstyled("   Processing $(graph_id)_$(tree_id)   \n"; color = 9)
-            printstyled(
-                "------------------------------------------------------------------------------------\n";
-                color = 124,
-            )
-        end
     end
 
 end

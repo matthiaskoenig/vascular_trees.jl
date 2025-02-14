@@ -24,7 +24,7 @@ export read_edges,
     create_tuples_from_dfrows
 
 # calculation of terminal volume
-volume_geometry::Float64 = (0.100 * 0.100 * 0.10) / 1000  # [cm^3] -> [l]
+volume_geometry::Float64 = (0.100 * 0.100 * 0.10) / 1000 # [cm^3] -> [l]
 
 function read_edges(GRAPH_PATH::String, EDGES_PATH::String)::DataFrame
     # read and prepare lg file with information about edges
@@ -33,12 +33,13 @@ function read_edges(GRAPH_PATH::String, EDGES_PATH::String)::DataFrame
     edges_attrib::DataFrame = read_edges_attributes(EDGES_PATH)
     # join dfs with graph structure and edges attributes
     leftjoin!(graph_structure, edges_attrib, on = :target_id)
-
+    disallowmissing!(graph_structure)
+    
     return graph_structure
 end
 
 function read_graph_skeleton(GRAPH_PATH::String)::DataFrame
-    graph_skeleton::DataFrame = DataFrame(CSV.File(GRAPH_PATH))
+    graph_skeleton::DataFrame = CSV.read(GRAPH_PATH, DataFrame)
     select!(graph_skeleton, Not(names(graph_skeleton, Missing)))
     rename!(graph_skeleton, [:source_id, :target_id])
     transform!(
@@ -51,7 +52,7 @@ function read_graph_skeleton(GRAPH_PATH::String)::DataFrame
 end
 
 function read_edges_attributes(EDGES_PATH::String)::DataFrame
-    edges_attrib::DataFrame = DataFrame(CSV.File(EDGES_PATH))
+    edges_attrib::DataFrame = CSV.read(EDGES_PATH, DataFrame)
     @chain edges_attrib begin
         @rename! begin
             :target_id = :edge_idx
@@ -64,8 +65,8 @@ function read_edges_attributes(EDGES_PATH::String)::DataFrame
         @transform! begin
             :target_id = Int32.(:target_id)
             :leaf = Int32.(:leaf)
-            :flows = (:flows / 1000000 * 60) # Change units of the flow [mm3/s --> L/min]
-            :volumes = π .* :radius .^ 2 .* :length / 1000000 # [mm3 --> L] 
+            :flows = (:flows ./ 1000000 * 60) # Change units of the flow [mm3/s --> L/min]
+            :volumes = π .* :radius .^ 2 .* :length ./ 1000000 # [mm3 --> L] 
         end
     end
 
@@ -73,7 +74,7 @@ function read_edges_attributes(EDGES_PATH::String)::DataFrame
 end
 
 function read_nodes_attributes(NODES_PATH::String)::DataFrame
-    nodes_attrib::DataFrame = DataFrame(CSV.File(NODES_PATH))
+    nodes_attrib::DataFrame = CSV.read(NODES_PATH, DataFrame)
     @chain nodes_attrib begin
         @rename! begin
             :ids = :node_idx
@@ -134,7 +135,7 @@ function create_marginal_edge!(graph_structure)
             0.0,
             0.0,
             0.0,
-            0.0,
+            graph_structure[graph_structure.start .== true, :volumes][1], # volume equal to the volume of start edge
             "Marginal",
             "",
             "",
@@ -172,7 +173,7 @@ function selection_from_df(df::DataFrame, conditions::Tuple{Union{Colon, BitVect
     return @view df[conditions...]
 end
 
-function create_tuples_from_dfrows(df::AbstractDataFrame)::Vector{Tuple}
+function create_tuples_from_dfrows(df::AbstractDataFrame)
     return Tuple.(Tables.namedtupleiterator(df))
 end
 
