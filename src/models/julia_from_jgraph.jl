@@ -1,4 +1,19 @@
 module Julia_from_jgraph
+"""
+Module which contains functions to load .arrow files (contain information of julia graph needed for ODE model)
+    and to prepare vector of initial values and parameters for the ODE function.
+
+Input: tree_id (ex. "Rectangle_quad"), 
+       n_node (ex. 10),
+       vessel_tree (ex. "A") - id of a single tree
+Output: x0 (vector of initial values) and 
+        graph_p (structure that contains parameters for the differential equations)
+
+To use this module also for simulations - uncomment __init__ function (will be deleted in the future)
+"""
+
+export get_ODE_components
+
 include("../utils.jl")
 import .Utils: JULIA_RESULTS_DIR
 import .Utils.Definitions: tree_definitions

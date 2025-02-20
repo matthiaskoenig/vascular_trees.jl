@@ -1,7 +1,7 @@
 
 module Simulation_runner
 """
-Module that summarizes functions that load graph file in arrow format and runs simulations.
+Module that summarizes functions that load graph file in arrow format and run simulations.
 
 Make sure that structure of vascular_trees.jl directory is as needed (somewhere it should be written)
 
@@ -11,6 +11,7 @@ What must/may be specified in code below:
     1.2. sim_options (simulation options)
 2. may (if you whant to geet additional data and do not like default variants)
     2.1. benchmark options 
+    2.2. solver options
 
 Inputs:
 1. Graph file (prepared information in arrow format from graph generated in SyntheticVascularTrees.jl)
