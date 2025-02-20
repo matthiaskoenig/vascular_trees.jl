@@ -1,190 +1,119 @@
 module Simulation_helpers
 
-    export create_simulations, create_benchmarked_simulations
+export create_simulations, create_benchmarked_simulations
 
-    using OrdinaryDiffEq, DiffEqCallbacks
-    using DataFrames
-    using CSV
-    using TimerOutputs
-    using ModelingToolkit
-    using Plots
-    using Sundials, LinearSolve
+using OrdinaryDiffEq
+using DataFrames
+using CSV
+using TimerOutputs
+using ModelingToolkit
+using Plots
+using Term
 
-    include("../utils.jl")
-    import .Utils: JULIA_RESULTS_DIR
-    import .Utils.Definitions: tree_definitions
-    import .Utils.Benchmarking: save_times_as_csv
-    import .Utils.Options: model_types
+include("../utils.jl")
+import .Utils: JULIA_RESULTS_DIR, MODEL_PATH
+import .Utils.Definitions: tree_definitions
+import .Utils.Benchmarking: save_times_as_csv
 
-    include("../models/julia_from_pygraph.jl")
-    import .Julia_from_pygraph: get_ODE_components
-    include("../models/julia_from_jgraph.jl")
-    import .Julia_from_jgraph: get_ODE_components
+include("../models/julia_from_jgraph.jl")
+import .Julia_from_jgraph: get_ODE_components
 
-    # Already specified in utils.jl
-    m_types::model_types = model_types()
-    trees::tree_definitions = tree_definitions()
+include("../../"*MODEL_PATH)
+import .Julia_models: jf_dxdt!
 
-    function ODE_solver(ode_system, x0, tspan, tpoints, parameter_values, sol_options, model_type, cbs)::SciMLBase.ODESolution
+# Already specified in utils.jl
+trees::tree_definitions = tree_definitions()
 
-        prob = ODEProblem(ode_system, 
-                        x0,
-                        tspan,
-                        parameter_values)
+function ODE_solver(x0, sim_options, p, sol_options)
 
-        sol = solve(
-            prob, 
-            sol_options.solver, # Rosenbrock23(), # Tsit5(), # CVODE_BDF
-            saveat=tpoints,
-            dense=false,
-            reltol=sol_options.relative_tolerance, 
-            abstol=sol_options.absolute_tolerance,
-            dt=sol_options.dt,
-            callback=cbs)
+    problem = ODEProblem(jf_dxdt!, x0, sim_options.tspan, p)
 
-        return sol
+    solution = solve(
+        problem,
+        sol_options.solver,
+        saveat = sim_options.tpoints,
+        dense = false,
+        reltol = sol_options.relative_tolerance,
+        abstol = sol_options.absolute_tolerance,
+    )
 
-    end
+    #print(solution.destats)
+    #display(plot(solution))
 
-    function save_simulations_to_csv(; simulations::SciMLBase.ODESolution, column_names::Vector{String}, simulations_path)
-        # Convert solution to DataFrame
-        df = DataFrame(simulations)
+    return solution
 
-        # Write DataFrame to CSV
-        header = vcat(["time"], column_names)
-        CSV.write(simulations_path, df, header=header)
-    end
+end
 
-    function create_simulations(; g_options, sim_options, sol_options)
+function create_simulations(g_options, sim_options, sol_options)
 
-        graph_id::String = ""
-        file_name::String = ""
-        
-        for model_type in g_options.model_types
-            if model_type ∈ m_types.templates
-                for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
-                    graph_id = "$(tree_id)_$(n_node)"
-                    file_name = "$(graph_id)_$(model_type)"
-                    print("\r...Working with $(file_name)...")
-                    MODEL_PATH = normpath(joinpath(@__FILE__, "../../.." , JULIA_RESULTS_DIR, tree_id, graph_id, "models", "$(file_name).jl"))
-                    include(MODEL_PATH) # Load the odes module
-                    if contains(model_type, "!")
-                        f_dxdt = Transport_model.f_dxdt!
-                    else
-                        f_dxdt = Transport_model.f_dxdt
-                    end
-                    simulations = ODE_solver(ode_system=f_dxdt, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options, model_type=model_type)
-                    (sim_options.save_simulations) && (save_simulations_to_csv(simulations=simulations, column_names=Transport_model.xids, simulations_path=joinpath(JULIA_RESULTS_DIR, tree_id, graph_id, "simulations", "$(file_name).csv")))
-                end
+    graph_id::String = ""
+    file_name::String = ""
 
-            elseif model_type ∈ m_types.julia_model
-
-                MODEL_PATH = normpath(joinpath(@__FILE__, "../../models/julia_models.jl"))
-                include(MODEL_PATH)
-                if endswith(model_type, "_python")
-                    f_dxdt = Julia_models.pyf_dxdt!
-                    get_ODE_components = Julia_from_pygraph.get_ODE_components
-                elseif endswith(model_type, "_julia")
-                    f_dxdt = Julia_models.jf_dxdt!
-                    get_ODE_components = Julia_from_jgraph.get_ODE_components
-                end
-                for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
-                    graph_id = "$(tree_id)_$(n_node)"
-                    printstyled("------------------------------------------------------------------------------------\n"; color = 124)
-                    printstyled("   $(graph_id)_$(model_type)   \n"; color = 9)
-                    printstyled("------------------------------------------------------------------------------------\n"; color = 124)
-                    for vessel_tree ∈ trees.vascular_trees[tree_id]
-                        x0, p = get_ODE_components(tree_id, n_node, vessel_tree)
-                        simulations = ODE_solver(f_dxdt, x0, sim_options.tspan, sim_options.tpoints, p, sol_options, model_type, cbs)
-                        display(plot(simulations))
-                        if sim_options.save_simulations
-                            file_name = "$(graph_id)_$(vessel_tree)_$(model_type)"
-                            save_simulations_to_csv(simulations=simulations, column_names=["$(edge)" for edge in p[3]], simulations_path=joinpath(JULIA_RESULTS_DIR, tree_id, graph_id, "simulations", "$(file_name).csv"))
-                            #save_simulations_to_csv(simulations=simulations, column_names=["$(elements[1])_$(elements[2])" for elements in eachrow(@view p[:, 1:2])], simulations_path=joinpath(JULIA_RESULTS_DIR, tree_id, graph_id, "simulations", "$(file_name).csv"))
-                        end
-                    end
-                end
+    for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
+        graph_id = "$(tree_id)_$(n_node)"
+        for vessel_tree ∈ trees.vascular_trees[tree_id]
+            x0, graph_p = get_ODE_components(tree_id, n_node, vessel_tree)
+            p = (graph_p.is_inflow, graph_p.flows, graph_p.volumes, graph_p.ODE_groups, graph_p.pre_elements, graph_p.post_elements)
+            simulations = ODE_solver(x0, sim_options, p, sol_options)
+            if sim_options.save_simulations
+                file_name = "$(graph_id)_$(vessel_tree)"
+                save_simulations_to_csv(
+                    simulations,
+                    ["$(edge[1]),$(edge[2])" for edge in graph_p.all_edges], # column names
+                    joinpath(
+                        JULIA_RESULTS_DIR,
+                        tree_id,
+                        graph_id,
+                        "simulations",
+                        "$(file_name).csv",
+                    ), # simulations_path
+                )
             end
         end
     end
+end
 
-    function create_benchmarked_simulations(; g_options, sim_options, bench_options, sol_options)
-        to = TimerOutput()
-        graph_id::String = ""
-        file_name::String = ""
-        
-        for model_type in g_options.model_types
-            if model_type ∈ m_types.templates
-                for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
-                    graph_id = "$(tree_id)_$(n_node)"
-                    file_name = "$(graph_id)_$(model_type)"
-                    printstyled("------------------------------------------------------------------------------------\n"; color = 124)
-                    printstyled("   $(file_name)   \n"; color = 9)
-                    printstyled("------------------------------------------------------------------------------------\n"; color = 124)
-                    
-                    MODEL_PATH = normpath(joinpath(@__FILE__, "../../.." , JULIA_RESULTS_DIR, tree_id, graph_id, "models", "$(file_name).jl"))
-                    include(MODEL_PATH) # Load the odes module
-                    @timeit to "$(graph_id)" begin
-                        if contains(model_type, "!")
-                            f_dxdt = Transport_model.f_dxdt!
-                        else
-                            f_dxdt = Transport_model.f_dxdt
-                        end
-                        @timeit to "$(graph_id)_precompilation" (!contains(model_type, "MT")) && (@invokelatest f_dxdt(zeros(length(Transport_model.x0)), Transport_model.x0, Transport_model.p, 0.0))
-                        for ki in range(1, bench_options.n_iterations, step=1)
-                            @timeit to "$(graph_id)_$ki" ODE_solver(ode_system=f_dxdt, x0=Transport_model.x0, tspan=sim_options.tspan, tpoints=sim_options.tpoints, parameter_values=Transport_model.p, sol_options=sol_options, model_type=model_type)
-                        end
-                    end
-                    n_species = length(Transport_model.x0)
-                    show(to, sortby=:firstexec)
-                    (bench_options.save_running_times) && (save_times_as_csv(times=to, n_node=n_node, tree_id=tree_id, n_species=n_species, model_type=model_type, solver_name=sol_options.solver_name, n_term=Int32(0)))
-                    reset_timer!(to::TimerOutput)
-                end
+function create_simulations(g_options, sim_options, bench_options, sol_options)
+    to = TimerOutput()
+    graph_id::String = ""
 
-            elseif model_type ∈ m_types.julia_model
-                dose = 1.0
-                dose_times = [0.001]
-    
-                # Events
-                function affect1!(integrator)
-                    integrator.p[5][length(integrator.u)] = dose;
-                end
-                function affect2!(integrator)
-                    integrator.p[5][length(integrator.u)] = 0.0;
-                end
-                cb_variant1 = PresetTimeCallback(dose_times, affect1!)
-                cb_variant2 = PresetTimeCallback(10.0 / 60, affect2!)
-                # All Callbacks together
-                cbs = CallbackSet(cb_variant1, cb_variant2)
-                MODEL_PATH = normpath(joinpath(@__FILE__, "../../models/julia_models.jl"))
-                include(MODEL_PATH)
-                # if endswith(model_type, "_python")
-                #     f_dxdt = Julia_models.pyf_dxdt!
-                #     get_ODE_components = Julia_from_pygraph.get_ODE_components
-                if endswith(model_type, "_julia")
-                    f_dxdt = Julia_models.jf_dxdt!
-                    get_ODE_components = Julia_from_jgraph.get_ODE_components
-                end
-                for tree_id ∈ g_options.tree_ids, n_node ∈ g_options.n_nodes
-                    graph_id = "$(tree_id)_$(n_node)"
-                    printstyled("------------------------------------------------------------------------------------\n"; color = 124)
-                    printstyled("   $(graph_id)_$(model_type)   \n"; color = 9)
-                    printstyled("------------------------------------------------------------------------------------\n"; color = 124)
-                    for vessel_tree ∈ trees.vascular_trees[tree_id]
-                        x0, p = get_ODE_components(tree_id, n_node, vessel_tree)
-                        printstyled("   ODEs solving started   \n"; color = 9)
-                        @timeit to "$(graph_id)_$(vessel_tree)" begin
-                            for ki in range(1, bench_options.n_iterations, step=1)
-                                @timeit to "$(graph_id)_$ki" ODE_solver(f_dxdt, x0, sim_options.tspan, sim_options.tpoints, p, sol_options, model_type, cbs)
-                            end
-                        end
-                        (bench_options.save_running_times) && (n_species::Int64 = length(x0))
-                        show(to, sortby=:firstexec)
-                        (bench_options.save_running_times) && (save_times_as_csv(times=to, n_node=n_node, tree_id="$(tree_id)_$(vessel_tree)", n_species=n_species, model_type=model_type, solver_name=sol_options.solver_name, n_term=Int32(length(p[4]))))
-                        reset_timer!(to::TimerOutput)
-                    end
-                end
+    for tree_id ∈ g_options.tree_ids, n_node ∈ g_options.n_nodes
+        graph_id = "$(tree_id)_$(n_node)"
+
+        for vessel_tree ∈ trees.vascular_trees[tree_id]
+            x0, graph_p = get_ODE_components(tree_id, n_node, vessel_tree)
+            p = (graph_p.is_inflow, graph_p.flows, graph_p.volumes, graph_p.ODE_groups, graph_p.pre_elements, graph_p.post_elements)
+            @timeit to "$(graph_id)_$(vessel_tree)" begin
+                for ki in 1:bench_options.n_iterations @timeit to "$(graph_id)_$ki" ODE_solver(x0, sim_options, p, sol_options) end
             end
+            show(to, sortby = :firstexec)
+            if bench_options.save_running_times
+                n_species::Int32 = length(x0)
+                n_terminals = Int32(n_species / 3)
+                save_times_as_csv(
+                to,
+                n_node,
+                "$(tree_id)_$(vessel_tree)",
+                n_species,
+                sol_options.solver_name,
+                n_terminals, 
+                )
+            end
+            reset_timer!(to::TimerOutput)
         end
     end
+end
+
+function save_simulations_to_csv(
+    simulations,
+    column_names::Vector{String},
+    simulations_path::String,
+)
+    # Convert solution to DataFrame
+    df = DataFrame(simulations)
+
+    # Write DataFrame to CSV
+    header = vcat(["time"], column_names)
+    CSV.write(simulations_path, df, header = header)
+end
 end
