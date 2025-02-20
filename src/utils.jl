@@ -3,7 +3,7 @@ module Utils
     RESULTS_DIR::String = "results"
     JULIA_RESULTS_DIR::String = RESULTS_DIR * "/julia_vessel_trees"
     BENCHMARKING_RESULTS_PATH::String = joinpath(JULIA_RESULTS_DIR, "jrunning_times.csv")
-    MODEL_PATH::String = "/models/julia_models.jl"
+    MODEL_PATH::String = "src/models/julia_models.jl" 
 
 
     module Definitions
@@ -15,7 +15,7 @@ module Utils
         @with_kw struct tree_definitions
             vascular_trees::Dict{String,Vector{String}} = Dict(
                 "Rectangle_trio" => ["A", "P", "V"],
-                "Rectangle_quad" => ["P", "A", "V", "B"]
+                "Rectangle_quad" => ["A"] #["P", "A", "V", "B"]
             )
             inflow_trees::Tuple{String,String} = ("A", "P")
             outflow_trees::Tuple{String,String} = ("V", "B")
@@ -41,7 +41,6 @@ module Utils
         @with_kw struct graph_options
             n_nodes::Vector{Int32}
             tree_ids::Vector{String}
-            model_types::Union{Vector{String},Nothing} = nothing
         end
 
         @with_kw struct simulations_options
@@ -53,14 +52,14 @@ module Utils
 
         @with_kw struct benchmark_options
             save_running_times::Bool = false
-            n_iterations::Int16 = 1
+            n_iterations::Int16 = 3
         end
 
         # https://docs.sciml.ai/DiffEqDocs/stable/solvers/split_ode_solve/
         @with_kw struct solver_options
             solver = Tsit5()
-            absolute_tolerance::Float64 = 1e-6
-            relative_tolerance::Float64 = 1e-6
+            absolute_tolerance::Float64 = 1e-4
+            relative_tolerance::Float64 = 1e-4
             dt::Float64 = 0.1
             solver_name::String = "Tsit5" # "Tsit5"
         end
@@ -75,11 +74,11 @@ module Utils
         using Tables
         import ..JULIA_RESULTS_DIR, ..BENCHMARKING_RESULTS_PATH
 
-        function save_times_as_csv(;
+        function save_times_as_csv(
             times::TimerOutput,
             n_node::Int32,
             tree_id::String,
-            n_species::Int64
+            n_species::Int32,
             solver_name::String,
             n_term::Int32,
         )
@@ -100,36 +99,20 @@ module Utils
                 push!(call_orders, "Total time (all iterations)")
                 push!(times_ns, time_ns)
                 push!(allocated_bytes, allocated_mem)
-                time_with_precomp = 0
-                mem_with_precomp = 0
-                for (ksb, subgraph_id) ∈ enumerate(keys(indiv_times))
+                for subgraph_id ∈ keys(indiv_times)
                     n_call_minor = get(get(indiv_times, subgraph_id, NaN), "n_calls", NaN)
                     time_ns = get(get(indiv_times, subgraph_id, NaN), "time_ns", NaN)
                     allocated_mem = get(get(indiv_times, subgraph_id, NaN), "allocated_bytes", NaN)
                     push!(n_calls, n_call_minor)
-                    if endswith(subgraph_id, "_precompilation")
-                        push!(call_orders, "Precompilation")
-                        time_with_precomp += time_ns
-                        mem_with_precomp += allocated_mem
-                    elseif endswith(subgraph_id, "_1")
-                        push!(call_orders, "First call")
-                        time_with_precomp += time_ns
-                        mem_with_precomp += allocated_mem
-                    else
-                        push!(call_orders, "Call number > 1 (n=$(len-1))")
-                    end
+                    push!(call_orders, "Call")
                     push!(times_ns, time_ns)
                     push!(allocated_bytes, allocated_mem)
                 end
-                push!(n_calls, 1)
-                push!(call_orders, "First call + precompilation")
-                push!(times_ns, time_with_precomp)
-                push!(allocated_bytes, mem_with_precomp)
             end
-            tree_ids::Vector{String} = ["$(tree_id)_not!" for _ ∈ eachindex(allocated_bytes)]
+            tree_ids::Vector{String} = ["$(tree_id)" for _ ∈ eachindex(allocated_bytes)]
             n_nodes::Vector{Int32} = [n_node for _ ∈ eachindex(allocated_bytes)]
-            n_sp::Vector{Int64} = [n_species for _ ∈ eachindex(allocated_bytes)]
-            solver_names = [solver_name for _ ∈ eachindex(allocated_bytes)]
+            n_sp::Vector{Int32} = [n_species for _ ∈ eachindex(allocated_bytes)]
+            solver_names::Vector{String} = [solver_name for _ ∈ eachindex(allocated_bytes)]
             n_terminals::Vector{Int32} = [n_term for _ ∈ eachindex(allocated_bytes)]
             table = (
                 n_calls = n_calls,

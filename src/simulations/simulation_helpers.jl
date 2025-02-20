@@ -14,23 +14,22 @@ include("../utils.jl")
 import .Utils: JULIA_RESULTS_DIR, MODEL_PATH
 import .Utils.Definitions: tree_definitions
 import .Utils.Benchmarking: save_times_as_csv
-import .Utils.Options: model_types
 
 include("../models/julia_from_jgraph.jl")
 import .Julia_from_jgraph: get_ODE_components
 
-include(MODEL_PATH)
+include("../../"*MODEL_PATH)
 import .Julia_models: jf_dxdt!
 
 # Already specified in utils.jl
 trees::tree_definitions = tree_definitions()
 
-function ODE_solver(x0, sim_options, parameters_value, sol_options)::SciMLBase.ODESolution
+function ODE_solver(x0, sim_options, p, sol_options)
 
-    prob = ODEProblem(jf_dxdt!, x0, sim_options.tspan, parameters_value)
+    problem = ODEProblem(jf_dxdt!, x0, sim_options.tspan, p)
 
-    sol = solve(
-        prob,
+    solution = solve(
+        problem,
         sol_options.solver,
         saveat = sim_options.tpoints,
         dense = false,
@@ -38,7 +37,10 @@ function ODE_solver(x0, sim_options, parameters_value, sol_options)::SciMLBase.O
         abstol = sol_options.absolute_tolerance,
     )
 
-    return sol
+    #print(solution.destats)
+    #display(plot(solution))
+
+    return solution
 
 end
 
@@ -50,27 +52,28 @@ function create_simulations(g_options, sim_options, sol_options)
     for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
         graph_id = "$(tree_id)_$(n_node)"
         for vessel_tree ∈ trees.vascular_trees[tree_id]
-            x0, p = get_ODE_components(tree_id, n_node, vessel_tree)
+            x0, graph_p = get_ODE_components(tree_id, n_node, vessel_tree)
+            p = (graph_p.is_inflow, graph_p.flows, graph_p.volumes, graph_p.ODE_groups, graph_p.pre_elements, graph_p.post_elements)
             simulations = ODE_solver(x0, sim_options, p, sol_options)
             if sim_options.save_simulations
-                file_name = "$(graph_id)_$(vessel_tree)_$(model_type)"
+                file_name = "$(graph_id)_$(vessel_tree)"
                 save_simulations_to_csv(
-                    simulations = simulations,
-                    column_names = ["$(edge[1]),$(edge[2])" for edge in p[3]],
-                    simulations_path = joinpath(
+                    simulations,
+                    ["$(edge[1]),$(edge[2])" for edge in graph_p.all_edges], # column names
+                    joinpath(
                         JULIA_RESULTS_DIR,
                         tree_id,
                         graph_id,
                         "simulations",
                         "$(file_name).csv",
-                    ),
+                    ), # simulations_path
                 )
             end
         end
     end
 end
 
-function create_benchmarked_simulations(g_options, sim_options, bench_options, sol_options)
+function create_simulations(g_options, sim_options, bench_options, sol_options)
     to = TimerOutput()
     graph_id::String = ""
 
@@ -78,31 +81,31 @@ function create_benchmarked_simulations(g_options, sim_options, bench_options, s
         graph_id = "$(tree_id)_$(n_node)"
 
         for vessel_tree ∈ trees.vascular_trees[tree_id]
-            x0, p = get_ODE_components(tree_id, n_node, vessel_tree)
-            printstyled("   ODEs solving started   \n"; color = 9)
+            x0, graph_p = get_ODE_components(tree_id, n_node, vessel_tree)
+            p = (graph_p.is_inflow, graph_p.flows, graph_p.volumes, graph_p.ODE_groups, graph_p.pre_elements, graph_p.post_elements)
             @timeit to "$(graph_id)_$(vessel_tree)" begin
-                for ki in range(1, bench_options.n_iterations, step = 1)
-                    @timeit to "$(graph_id)_$ki" ODE_solver(x0, sim_options, p, sol_options)
-                end
+                for ki in 1:bench_options.n_iterations @timeit to "$(graph_id)_$ki" ODE_solver(x0, sim_options, p, sol_options) end
             end
-            (bench_options.save_running_times) && (n_species::Int64 = length(x0))
             show(to, sortby = :firstexec)
-            (bench_options.save_running_times) && (save_times_as_csv(
-                times = to,
-                n_node = n_node,
-                tree_id = "$(tree_id)_$(vessel_tree)",
-                n_species = n_species,
-                model_type = model_type,
-                solver_name = sol_options.solver_name,
-                n_term = Int32(n_species / 3),
-            ))
+            if bench_options.save_running_times
+                n_species::Int32 = length(x0)
+                n_terminals = Int32(n_species / 3)
+                save_times_as_csv(
+                to,
+                n_node,
+                "$(tree_id)_$(vessel_tree)",
+                n_species,
+                sol_options.solver_name,
+                n_terminals, 
+                )
+            end
             reset_timer!(to::TimerOutput)
         end
     end
 end
 
-function save_simulations_to_csv(;
-    simulations::SciMLBase.ODESolution,
+function save_simulations_to_csv(
+    simulations,
     column_names::Vector{String},
     simulations_path::String,
 )
