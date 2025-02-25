@@ -39,7 +39,7 @@ module Utils
         using Revise # this package must not be in final version
 
         @with_kw struct graph_options
-            n_nodes::Vector{Int32}
+            n_nodes::Vector{Int64}
             tree_ids::Vector{String}
         end
 
@@ -52,16 +52,16 @@ module Utils
 
         @with_kw struct benchmark_options
             save_running_times::Bool = false
-            n_iterations::Int16 = 3
+            n_iterations::Int16 = 1
         end
 
         # https://docs.sciml.ai/DiffEqDocs/stable/solvers/split_ode_solve/
         @with_kw struct solver_options
             solver = Tsit5()
-            absolute_tolerance::Float64 = 1e-4
-            relative_tolerance::Float64 = 1e-4
-            dt::Float64 = 0.1
-            solver_name::String = "Tsit5" # "Tsit5"
+            absolute_tolerance = 1e-4
+            relative_tolerance = 1e-4
+            dt = 0.1
+            solver_name = "Tsit5" # "Tsit5"
         end
 
     end
@@ -76,15 +76,15 @@ module Utils
 
         function save_times_as_csv(
             times::TimerOutput,
-            n_node::Int32,
+            n_node::Int64,
             tree_id::String,
-            n_species::Int32,
+            n_species::Int64,
             solver_name::String,
-            n_term::Int32,
+            n_term::Int64,
         )
 
             total_times = TimerOutputs.todict(times)["inner_timers"]
-            n_calls::Vector{Int16} = []
+            n_calls::Vector{Integer} = []
             call_orders::Vector{String} = []
             times_ns::Vector{Float64} = []
             allocated_bytes::Vector{Float64} = []
@@ -110,10 +110,10 @@ module Utils
                 end
             end
             tree_ids::Vector{String} = ["$(tree_id)" for _ ∈ eachindex(allocated_bytes)]
-            n_nodes::Vector{Int32} = [n_node for _ ∈ eachindex(allocated_bytes)]
-            n_sp::Vector{Int32} = [n_species for _ ∈ eachindex(allocated_bytes)]
+            n_nodes::Vector{Integer} = [n_node for _ ∈ eachindex(allocated_bytes)]
+            n_sp::Vector{Integer} = [n_species for _ ∈ eachindex(allocated_bytes)]
             solver_names::Vector{String} = [solver_name for _ ∈ eachindex(allocated_bytes)]
-            n_terminals::Vector{Int32} = [n_term for _ ∈ eachindex(allocated_bytes)]
+            n_terminals::Vector{Integer} = [n_term for _ ∈ eachindex(allocated_bytes)]
             table = (
                 n_calls = n_calls,
                 call_orders = call_orders,

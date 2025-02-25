@@ -25,20 +25,20 @@ Output: .arrow (table) for every individual vessel tree (arterial, portal, etc.)
 
 Idea of this module: to get, to store, and to save all the information that we need for correct ODEs from the graph. 
 
-TODO: Get rid of zeros in DataFrame
+TODO: Optimize code
 """
 
 # ============ Specify options
 g_options::graph_options = graph_options(
-    n_nodes = [10],  #750, 1000, 1250, 1500
+    n_nodes = [1000000],  #750, 1000, 1250, 1500
     tree_ids = [
         "Rectangle_quad",
     ],
 )
 
 # Already specified in utils.jl
-trees::tree_definitions = tree_definitions()
-groups::ODE_groups = ODE_groups()
+const trees::tree_definitions = tree_definitions()
+const groups::ODE_groups = ODE_groups()
 
 function __init__()
     for tree_id ∈ g_options.tree_ids, n_node ∈ g_options.n_nodes
@@ -47,7 +47,7 @@ function __init__()
 end
 
 # Main function: workflow for whole tree
-function process_julia_graph(tree_id::String, n_node::Int32)
+function process_julia_graph(tree_id::String, n_node::Integer)
     # get graph id for correct path definition
     graph_id::String = "$(tree_id)_$(n_node)"
     GRAPH_DIR::String = normpath(
@@ -120,11 +120,11 @@ function create_graph_structure(
     vessel_tree::String,
 )::NamedTuple
     graph_info::NamedTuple = prepare_graph_info(graph_structure, nodes_attrib, vessel_tree)
-    df_length = length(graph_info.all_edges)
+    df_length::Integer = length(graph_info.all_edges)
     graph = (
-        vascular_tree_id = [vessel_tree; fill(missing, df_length-length(vessel_tree))], # vascular_tree_id
-        is_inflow = [graph_info.is_inflow; fill(missing, df_length-length(graph_info.is_inflow))], # is_inflow
-        nodes_ids = [nodes_attrib.ids; fill(missing, df_length-length(nodes_attrib.ids))], # nodes::Vector{Int32}
+        vascular_tree_id = get_extended_vector(vessel_tree, df_length), #[vessel_tree; fill(missing, df_length-length(vessel_tree))], # vascular_tree_id
+        is_inflow = get_extended_vector(graph_info.is_inflow, df_length), #[graph_info.is_inflow; fill(missing, df_length-length(graph_info.is_inflow))], # is_inflow
+        nodes_ids = [nodes_attrib.ids; fill(missing, df_length-length(nodes_attrib.ids))], # nodes::Vector{Int64}
         nodes_coordinates = [graph_info.nodes_coordinates; fill(missing, df_length-length(graph_info.nodes_coordinates))],
         all_edges = graph_info.all_edges, # 
         terminal_edges = [graph_info.terminal_edges; fill(missing, df_length-length(graph_info.terminal_edges))], # terminal edges
@@ -175,7 +175,7 @@ function assign_ODE_group!(graph_structure::DataFrame)
 end
 
 function set_index!(graph_structure::DataFrame)
-    graph_structure.index = Int32.(1:nrow(graph_structure))
+    graph_structure.index = 1:nrow(graph_structure)
 end
 
 function prepare_graph_info(graph_structure::DataFrame, nodes_attrib::DataFrame, vessel_tree::String)::NamedTuple
@@ -211,9 +211,9 @@ function prepare_graph_info(graph_structure::DataFrame, nodes_attrib::DataFrame,
 end
 
 function get_pre_postelements(
-    edges::Vector{Tuple{Int32, Int32}},
+    edges::Vector{Tuple{T, T}},
     graph_structure::DataFrame,
-)
+) where {T<:Integer}
     pre_elements = [[] for _ in eachindex(edges)]
     post_elements = [[] for _ in eachindex(edges)]
     df = @view graph_structure[:, [:source_id, :target_id, :index]]
@@ -226,5 +226,9 @@ function get_pre_postelements(
 end
 
 condition(df, id, ke, df_index) = df==id && ke!=df_index
+
+function get_extended_vector(df_column, df_length)
+    return [df_column; fill(missing, df_length-length(df_column))]
+end
 
 end

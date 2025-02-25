@@ -24,7 +24,7 @@ export read_edges,
     create_tuples_from_dfrows
 
 # calculation of terminal volume
-volume_geometry::Float64 = (0.100 * 0.100 * 0.10) / 1000 # [cm^3] -> [l]
+volume_geometry = (0.100 * 0.100 * 0.10) / 1000 # [cm^3] -> [l]
 
 function read_edges(GRAPH_PATH::String, EDGES_PATH::String)::DataFrame
     # read and prepare lg file with information about edges
@@ -42,11 +42,6 @@ function read_graph_skeleton(GRAPH_PATH::String)::DataFrame
     graph_skeleton::DataFrame = CSV.read(GRAPH_PATH, DataFrame)
     select!(graph_skeleton, Not(names(graph_skeleton, Missing)))
     rename!(graph_skeleton, [:source_id, :target_id])
-    transform!(
-        graph_skeleton,
-        names(graph_skeleton, Int64) .=> ByRow(Int32),
-        renamecols = false,
-    )
 
     return graph_skeleton
 end
@@ -63,8 +58,6 @@ function read_edges_attributes(EDGES_PATH::String)::DataFrame
             :pressure_drop = :pressure_drop_in_kg_per_mm_s2
         end
         @transform! begin
-            :target_id = Int32.(:target_id)
-            :leaf = Int32.(:leaf)
             :flows = (:flows ./ 1000000 * 60) # Change units of the flow [mm3/s --> L/min]
             :volumes = π .* :radius .^ 2 .* :length ./ 1000000 # [mm3 --> L] 
         end
@@ -82,7 +75,6 @@ function read_nodes_attributes(NODES_PATH::String)::DataFrame
             :y = :y_coord_in_mm
             :z = :z_coord_in_mm
         end
-        @transform! :ids = Int32.(:ids)
     end
 
     return nodes_attrib
@@ -124,7 +116,7 @@ end
 
 function create_marginal_edge!(graph_structure)
     # adding marginal edge (for input)
-    start_node_id::Int32 = (selection_from_df(graph_structure, (graph_structure.start .== true, :source_id)))[1]
+    start_node_id = (selection_from_df(graph_structure, (graph_structure.start .== true, :source_id)))[1]
     push!(
         graph_structure,
         [
@@ -147,10 +139,10 @@ function create_marginal_edge!(graph_structure)
 end
 
 function collect_terminal_edges_info(
-    terminal_node_ids::SubArray{Int32,1,Vector{Int32},Tuple{Vector{Int64}},false},
+    terminal_node_ids,
 )::DataFrame
     n_terminals = length(terminal_node_ids)
-    volume_terminal::Float64 = volume_geometry / n_terminals
+    volume_terminal = volume_geometry / n_terminals
     terminal_edges_info = DataFrame(
         :source_id => terminal_node_ids,
         :target_id => terminal_node_ids,

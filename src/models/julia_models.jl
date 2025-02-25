@@ -41,7 +41,7 @@ function jf_dxdt!(dx, x, p, t)
 end
 
 function jf_inflow!(dx, x, flows, ODE_groups, pre_elements, post_elements, t)
-    x[length(x)] = f_intervention(t)
+    x[end] = f_intervention(t)
     @inbounds for (ke, group) in enumerate(ODE_groups)
         # retrieve information for element
         pre_element = pre_elements[ke]

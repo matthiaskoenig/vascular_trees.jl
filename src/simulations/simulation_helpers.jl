@@ -12,7 +12,7 @@ using Term
 
 include("../utils.jl")
 import .Utils: JULIA_RESULTS_DIR, MODEL_PATH
-import .Utils.Definitions: tree_definitions
+import .Utils.Definitions: tree_definitions, ODE_groups
 import .Utils.Benchmarking: save_times_as_csv
 
 include("../models/julia_from_jgraph.jl")
@@ -22,19 +22,22 @@ include("../../" * MODEL_PATH)
 import .Julia_models: jf_dxdt!
 
 # Already specified in utils.jl
-trees::tree_definitions = tree_definitions()
+const trees = tree_definitions()
+const groups = ODE_groups()
 
-function ODE_solver(x0, sim_options, p, sol_options)
+function ODE_solver(x0, sim_options, p, sol_options, idxs_tosave)
 
     problem = ODEProblem(jf_dxdt!, x0, sim_options.tspan, p)
 
     solution = solve(
         problem,
         sol_options.solver,
-        saveat = sim_options.tpoints,
+        # saveat = sim_options.tpoints,
         dense = false,
         reltol = sol_options.relative_tolerance,
         abstol = sol_options.absolute_tolerance,
+        save_idxs = idxs_tosave,
+        progress = true
     )
 
     #print(solution.destats)
@@ -51,7 +54,9 @@ function create_simulations(g_options, sim_options, sol_options)
 
     for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
         graph_id = "$(tree_id)_$(n_node)"
-        for vessel_tree ∈ trees.vascular_trees[tree_id]
+        vessel_trees = trees.vascular_trees[tree_id]
+
+        for vessel_tree ∈ vessel_trees
             x0, graph_p = get_ODE_components(tree_id, n_node, vessel_tree)
             p = (
                 graph_p.is_inflow,
@@ -61,7 +66,8 @@ function create_simulations(g_options, sim_options, sol_options)
                 graph_p.pre_elements,
                 graph_p.post_elements,
             )
-            simulations = ODE_solver(x0, sim_options, p, sol_options)
+            idxs_tosave = get_indices(p[4], [groups.marginal, groups.terminal])
+            simulations = ODE_solver(x0, sim_options, p, sol_options, idxs_tosave)
             if sim_options.save_simulations
                 file_name = "$(graph_id)_$(vessel_tree)"
                 save_simulations_to_csv(
@@ -86,8 +92,9 @@ function create_simulations(g_options, sim_options, bench_options, sol_options)
 
     for tree_id ∈ g_options.tree_ids, n_node ∈ g_options.n_nodes
         graph_id = "$(tree_id)_$(n_node)"
+        vessel_trees = trees.vascular_trees[tree_id]
 
-        for vessel_tree ∈ trees.vascular_trees[tree_id]
+        for vessel_tree ∈ vessel_trees
             x0, graph_p = get_ODE_components(tree_id, n_node, vessel_tree)
             p = (
                 graph_p.is_inflow,
@@ -97,15 +104,16 @@ function create_simulations(g_options, sim_options, bench_options, sol_options)
                 graph_p.pre_elements,
                 graph_p.post_elements,
             )
+            idxs_tosave = get_indices(p[4], [groups.marginal, groups.terminal])
             @timeit to "$(graph_id)_$(vessel_tree)" begin
                 for ki = 1:bench_options.n_iterations
-                    @timeit to "$(graph_id)_$ki" ODE_solver(x0, sim_options, p, sol_options)
+                    @timeit to "$(graph_id)_$ki" ODE_solver(x0, sim_options, p, sol_options, idxs_tosave)
                 end
             end
             show(to, sortby = :firstexec)
             if bench_options.save_running_times
-                n_species::Int32 = length(x0)
-                n_terminals = Int32(n_species / 3)
+                n_species = length(x0)
+                n_terminals = Int64(n_species / 3)
                 save_times_as_csv(
                     to,
                     n_node,
@@ -132,4 +140,12 @@ function save_simulations_to_csv(
     header = vcat(["time"], column_names)
     CSV.write(simulations_path, df, header = header)
 end
+
+function get_indices(collection, groups)
+    indices::Vector{Int64} = []
+    @inbounds for (ke, element) ∈ enumerate(collection)
+        (element ∈ groups) && (push!(indices, ke))
+    end
+    return indices
+end    
 end
