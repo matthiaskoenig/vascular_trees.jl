@@ -37,7 +37,7 @@ using InteractiveUtils
 
 # ============ Specify options
 g_options::graph_options = graph_options(
-    n_nodes = [1000],  
+    n_nodes = [10],  
     tree_ids = [
         "Rectangle_quad",
         # "Rectangle_trio",

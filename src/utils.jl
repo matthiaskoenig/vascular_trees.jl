@@ -13,9 +13,15 @@ module Utils
         using Revise
 
         @with_kw struct tree_definitions
-            vascular_trees::Dict{String,Vector{String}} = Dict(
-                "Rectangle_trio" => ["A", "P", "V"],
-                "Rectangle_quad" => ["A"] #["P", "A", "V", "B"]
+            vascular_trees::Dict{String,Dict{Symbol,Vector{String}}} = Dict(
+                "Rectangle_trio" => Dict(
+                    :inflow_trees => ["A", "P"],
+                    :outflow_trees => ["V"]
+                ),
+                "Rectangle_quad" => Dict(
+                    :inflow_trees => ["A", "P"],
+                    :outflow_trees => ["V", "B"]
+                ) #["P", "A", "V", "B"]
             )
             inflow_trees::Tuple{String,String} = ("A", "P")
             outflow_trees::Tuple{String,String} = ("V", "B")

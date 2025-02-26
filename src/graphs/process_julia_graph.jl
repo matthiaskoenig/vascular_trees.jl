@@ -30,7 +30,7 @@ TODO: Optimize code
 
 # ============ Specify options
 g_options::graph_options = graph_options(
-    n_nodes = [1000000],  #750, 1000, 1250, 1500
+    n_nodes = [10],  #750, 1000, 1250, 1500
     tree_ids = [
         "Rectangle_quad",
     ],
@@ -53,7 +53,8 @@ function process_julia_graph(tree_id::String, n_node::Integer)
     GRAPH_DIR::String = normpath(
         joinpath(@__FILE__, "../../..", JULIA_RESULTS_DIR, tree_id, graph_id, "julia"),
     )
-    for vessel_tree ∈ trees.vascular_trees[tree_id]
+    vessel_trees = values(trees.vascular_trees[tree_id])
+    for vessel_tree ∈ Iterators.flatten(vessel_trees)
         process_individual_tree(GRAPH_DIR, vessel_tree, tree_id, graph_id)
     end
 end

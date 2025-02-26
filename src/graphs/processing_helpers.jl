@@ -109,8 +109,8 @@ end
 
 function create_terminal_edges!(graph_structure)
     # adding self edges for terminal nodes
-    terminal_nodes_id = selection_from_df(graph_structure, (graph_structure.preterminal .== true, :target_id))
-    terminal_nodes_info = collect_terminal_edges_info(terminal_nodes_id)
+    terminal_nodes_ids = selection_from_df(graph_structure, (graph_structure.preterminal .== true, :target_id))
+    terminal_nodes_info = collect_terminal_edges_info(terminal_nodes_ids)
     append!(graph_structure, terminal_nodes_info)
 end
 
