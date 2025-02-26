@@ -1,5 +1,12 @@
 module Julia_models
 
+"""
+Module with ODE functions that are transport models for the drug(s).
+ODEs for inflow trees (arterial and portal) differ from ODEs for
+    outflow trees (venous and biliary), so they are written in separate
+    functions.
+"""
+
 include("../interventions.jl")
 using .Interventions: f_intervention
 using InteractiveUtils
@@ -34,13 +41,12 @@ function jf_dxdt!(dx, x, p, t)
 end
 
 function jf_inflow!(dx, x, flows, ODE_groups, pre_elements, post_elements, t)
-    x[length(x)] = f_intervention(t)
+    x[end] = f_intervention(t)
     @inbounds for (ke, group) in enumerate(ODE_groups)
         # retrieve information for element
-        # post_element = post_elements[ke]
-        # in -> inflow & inflow element not connected to terminal
         pre_element = pre_elements[ke]
         post_element = post_elements[ke]
+        # in -> inflow & inflow element not connected to terminal
         if group == 1 #(!is_preterminal .&& !is_terminal .&& source_id != 0) 
             # dA/dt = QA * A_pre / VA - Q_post * A / VA;
             # species before
@@ -51,7 +57,7 @@ function jf_inflow!(dx, x, flows, ODE_groups, pre_elements, post_elements, t)
         # inflow element connected to terminal
         elseif group == 2 # (is_preterminal) 
             # dA/dt = QA * A_pre / VA - QA * A / VA;
-            # species before and after
+            # species before
             inflow_in .= flows[ke] .* view(x, pre_element)
             dx[ke] = sum(inflow_in) - flows[ke] * x[ke] * length(post_element)
         # terminal element
@@ -60,6 +66,7 @@ function jf_inflow!(dx, x, flows, ODE_groups, pre_elements, post_elements, t)
             # dT/dt = QA * A / VT - QA * T / VT
             # species before and output
             inflow_in .= view(flows, pre_element) .* view(x, pre_element)
+            # species output
             inflow_out_term .= view(flows, pre_element) .* x[ke]
             dx[ke] = sum(inflow_in) - sum(inflow_out_term)
         end
@@ -76,16 +83,19 @@ function jf_outflow!(dx, x, flows, ODE_groups, pre_elements, post_elements, t)
         if group == 0 #target_id == 0
             # species before
             outflow_in_margin .= view(flows, pre_element) .* view(x, pre_element)
+            # output
             outflow_out_margin .= view(flows, pre_element) .* x[ke]
             dx[ke] = sum(outflow_in_margin) - sum(outflow_out_margin)
         # outflow -> out & outflow element not connected to terminal
         elseif group == 1 #(!is_preterminal .&& !is_terminal .&& target_id != 0) 
             # dV/dt = QV_pre * V_pre / VV - Q * V / VV;
+            # species before
             outflow_in .= view(flows, pre_element) .* view(x, pre_element)
             dx[ke] = sum(outflow_in) - flows[ke] * x[ke] * length(post_element)
         # outflow element connected to terminal
         elseif group == 2 #(is_preterminal) 
             # dV/dt = QV * T / VV - QV * V / VV;
+            # species before and after
             dx[ke] = sum(flows[ke] .* view(x, pre_element)) - flows[ke] * x[ke] * length(post_element)
         elseif group == 3 #(is_terminal) 
             dx[ke] = f_intervention(t) 
