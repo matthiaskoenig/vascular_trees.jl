@@ -49,28 +49,28 @@ struct to_collect{T, N}
     post_elements::Vector{Vector{T}}
 end
 
-# function __init__()
-#     for tree_id ∈ g_options.tree_ids, n_node ∈ g_options.n_nodes
-#         to = TimerOutput()
-#         vessel_tree = "A"
-#         #@code_warntype get_ODE_components(tree_id, n_node, vessel_tree)
-#         x0, graph_p = get_ODE_components(tree_id, n_node, vessel_tree)
-#         p = (graph_p.is_inflow, graph_p.flows, graph_p.volumes, graph_p.ODE_groups, graph_p.pre_elements, graph_p.post_elements)
-#         #jf_dxdt!([0.0 for _ in eachindex(x0)], x0, p, 10.0)
-#         prob = ODEProblem(jf_dxdt!, x0, (0.0, 10.0 / 60.0), p)
-#         sol = solve(
-#             prob,
-#             Tsit5(),
-#             # CVODE_BDF(),
-#             # callback=cb_variant2
-#             abstol = 1e-8,
-#             reltol = 1e-8, # Rosenbrock23(), # Tsit5(), # CVODE_BDF
-#         )
+function __init__()
+    for tree_id ∈ g_options.tree_ids, n_node ∈ g_options.n_nodes
+        to = TimerOutput()
+        vessel_tree = "A"
+        #@code_warntype get_ODE_components(tree_id, n_node, vessel_tree)
+        x0, graph_p = get_ODE_components(tree_id, n_node, vessel_tree)
+        p = (graph_p.is_inflow, graph_p.flows, graph_p.volumes, graph_p.ODE_groups, graph_p.pre_elements, graph_p.post_elements)
+        #jf_dxdt!([0.0 for _ in eachindex(x0)], x0, p, 10.0)
+        prob = ODEProblem(jf_dxdt!, x0, (0.0, 10.0 / 60.0), p)
+        sol = solve(
+            prob,
+            Tsit5(),
+            # CVODE_BDF(),
+            # callback=cb_variant2
+            abstol = 1e-8,
+            reltol = 1e-8, # Rosenbrock23(), # Tsit5(), # CVODE_BDF
+        )
 
-#         # show(to, sortby = :firstexec)
-#         # display(plot(sol))
-#     end
-# end
+        # show(to, sortby = :firstexec)
+        #display(plot(sol))
+    end
+end
 
 function get_ODE_components(tree_id::String, n_node::Integer, vessel_tree::String)
     # get graph id for correct path definition

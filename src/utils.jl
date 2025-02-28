@@ -19,8 +19,8 @@ module Utils
                     :outflow_trees => ["V"]
                 ),
                 "Rectangle_quad" => Dict(
-                    :inflow_trees => ["A", "P"],
-                    :outflow_trees => ["V", "B"]
+                    :inflow_trees => ["A"],
+                    :outflow_trees => []
                 ) #["P", "A", "V", "B"]
             )
             inflow_trees::Tuple{String,String} = ("A", "P")
@@ -58,14 +58,14 @@ module Utils
 
         @with_kw struct benchmark_options
             save_running_times::Bool = false
-            n_iterations::Int16 = 1
+            n_iterations::Int16 = 3
         end
 
         # https://docs.sciml.ai/DiffEqDocs/stable/solvers/split_ode_solve/
         @with_kw struct solver_options
             solver = Tsit5()
-            absolute_tolerance = 1e-4
-            relative_tolerance = 1e-4
+            absolute_tolerance = 1e-8
+            relative_tolerance = 1e-8
             dt = 0.1
             solver_name = "Tsit5" # "Tsit5"
         end

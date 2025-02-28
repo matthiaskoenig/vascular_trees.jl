@@ -36,8 +36,8 @@ function ODE_solver(x0, sim_options, p, sol_options, idxs_tosave)
         dense = false,
         reltol = sol_options.relative_tolerance,
         abstol = sol_options.absolute_tolerance,
-        save_idxs = idxs_tosave,
-        progress = true
+        # save_idxs = idxs_tosave,
+        #progress = true
     )
 
     #print(solution.destats)
@@ -54,9 +54,9 @@ function create_simulations(g_options, sim_options, sol_options)
 
     for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
         graph_id = "$(tree_id)_$(n_node)"
-        vessel_trees = trees.vascular_trees[tree_id]
+        vessel_trees = values(trees.vascular_trees[tree_id])
 
-        for vessel_tree ∈ vessel_trees
+        for vessel_tree ∈ Iterators.flatten(vessel_trees)
             x0, graph_p = get_ODE_components(tree_id, n_node, vessel_tree)
             p = (
                 graph_p.is_inflow,
@@ -92,9 +92,9 @@ function create_simulations(g_options, sim_options, bench_options, sol_options)
 
     for tree_id ∈ g_options.tree_ids, n_node ∈ g_options.n_nodes
         graph_id = "$(tree_id)_$(n_node)"
-        vessel_trees = trees.vascular_trees[tree_id]
+        vessel_trees = values(trees.vascular_trees[tree_id])
 
-        for vessel_tree ∈ vessel_trees
+        for vessel_tree ∈ Iterators.flatten(vessel_trees)
             x0, graph_p = get_ODE_components(tree_id, n_node, vessel_tree)
             p = (
                 graph_p.is_inflow,

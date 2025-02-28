@@ -37,7 +37,7 @@ using InteractiveUtils
 
 # ============ Specify options
 g_options::graph_options = graph_options(
-    n_nodes = [10],  
+    n_nodes = [10, 10000],  #10
     tree_ids = [
         "Rectangle_quad",
         # "Rectangle_trio",
@@ -59,7 +59,7 @@ if sim_options.benchmark
     import .Utils.Options: benchmark_options
 
     # do not write anything here in brackets if you are okay with default variant
-    bench_options::benchmark_options = benchmark_options(save_running_times = false)
+    bench_options::benchmark_options = benchmark_options(save_running_times = true)
     create_simulations(
         g_options,
         sim_options,

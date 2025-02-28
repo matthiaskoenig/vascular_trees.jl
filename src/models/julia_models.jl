@@ -19,6 +19,8 @@ const outflow_in = zeros(2)
 const outflow_in_margin = zeros(1)
 const outflow_out_margin = zeros(1)
 
+const terminal_in = zeros(1)
+
 export jf_dxdt!
 
 function jf_dxdt!(dx, x, p, t)
@@ -102,4 +104,13 @@ function jf_outflow!(dx, x, flows, ODE_groups, pre_elements, post_elements, t)
         end
     end
 end
+
+function jf_terminal!(dx, x, flows, ODE_groups, pre_elements, post_elements, t)
+    @inbounds for (ke, group) in enumerate(ODE_groups)
+        terminal_in .= view(flows, pre_element) .* view(x, pre_element)
+        terminal_out .= view(flows, post_element) .* x[ke]
+        dx[ke] = sum(terminal_in) - sum(terminal_out)
+    end
+end
+
 end
