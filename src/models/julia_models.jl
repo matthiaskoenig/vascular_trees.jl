@@ -21,28 +21,15 @@ const outflow_out_margin = zeros(1)
 
 const terminal_in = zeros(1)
 
-export jf_dxdt!
+export jf_inflow!, jf_outflow!, jf_terminal!
 
-function jf_dxdt!(dx, x, p, t)
-
+function jf_inflow!(dx, x, p, t)
     is_inflow = p[1]
     flows = p[2]
     volumes = p[3]
     ODE_groups = p[4]
     pre_elements = p[5]
     post_elements = p[6]
-
-    dx .= 0.0
-
-    if is_inflow == 1
-        jf_inflow!(dx, x, flows, ODE_groups, pre_elements, post_elements, t)
-    else
-        jf_outflow!(dx, x, flows, ODE_groups, pre_elements, post_elements, t)
-    end
-    dx .= dx ./ volumes
-end
-
-function jf_inflow!(dx, x, flows, ODE_groups, pre_elements, post_elements, t)
     x[end] = f_intervention(t)
     @inbounds for (ke, group) in enumerate(ODE_groups)
         # retrieve information for element
@@ -75,7 +62,13 @@ function jf_inflow!(dx, x, flows, ODE_groups, pre_elements, post_elements, t)
     end
 end
 
-function jf_outflow!(dx, x, flows, ODE_groups, pre_elements, post_elements, t)
+function jf_outflow!(dx, x, p, t)
+    is_inflow = p[1]
+    flows = p[2]
+    volumes = p[3]
+    ODE_groups = p[4]
+    pre_elements = p[5]
+    post_elements = p[6]
     @inbounds for (ke, group) in enumerate(ODE_groups)
         # retrieve information for element
         pre_element = pre_elements[ke]
@@ -107,9 +100,13 @@ end
 
 function jf_terminal!(dx, x, flows, ODE_groups, pre_elements, post_elements, t)
     @inbounds for (ke, group) in enumerate(ODE_groups)
-        terminal_in .= view(flows, pre_element) .* view(x, pre_element)
-        terminal_out .= view(flows, post_element) .* x[ke]
-        dx[ke] = sum(terminal_in) - sum(terminal_out)
+        if group == 3 # terminal
+            pre_element = pre_elements[ke]
+            post_element = post_elements[ke]
+            terminal_in .= view(flows, pre_element) .* view(x, pre_element)
+            terminal_out .= view(flows, post_element) .* x[ke]
+            dx[ke] = sum(terminal_in) - sum(terminal_out)
+        end
     end
 end
 

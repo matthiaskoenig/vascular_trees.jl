@@ -14,7 +14,7 @@ What must/may be specified in code below:
     2.2. solver options
 
 Inputs:
-1. Graph file (prepared information in arrow format from graph generated in SyntheticVascularTrees.jl)
+1. Graph file (prepared information in arrow format (process_julia_graph.jl) from graph generated in SyntheticVascularTrees.jl)
 
 Showed in the terminal:
 1. Julia stuff
@@ -37,7 +37,7 @@ using InteractiveUtils
 
 # ============ Specify options
 g_options::graph_options = graph_options(
-    n_nodes = [10, 10000],  #10
+    n_nodes = [10],  #10
     tree_ids = [
         "Rectangle_quad",
         # "Rectangle_trio",
@@ -49,7 +49,7 @@ sim_options::simulations_options = simulations_options(
     tspan = tspan,
     tpoints = range(tspan[1], stop = tspan[2], length = 30),
     save_simulations = false,
-    benchmark = true,
+    benchmark = false,
 )
 
 sol_options::solver_options = solver_options()
@@ -59,7 +59,7 @@ if sim_options.benchmark
     import .Utils.Options: benchmark_options
 
     # do not write anything here in brackets if you are okay with default variant
-    bench_options::benchmark_options = benchmark_options(save_running_times = true)
+    bench_options::benchmark_options = benchmark_options(save_running_times=false)
     create_simulations(
         g_options,
         sim_options,

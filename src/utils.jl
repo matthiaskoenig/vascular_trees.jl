@@ -20,11 +20,11 @@ module Utils
                 ),
                 "Rectangle_quad" => Dict(
                     :inflow_trees => ["A"],
-                    :outflow_trees => []
+                    :outflow_trees => ["V"]
                 ) #["P", "A", "V", "B"]
             )
-            inflow_trees::Tuple{String,String} = ("A", "P")
-            outflow_trees::Tuple{String,String} = ("V", "B")
+            inflow_trees::String = "A" # ("A", "P")
+            outflow_trees::String = "V" # ("V", "B")
         end
 
         @with_kw struct ODE_groups
@@ -43,6 +43,7 @@ module Utils
 
         using OrdinaryDiffEq
         using Revise # this package must not be in final version
+        using Sundials
 
         @with_kw struct graph_options
             n_nodes::Vector{Int64}
@@ -125,7 +126,7 @@ module Utils
                 call_orders = call_orders,
                 times_min = times_ns / 60 * 10^-9,
                 n_species = n_sp,
-                allocated_gbytes = allocated_bytes / 10^9,
+                allocated_gbytes = allocated_bytes / 2^30,
                 solver_names = solver_names,
                 n_node = n_nodes,
                 tree_id = tree_ids,
