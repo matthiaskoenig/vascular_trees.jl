@@ -21,10 +21,19 @@ const outflow_out_margin = zeros(1)
 
 const terminal_in = zeros(1)
 
-export jf_inflow!, jf_outflow!, jf_terminal!
+export jf_dxdt!
+
+function jf_dxdt!(dx, x, p, t)
+    is_inflow = p[1]
+    if is_inflow
+        jf_inflow!(dx, x, p, t)
+    else
+        jf_outflow!(dx, x, p, t)
+    end
+end
 
 function jf_inflow!(dx, x, p, t)
-    is_inflow = p[1]
+    
     flows = p[2]
     volumes = p[3]
     ODE_groups = p[4]
@@ -60,6 +69,7 @@ function jf_inflow!(dx, x, p, t)
             dx[ke] = sum(inflow_in) - sum(inflow_out_term)
         end
     end
+    dx .= dx ./ volumes
 end
 
 function jf_outflow!(dx, x, p, t)
@@ -96,6 +106,7 @@ function jf_outflow!(dx, x, p, t)
             dx[ke] = f_intervention(t) 
         end
     end
+    dx .= dx ./ volumes
 end
 
 function jf_terminal!(dx, x, flows, ODE_groups, pre_elements, post_elements, t)

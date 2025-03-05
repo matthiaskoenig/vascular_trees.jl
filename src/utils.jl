@@ -23,8 +23,8 @@ module Utils
                     :outflow_trees => ["V"]
                 ) #["P", "A", "V", "B"]
             )
-            inflow_trees::String = "A" # ("A", "P")
-            outflow_trees::String = "V" # ("V", "B")
+            inflow_trees::Tuple{String, String} = ("A", "P")
+            outflow_trees::Tuple{String, String} = ("V", "B")
         end
 
         @with_kw struct ODE_groups
@@ -52,7 +52,7 @@ module Utils
 
         @with_kw struct simulations_options
             tspan::Tuple{Float64,Float64}
-            tpoints::AbstractRange = []
+            sdt::Float64 # synchronization step
             save_simulations::Bool
             benchmark::Bool
         end

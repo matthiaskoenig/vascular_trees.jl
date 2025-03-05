@@ -30,7 +30,7 @@ TODO: Optimize code
 
 # ============ Specify options
 g_options::graph_options = graph_options(
-    n_nodes = [10],  #750, 1000, 1250, 1500
+    n_nodes = [500, 750, 1000],  #750, 1000, 1250, 1500
     tree_ids = [
         "Rectangle_quad",
     ],

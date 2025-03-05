@@ -21,15 +21,16 @@ include("../models/julia_from_jgraph.jl")
 import .Julia_from_jgraph: get_ODE_components
 
 include("../../" * MODEL_PATH)
-import .Julia_models: jf_inflow!, jf_outflow!, jf_terminal!
+import .Julia_models: jf_dxdt!
 
 # Already specified in utils.jl
 const trees = tree_definitions()
 const groups = ODE_groups()
+const tspan = Vector{Float64}(undef, 2)
 
-function ODE_solver(jf_dxdt!, x0, sim_options, p, sol_options, idxs_tosave)
+function solve_ODE(x0, p, tspan, sol_options, idxs_tosave)
 
-    problem = ODEProblem(jf_dxdt!, x0, sim_options.tspan, p)
+    problem = ODEProblem(jf_dxdt!, x0, tspan, p)
 
     solution = solve(
         problem,
@@ -50,16 +51,25 @@ function ODE_solver(jf_dxdt!, x0, sim_options, p, sol_options, idxs_tosave)
 end
 
 function create_simulations(g_options, sim_options, sol_options)
-
-    graph_id::String = ""
-    file_name::String = ""
+    tmin = sim_options.tspan[1]
+    tmax = sim_options.tspan[2]
+    sdt = sim_options.sdt
 
     for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
         graph_id = "$(tree_id)_$(n_node)"
         vessel_trees = values(trees.vascular_trees[tree_id])
-        # Distributed.nworkers(length(vessel_trees))
-
-        # simulations = Distributed.pmap(vessel_tree -> solve_single_tree(tree_id, n_node, vessel_tree, sim_options, sol_options), Iterators.flatten(vessel_trees))
+        t_left = tmin
+        t_right = sdt
+        x0, graph_p = get_ODE_components(tree_id, n_node, vessel_tree)
+        while t_right <= tmax
+            for vessel_tree ∈ Iterators.flatten(vessel_trees)
+                tspan .= [t_left, t_right]
+                solution = solve_single_tree(tree_id, n_node, vessel_tree, tspan, sol_options, x0)
+                display(plot(solution))
+            end
+            t_left += sdt
+            t_right += sdt
+        end
 
             # if sim_options.save_simulations
             #     file_name = "$(graph_id)_$(vessel_tree)"
@@ -78,8 +88,8 @@ function create_simulations(g_options, sim_options, sol_options)
     end
 end
 
-function solve_single_tree(tree_id, n_node, vessel_tree, sim_options, sol_options)
-    x0, graph_p = get_ODE_components(tree_id, n_node, vessel_tree)
+function solve_single_tree(tree_id, n_node, vessel_tree, tspan, sol_options, x0)
+    x, graph_p = get_ODE_components(tree_id, n_node, vessel_tree)
     p = (
         graph_p.is_inflow,
         graph_p.flows,
@@ -90,12 +100,9 @@ function solve_single_tree(tree_id, n_node, vessel_tree, sim_options, sol_option
     )
     idxs_tosave = get_indices(p[4], [groups.marginal, groups.terminal])
 
-    if vessel_tree == trees.inflow_trees
-        simulations = ODE_solver(jf_inflow!, x0, sim_options, p, sol_options, idxs_tosave)
-    elseif vessel_tree == trees.outflow_trees
-        simulations = ODE_solver(jf_outflow!, x0, sim_options, p, sol_options, idxs_tosave)
-    end
-    display(plot(simulations))
+    simulations = solve_ODE(x0, p, tspan, sol_options, idxs_tosave)
+
+    return simulations
 end
 
 # function create_simulations(g_options, sim_options, bench_options, sol_options)
