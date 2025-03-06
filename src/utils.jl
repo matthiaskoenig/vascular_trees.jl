@@ -52,7 +52,6 @@ module Utils
 
         @with_kw struct simulations_options
             tspan::Tuple{Float64,Float64}
-            sdt::Float64 # synchronization step
             save_simulations::Bool
             benchmark::Bool
         end

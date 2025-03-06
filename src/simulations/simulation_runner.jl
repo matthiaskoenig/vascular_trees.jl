@@ -37,7 +37,7 @@ using InteractiveUtils
 
 # ============ Specify options
 g_options::graph_options = graph_options(
-    n_nodes = [500],  #10
+    n_nodes = [10],  #10
     tree_ids = [
         "Rectangle_quad",
         # "Rectangle_trio",
@@ -47,7 +47,6 @@ g_options::graph_options = graph_options(
 tspan = (0.0, 15.0)
 sim_options::simulations_options = simulations_options(
     tspan = tspan,
-    sdt = tspan[2]/2,
     save_simulations = false,
     benchmark = false,
 )
