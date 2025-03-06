@@ -17,7 +17,7 @@ export get_ODE_components
 
 include("../utils.jl")
 import .Utils: JULIA_RESULTS_DIR
-import .Utils.Definitions: tree_definitions
+import .Utils.Definitions: tree_definitions, to_collect
 import .Utils.Options: graph_options
 
 # include("./julia_models.jl")
@@ -38,17 +38,6 @@ g_options::graph_options = graph_options(
 
 # Already specified in utils.jl
 trees::tree_definitions = tree_definitions()
-
-struct to_collect{T, N}
-    vascular_tree_id::String
-    is_inflow::Bool
-    all_edges::Vector{Tuple{T, T}}
-    flows::Vector{N}
-    volumes::Vector{N}
-    ODE_groups::Vector{Int16}
-    pre_elements::Vector{Vector{T}}
-    post_elements::Vector{Vector{T}}
-end
 
 # function __init__()
 #     for tree_id ∈ g_options.tree_ids, n_node ∈ g_options.n_nodes
@@ -90,22 +79,23 @@ function get_ODE_components(tree_id::String, n_node::Integer, vessel_tree::Strin
 
     graph_p = get_graph_parameters(GRAPH_PATH)
 
-    x0 = zeros(length(graph_p.all_edges))
+    x0 = zeros(length(graph_p[2]))
     # (graph_p.vascular_tree_id == "A") && (set_initial_values!(x0, 1.0))
     return x0, graph_p
 end
 
 function get_graph_parameters(GRAPH_PATH::String)
     graph = DataFrame(Arrow.Table(GRAPH_PATH))
-    graph_p = to_collect{Int64, Float64}(
-        graph.vascular_tree_id[1],
+    graph_p = (
+        # graph.vascular_tree_id[1],
         graph.is_inflow[1],
-        graph.all_edges,
+        # graph.all_edges,
         graph.flows,
         graph.volumes,
         graph.ODE_groups,
         graph.pre_elements,
-        graph.post_elements,
+        graph.post_elements
+        #graph.post_elements,
     )
 
     return graph_p

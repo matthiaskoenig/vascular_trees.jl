@@ -103,7 +103,7 @@ function jf_outflow!(dx, x, p, t)
             # species before and after
             dx[ke] = sum(flows[ke] .* view(x, pre_element)) - flows[ke] * x[ke] * length(post_element)
         elseif group == 3 #(is_terminal) 
-            dx[ke] = f_intervention(t) 
+            dx[ke] = -sum(view(flows, post_element) .* x[ke])
         end
     end
     dx .= dx ./ volumes

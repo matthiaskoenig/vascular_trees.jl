@@ -30,7 +30,7 @@ TODO: Optimize code
 
 # ============ Specify options
 g_options::graph_options = graph_options(
-    n_nodes = [500, 750, 1000],  #750, 1000, 1250, 1500
+    n_nodes = [10],  #750, 1000, 1250, 1500
     tree_ids = [
         "Rectangle_quad",
     ],
@@ -215,8 +215,8 @@ function get_pre_postelements(
     edges::Vector{Tuple{T, T}},
     graph_structure::DataFrame,
 ) where {T<:Integer}
-    pre_elements = [[] for _ in eachindex(edges)]
-    post_elements = [[] for _ in eachindex(edges)]
+    pre_elements = [Int64[] for _ in eachindex(edges)]
+    post_elements = [Int64[] for _ in eachindex(edges)]
     df = @view graph_structure[:, [:source_id, :target_id, :index]]
     @inbounds for (ke, element) in enumerate(edges)
         source_id, target_id = element

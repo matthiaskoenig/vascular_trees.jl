@@ -7,7 +7,7 @@ module Utils
 
 
     module Definitions
-        export tree_definitions, ODE_groups
+        export tree_definitions, ODE_groups, to_collect
 
         using Parameters
         using Revise
@@ -34,6 +34,17 @@ module Utils
             other::Int16 = 1
         end
 
+        struct to_collect{T, N}
+            vascular_tree_id::String
+            is_inflow::Bool
+            all_edges::Vector{Tuple{T, T}}
+            flows::Vector{N}
+            volumes::Vector{N}
+            ODE_groups::Vector{Int16}
+            pre_elements::Vector{Vector{T}}
+            post_elements::Vector{Vector{T}}
+        end
+
     end
 
     module Options
@@ -52,6 +63,7 @@ module Utils
 
         @with_kw struct simulations_options
             tspan::Tuple{Float64,Float64}
+            sdt::Float64
             save_simulations::Bool
             benchmark::Bool
         end

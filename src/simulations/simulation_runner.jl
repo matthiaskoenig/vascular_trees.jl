@@ -36,7 +36,7 @@ import .Simulation_helpers: create_simulations
 using InteractiveUtils
 
 # ============ Specify options
-g_options::graph_options = graph_options(
+g_options = graph_options(
     n_nodes = [10],  #10
     tree_ids = [
         "Rectangle_quad",
@@ -45,20 +45,21 @@ g_options::graph_options = graph_options(
 )
 
 tspan = (0.0, 15.0)
-sim_options::simulations_options = simulations_options(
+sim_options = simulations_options(
     tspan = tspan,
+    sdt = 7.5,
     save_simulations = false,
     benchmark = false,
 )
 
-sol_options::solver_options = solver_options()
+sol_options = solver_options()
 
 if sim_options.benchmark
 
     import .Utils.Options: benchmark_options
 
     # do not write anything here in brackets if you are okay with default variant
-    bench_options::benchmark_options = benchmark_options(save_running_times=false)
+    bench_options = benchmark_options(save_running_times=false)
     create_simulations(
         g_options,
         sim_options,
