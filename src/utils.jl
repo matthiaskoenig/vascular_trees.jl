@@ -7,7 +7,7 @@ module Utils
 
 
     module Definitions
-        export tree_definitions, ODE_groups, to_collect
+        export tree_definitions, ODE_groups
 
         using Parameters
         using Revise
@@ -32,17 +32,6 @@ module Utils
             preterminal::Int16 = 2
             terminal::Int16 = 3
             other::Int16 = 1
-        end
-
-        struct to_collect{T, N}
-            vascular_tree_id::String
-            is_inflow::Bool
-            all_edges::Vector{Tuple{T, T}}
-            flows::Vector{N}
-            volumes::Vector{N}
-            ODE_groups::Vector{Int16}
-            pre_elements::Vector{Vector{T}}
-            post_elements::Vector{Vector{T}}
         end
 
     end

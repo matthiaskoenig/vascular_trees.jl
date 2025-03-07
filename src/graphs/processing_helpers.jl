@@ -1,4 +1,4 @@
-module Processing_helpers
+module Processing_Helpers
 """
 Helper functions used in workflow of julia graph processing.
 
@@ -14,14 +14,15 @@ Why id in this df is a target id? In Julia graph all attributes belongs to nodes
     Node 2 has flow value, radius, length and pressure drop ---> these values characterise edge (1, 2).
 """
 
-using CSV, DataFrames, DataFramesMeta, InteractiveUtils, Parameters, Revise
+using CSV, DataFrames, DataFramesMeta, InteractiveUtils, Parameters, Revise, Arrow
 
 export read_edges,
     read_nodes_attributes,
     label_special_edges!,
     create_special_edges!,
     selection_from_df,
-    create_tuples_from_dfrows
+    create_tuples_from_dfrows,
+    save_as_arrow
 
 # calculation of terminal volume
 volume_geometry = (0.100 * 0.100 * 0.10) / 1000 # [cm^3] -> [l]
@@ -157,16 +158,32 @@ function collect_terminal_edges_info(
 end
 
 #=================================================================================================================================#
-function selection_from_df(df::DataFrame, conditions::Tuple{Union{Colon, BitVector}, Vector{Symbol}})::SubDataFrame
+function selection_from_df(df::AbstractDataFrame, conditions::Tuple{Union{Colon, BitVector}, Vector{Symbol}})::SubDataFrame
     return @view df[conditions...]
 end
 
-function selection_from_df(df::DataFrame, conditions::Tuple{Union{Colon, BitVector}, Symbol})::SubArray
+function selection_from_df(df::AbstractDataFrame, conditions::Tuple{Union{Colon, BitVector}, Symbol})::SubArray
     return @view df[conditions...]
 end
 
 function create_tuples_from_dfrows(df::AbstractDataFrame)
     return Tuple.(Tables.namedtupleiterator(df))
+end
+
+#=================================================================================================================================#
+function save_as_arrow(
+    graph::NamedTuple,
+    tree_id::String,
+    graph_id::String,
+    vessel_tree::String,
+    JULIA_RESULTS_DIR::String,
+    folder::String
+)
+    ARROW_DIR::String = normpath(
+        joinpath(@__FILE__, "../../..", JULIA_RESULTS_DIR, tree_id, graph_id, folder),
+    )
+    Arrow.write(joinpath(ARROW_DIR, "$(vessel_tree).arrow"), graph)
+    
 end
 
 end
