@@ -22,7 +22,8 @@ export read_edges,
     create_special_edges!,
     selection_from_df,
     create_tuples_from_dfrows,
-    save_as_arrow
+    save_as_arrow,
+    get_extended_vector
 
 # calculation of terminal volume
 volume_geometry = (0.100 * 0.100 * 0.10) / 1000 # [cm^3] -> [l]
@@ -184,6 +185,10 @@ function save_as_arrow(
     )
     Arrow.write(joinpath(ARROW_DIR, "$(vessel_tree).arrow"), graph)
     
+end
+
+function get_extended_vector(df_column, df_length)
+    return [df_column; fill(missing, df_length-length(df_column))]
 end
 
 end

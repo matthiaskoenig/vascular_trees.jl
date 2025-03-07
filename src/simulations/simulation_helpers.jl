@@ -1,21 +1,13 @@
-module Simulation_helpers
+module Simulation_Helpers
 
 export create_simulations, create_benchmarked_simulations
 
-using OrdinaryDiffEq
-using DataFrames
-using CSV
-using TimerOutputs
-using ModelingToolkit
-using Plots
-using Term
-using Sundials
-# using Distributed
+using OrdinaryDiffEq, DataFrames, CSV, Sundials
+using TimerOutputs, Plots
 
-include("../utils.jl")
-import .Utils: JULIA_RESULTS_DIR, MODEL_PATH
-import .Utils.Definitions: tree_definitions, ODE_groups, to_collect
-import .Utils.Benchmarking: save_times_as_csv
+using ..Utils: JULIA_RESULTS_DIR, MODEL_PATH
+using ..Utils.Definitions: tree_definitions, ODE_groups
+using ..Utils.Benchmarking: save_times_as_csv
 
 include("../models/julia_from_jgraph.jl")
 import .Julia_from_jgraph: get_ODE_components
@@ -68,9 +60,10 @@ function create_simulations(g_options, sim_options, sol_options)
         for vessel_tree ∈ Iterators.flatten(vessel_trees)
             x0[vessel_tree], p[vessel_tree] = get_ODE_components(tree_id, n_node, vessel_tree)
             synch_idx[vessel_tree] = get_indices(p[vessel_tree][4], [groups.terminal])
+            synch_idx["T_$vessel_tree"] = get_indices(p["T"][2], ["$vessel_tree"])
         end
-        # 
-
+        x0["T"], p["T"] = get_ODE_components(tree_id, n_node, "T")
+        
         t_left = tmin
         t_right = sdt
         while t_right <= tmax

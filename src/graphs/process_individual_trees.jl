@@ -24,7 +24,8 @@ using ..Processing_Helpers:
     create_special_edges!,
     create_tuples_from_dfrows,
     selection_from_df,
-    save_as_arrow
+    save_as_arrow,
+    get_extended_vector
 
 using DataFrames, InteractiveUtils
 
@@ -201,9 +202,5 @@ function get_pre_postelements(
 end
 
 condition(df, id, ke, df_index) = df==id && ke!=df_index
-
-function get_extended_vector(df_column, df_length)
-    return [df_column; fill(missing, df_length-length(df_column))]
-end
 
 end

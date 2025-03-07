@@ -10,6 +10,7 @@ ODEs for inflow trees (arterial and portal) differ from ODEs for
 include("../interventions.jl")
 using .Interventions: f_intervention
 using InteractiveUtils
+using ..Utils.Definitions: tree_definitions
 
 const inflow_in = zeros(1)
 const inflow_out = zeros(2)
@@ -110,13 +111,22 @@ function jf_outflow!(dx, x, p, t)
 end
 
 function jf_terminal!(dx, x, flows, ODE_groups, pre_elements, post_elements, t)
-    @inbounds for (ke, group) in enumerate(ODE_groups)
-        if group == 3 # terminal
-            pre_element = pre_elements[ke]
-            post_element = post_elements[ke]
-            terminal_in .= view(flows, pre_element) .* view(x, pre_element)
-            terminal_out .= view(flows, post_element) .* x[ke]
-            dx[ke] = sum(terminal_in) - sum(terminal_out)
+
+    n_terminals = p[4][1]
+    flow_values = p[3]
+    flow_affiliations = p[2]
+    kf = 1
+    dx .= 0
+    @inbounds for (ke, x_affiliation) in enumerate(x_affiliation)
+        if x_affiliation == "T" # terminal
+            for flow_idx in kf:n_terminals:length(flow_affiliations)
+                if flow_affiliation[flow_idx] ∈ tree_definitions.inflow_trees
+                    dx[ke] += flow_values[flow_idx] * x[flow_idx]
+                else
+                    dx[ke] -= flow_values[flow_idx] * x[ke]
+                end
+                kf += 1
+            end
         end
     end
 end

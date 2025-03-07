@@ -1,5 +1,5 @@
 
-module Simulation_runner
+module Simulation_Runner
 """
 Module that summarizes functions that load graph file in arrow format and run simulations.
 
@@ -31,7 +31,7 @@ include("../utils.jl")
 import .Utils.Options: graph_options, simulations_options, benchmark_options, solver_options
 
 include("simulation_helpers.jl")
-import .Simulation_helpers: create_simulations
+import .Simulation_Helpers: create_simulations
 
 using InteractiveUtils
 

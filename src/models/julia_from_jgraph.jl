@@ -17,7 +17,7 @@ export get_ODE_components
 
 include("../utils.jl")
 import .Utils: JULIA_RESULTS_DIR
-import .Utils.Definitions: tree_definitions, to_collect
+import .Utils.Definitions: tree_definitions
 import .Utils.Options: graph_options
 
 # include("./julia_models.jl")
@@ -43,8 +43,8 @@ trees::tree_definitions = tree_definitions()
 #     for tree_id ∈ g_options.tree_ids, n_node ∈ g_options.n_nodes
 #         to = TimerOutput()
 #         vessel_tree = "A"
-#         #@code_warntype get_ODE_components(tree_id, n_node, vessel_tree)
-#         x0, graph_p = get_ODE_components(tree_id, n_node, vessel_tree)
+#         #@code_warntype get_graph_components(tree_id, n_node, vessel_tree)
+#         x0, graph_p = get_graph_components(tree_id, n_node, vessel_tree)
 #         p = (graph_p.is_inflow, graph_p.flows, graph_p.volumes, graph_p.ODE_groups, graph_p.pre_elements, graph_p.post_elements)
 #         #jf_dxdt!([0.0 for _ in eachindex(x0)], x0, p, 10.0)
 #         prob = ODEProblem(jf_dxdt!, x0, (0.0, 10.0 / 60.0), p)
@@ -77,11 +77,15 @@ function get_ODE_components(tree_id::String, n_node::Integer, vessel_tree::Strin
         ),
     )
 
-    graph_p = get_graph_parameters(GRAPH_PATH)
+    if vessel_tree != "T"
+        parameters = get_graph_parameters(GRAPH_PATH)
+    else
+        parameters = get_terminal_parameters(GRAPH_PATH)
+    end
 
-    x0 = zeros(length(graph_p[2]))
+    x0 = zeros(length(parameters[2]))
     # (graph_p.vascular_tree_id == "A") && (set_initial_values!(x0, 1.0))
-    return x0, graph_p
+    return x0, parameters
 end
 
 function get_graph_parameters(GRAPH_PATH::String)
@@ -95,10 +99,23 @@ function get_graph_parameters(GRAPH_PATH::String)
         graph.ODE_groups,
         graph.pre_elements,
         graph.post_elements
-        #graph.post_elements,
+        # graph.post_elements,
     )
 
     return graph_p
+end
+
+function get_terminal_parameters(GRAPH_PATH::String)
+    terminal_nodes = DataFrame(Arrow.Table(GRAPH_PATH))
+    terminal_parameters = (
+        "T",
+        terminal_nodes.x_affiliations,
+        terminal_nodes.flow_affiliations,
+        terminal_nodes.flow_values,
+        terminal_nodes.n_terminals
+    )
+
+    return terminal_parameters
 end
 
 function set_initial_values!(x0::Vector{T}, initial_value::T) where {T}<:Number

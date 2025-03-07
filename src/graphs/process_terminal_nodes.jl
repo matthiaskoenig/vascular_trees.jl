@@ -17,7 +17,7 @@ TODO: Optimize code
 
 using ..Utils: JULIA_RESULTS_DIR
 using ..Utils.Definitions: tree_definitions, ODE_groups
-using ..Processing_Helpers: selection_from_df, save_as_arrow
+using ..Processing_Helpers: selection_from_df, save_as_arrow, get_extended_vector
 
 using DataFrames, Arrow
 
@@ -59,21 +59,27 @@ function prepare_terminal_nodes_information(graphs::Dict{String, DataFrame})::Na
     flow_values::Vector{AbstractFloat} = []
     flow_affiliations::Vector{String} = []
     x_affiliations::Vector{String} = []
+    n_terminals::Integer = 0
+    kt::Integer = 0
     for graph in values(graphs)
         flows_single_tree = selection_from_df(graph, (graph.ODE_groups .== groups.preterminal, :flows))
         push!(flow_values, flows_single_tree...)
         push!(flow_affiliations, [graph[1, :vascular_tree_id] for _ in eachindex(flows_single_tree)]...)
         if graph[1, :is_inflow] 
             x_affiliation = [graph[1, :vascular_tree_id] for _ in eachindex(flows_single_tree)]
-        else
+            push!(x_affiliations, x_affiliation...)
+        elseif kt == 0
             x_affiliation = ["T" for _ in eachindex(skipmissing(graph[:, :terminal_edges]))]
-        end
-        push!(x_affiliations, x_affiliation...)
+            n_terminals = length(x_affiliation)
+            push!(x_affiliations, x_affiliation...)
+            kt += 1
+        end  
     end
     terminal_nodes_info = (
         x_affiliations=x_affiliations,
         flow_affiliations=flow_affiliations,
-        flow_values=flow_values
+        flow_values=flow_values,
+        n_terminals=get_extended_vector(n_terminals, length(x_affiliations))
     )
     return terminal_nodes_info 
 end
