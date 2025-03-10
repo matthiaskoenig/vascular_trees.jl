@@ -41,34 +41,34 @@ function process_julia_graph(tree_id::String, n_node::Integer)
     GRAPH_DIR::String = normpath(
         joinpath(@__FILE__, "../../..", JULIA_RESULTS_DIR, tree_id, graph_id, "julia"),
     )
-    vessel_trees = values(trees.vascular_trees[tree_id])
-    for vessel_tree ∈ Iterators.flatten(vessel_trees)
-        process_individual_tree(GRAPH_DIR, vessel_tree, tree_id, graph_id)
+    vascular_trees = values(trees.vascular_trees[tree_id])
+    for vascular_tree ∈ Iterators.flatten(vascular_trees)
+        process_individual_tree(GRAPH_DIR, vascular_tree, tree_id, graph_id)
     end
 end
 
 # Workflow for individual vessel trees
 function process_individual_tree(
     GRAPH_DIR::String,
-    vessel_tree::String,
+    vascular_tree::String,
     tree_id::String,
     graph_id::String,
 )
-    GRAPH_PATH, EDGES_PATH, NODES_PATH = paths_initialization(GRAPH_DIR, vessel_tree)
+    GRAPH_PATH, EDGES_PATH, NODES_PATH = paths_initialization(GRAPH_DIR, vascular_tree)
     graph_structure, nodes_attrib = read_graph(GRAPH_PATH, EDGES_PATH, NODES_PATH)
     add_graph_characteristics!(graph_structure)
-    graph = create_graph_structure(graph_structure, nodes_attrib, vessel_tree)
-    save_as_arrow(graph, tree_id, graph_id, vessel_tree, JULIA_RESULTS_DIR, "graphs")
+    graph = create_graph_structure(graph_structure, nodes_attrib, vascular_tree)
+    save_as_arrow(graph, tree_id, graph_id, vascular_tree, JULIA_RESULTS_DIR, "graphs")
 end
 
 #=================================================================================================================================#
 function paths_initialization(
     GRAPH_DIR::String,
-    vessel_tree::String,
+    vascular_tree::String,
 )::Tuple{String,String,String}
-    GRAPH_PATH::String = joinpath(GRAPH_DIR, "$(vessel_tree).lg")
-    EDGES_PATH::String = joinpath(GRAPH_DIR, "$(vessel_tree)_edges.csv")
-    NODES_PATH::String = joinpath(GRAPH_DIR, "$(vessel_tree)_nodes.csv")
+    GRAPH_PATH::String = joinpath(GRAPH_DIR, "$(vascular_tree).lg")
+    EDGES_PATH::String = joinpath(GRAPH_DIR, "$(vascular_tree)_edges.csv")
+    NODES_PATH::String = joinpath(GRAPH_DIR, "$(vascular_tree)_nodes.csv")
     return GRAPH_PATH, EDGES_PATH, NODES_PATH
 end
 
@@ -106,12 +106,12 @@ end
 function create_graph_structure(
     graph_structure::DataFrame,
     nodes_attrib::DataFrame,
-    vessel_tree::String,
+    vascular_tree::String,
 )::NamedTuple
-    graph_info::NamedTuple = prepare_graph_info(graph_structure, nodes_attrib, vessel_tree)
+    graph_info::NamedTuple = prepare_graph_info(graph_structure, nodes_attrib, vascular_tree)
     df_length::Integer = length(graph_info.all_edges)
     graph = (
-        vascular_tree_id = get_extended_vector(vessel_tree, df_length), #[vessel_tree; fill(missing, df_length-length(vessel_tree))], # vascular_tree_id
+        vascular_tree_id = get_extended_vector(vascular_tree, df_length), #[vascular_tree; fill(missing, df_length-length(vascular_tree))], # vascular_tree_id
         is_inflow = get_extended_vector(graph_info.is_inflow, df_length), #[graph_info.is_inflow; fill(missing, df_length-length(graph_info.is_inflow))], # is_inflow
         nodes_ids = [nodes_attrib.ids; fill(missing, df_length-length(nodes_attrib.ids))], # nodes::Vector{Int64}
         nodes_coordinates = [graph_info.nodes_coordinates; fill(missing, df_length-length(graph_info.nodes_coordinates))],
@@ -154,8 +154,8 @@ function set_index!(graph_structure::DataFrame)
     graph_structure.index = 1:nrow(graph_structure)
 end
 
-function prepare_graph_info(graph_structure::DataFrame, nodes_attrib::DataFrame, vessel_tree::String)::NamedTuple
-    is_inflow::Bool = in(vessel_tree, trees.inflow_trees)
+function prepare_graph_info(graph_structure::DataFrame, nodes_attrib::DataFrame, vascular_tree::String)::NamedTuple
+    is_inflow::Bool = in(vascular_tree, trees.inflow_trees)
     # reverse edges if the tree is an outflow
     (!is_inflow) &&
         (rename!(graph_structure, [:source_id => :target_id, :target_id => :source_id]))

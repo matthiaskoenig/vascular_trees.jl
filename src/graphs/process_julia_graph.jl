@@ -31,7 +31,7 @@ module Process_Julia_Graph
     )
 
     for tree_id ∈ g_options.tree_ids, n_node ∈ g_options.n_nodes
-        process_julia_graph(tree_id, n_node)
+        # process_julia_graph(tree_id, n_node)
         process_terminal_nodes(tree_id, n_node)
     end
 

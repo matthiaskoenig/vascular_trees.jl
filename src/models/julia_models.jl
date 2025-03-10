@@ -24,7 +24,7 @@ const terminal_in = zeros(1)
 
 export jf_dxdt!
 
-function jf_dxdt!(dx, x, p, t)
+function jf_dxdt!(dx::Vector, x::Vector, p::Tuple, t::Float64)
     is_inflow = p[1]
     if is_inflow
         jf_inflow!(dx, x, p, t)
@@ -60,14 +60,14 @@ function jf_inflow!(dx, x, p, t)
             inflow_in .= flows[ke] .* view(x, pre_element)
             dx[ke] = sum(inflow_in) - flows[ke] * x[ke] * length(post_element)
         # terminal element
-        elseif group == 3 # (is_terminal)
-            # THIS IS DIFFERENT THAN IN OTHER MODELS
-            # dT/dt = QA * A / VT - QA * T / VT
-            # species before and output
-            inflow_in .= view(flows, pre_element) .* view(x, pre_element)
-            # species output
-            inflow_out_term .= view(flows, pre_element) .* x[ke]
-            dx[ke] = sum(inflow_in) - sum(inflow_out_term)
+        # elseif group == 3 # (is_terminal)
+        #     # THIS IS DIFFERENT THAN IN OTHER MODELS
+        #     # dT/dt = QA * A / VT - QA * T / VT
+        #     # species before and output
+        #     inflow_in .= view(flows, pre_element) .* view(x, pre_element)
+        #     # species output
+        #     inflow_out_term .= view(flows, pre_element) .* x[ke]
+        #     dx[ke] = sum(inflow_in) - sum(inflow_out_term)
         end
     end
     dx .= dx ./ volumes
@@ -103,32 +103,24 @@ function jf_outflow!(dx, x, p, t)
             # dV/dt = QV * T / VV - QV * V / VV;
             # species before and after
             dx[ke] = sum(flows[ke] .* view(x, pre_element)) - flows[ke] * x[ke] * length(post_element)
-        elseif group == 3 #(is_terminal) 
-            dx[ke] = -sum(view(flows, post_element) .* x[ke])
+        # elseif group == 3 #(is_terminal) 
+        #     dx[ke] = -sum(view(flows, post_element) .* x[ke])
         end
     end
     dx .= dx ./ volumes
 end
 
-function jf_terminal!(dx, x, flows, ODE_groups, pre_elements, post_elements, t)
+function jf_dxdt!(dx::Array, x::Array, p::Tuple, t::Float64)
 
-    n_terminals = p[4][1]
     flow_values = p[3]
-    flow_affiliations = p[2]
-    kf = 1
     dx .= 0
-    @inbounds for (ke, x_affiliation) in enumerate(x_affiliation)
-        if x_affiliation == "T" # terminal
-            for flow_idx in kf:n_terminals:length(flow_affiliations)
-                if flow_affiliation[flow_idx] ∈ tree_definitions.inflow_trees
-                    dx[ke] += flow_values[flow_idx] * x[flow_idx]
-                else
-                    dx[ke] -= flow_values[flow_idx] * x[ke]
-                end
-                kf += 1
-            end
+    for (ke, elements) in enumerate(eachrow(x))
+        for (ki, inflow) in enumerate(elements[2:end])
+            dx[ke,1] += flow_values[ke, ki+1] * x[ke, ki+1]
         end
+        dx[ke,1] -= flow_values[ke, 1] * x[ke, 1]
     end
+    dx = dx / p[5]
 end
 
 end

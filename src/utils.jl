@@ -1,4 +1,5 @@
 module Utils
+export JULIA_RESULTS_DIR, MODEL_PATH
 
     RESULTS_DIR::String = "results"
     JULIA_RESULTS_DIR::String = RESULTS_DIR * "/julia_vessel_trees"
