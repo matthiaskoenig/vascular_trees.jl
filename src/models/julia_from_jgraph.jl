@@ -6,7 +6,7 @@ Module which contains functions to load .arrow files (contain information of jul
 Input: tree_id (ex. "Rectangle_quad"), 
        n_node (ex. 10),
        vascular_tree (ex. "A") - id of a single tree
-Output: x0 (vector of initial values) and 
+Output: u0 (vector of initial values) and 
         graph_p (structure that contains parameters for the differential equations)
 
 This module is not used by itself. It's functions are imported and used by the functions in simulation_helpers.jl.
@@ -44,10 +44,10 @@ trees::tree_definitions = tree_definitions()
 #         to = TimerOutput()
 #         vascular_tree = "A"
 #         #@code_warntype get_graph_components(tree_id, n_node, vascular_tree)
-#         x0, graph_p = get_graph_components(tree_id, n_node, vascular_tree)
+#         u0, graph_p = get_graph_components(tree_id, n_node, vascular_tree)
 #         p = (graph_p.is_inflow, graph_p.flows, graph_p.volumes, graph_p.ODE_groups, graph_p.pre_elements, graph_p.post_elements)
-#         #jf_dxdt!([0.0 for _ in eachindex(x0)], x0, p, 10.0)
-#         prob = ODEProblem(jf_dxdt!, x0, (0.0, 10.0 / 60.0), p)
+#         #jf_dxdt!([0.0 for _ in eachindex(u0)], u0, p, 10.0)
+#         prob = ODEProblem(jf_dxdt!, u0, (0.0, 10.0 / 60.0), p)
 #         sol = solve(
 #             prob,
 #             Tsit5(),
@@ -79,21 +79,19 @@ function get_ODE_components(tree_id::String, n_node::Integer, vascular_tree::Str
 
     if vascular_tree != "T"
         parameters = get_graph_parameters(GRAPH_PATH)
-        x0 = zeros(size(parameters[3])[1])
+        u0 = zeros(size(parameters[3])[1])
     else
         n_inflows::Integer = length(trees.vascular_trees[tree_id][:inflow_trees])
-        parameters = get_terminal_parameters(GRAPH_PATH, n_inflows)
-        x0 = zeros(size(parameters[3]))
+        parameters = get_graph_parameters(GRAPH_PATH, n_inflows)
+        u0 = zeros(size(parameters[3]))
     end
 
-    
-    # (graph_p.vascular_tree_id == "A") && (set_initial_values!(x0, 1.0))
-    return x0, parameters
+    return u0, parameters
 end
 
 function get_graph_parameters(GRAPH_PATH::String)
     graph = DataFrame(Arrow.Table(GRAPH_PATH))
-    graph_p = (
+    graph_parameters = (
         # graph.vascular_tree_id[1],
         graph.is_inflow[1],
         # graph.all_edges,
@@ -105,25 +103,20 @@ function get_graph_parameters(GRAPH_PATH::String)
         # graph.post_elements,
     )
 
-    return graph_p
+    return graph_parameters
 end
 
-function get_terminal_parameters(GRAPH_PATH::String, n_inflows::Integer)
-    terminal_nodes = DataFrame(Arrow.Table(GRAPH_PATH))
-    terminal_parameters = (
+function get_graph_parameters(GRAPH_PATH::String, n_inflows::Integer)
+    graph = DataFrame(Arrow.Table(GRAPH_PATH))
+    graph_parameters = (
         "T",
-        Vector(terminal_nodes[1, 1:(n_inflows+1)]), #x_affiliations
-        Array(terminal_nodes[:, (n_inflows+2):(n_inflows+3)]), #terminal_nodes.flow_values,
-        Vector(terminal_nodes[1, (n_inflows+4):(n_inflows+5)]), #terminal_nodes.flow_affiliations,
-        terminal_nodes[1, end]  #terminal_nodes.volumes
+        Vector(graph[1:(n_inflows+1), 1]), #x_affiliations
+        Array(graph[(n_inflows+2):(n_inflows+3), :]), #terminal_nodes.flow_values,
+        # Vector(graph[(n_inflows+4):(n_inflows+5), 1]), #terminal_nodes.flow_affiliations,
+        graph[end, 1]  #terminal_nodes.volumes
     )
 
-    return terminal_parameters
+    return graph_parameters
 end
-
-function set_initial_values!(x0::Vector{T}, initial_value::T) where {T}<:Number
-    x0[length(x0)] = initial_value
-end
-
 
 end

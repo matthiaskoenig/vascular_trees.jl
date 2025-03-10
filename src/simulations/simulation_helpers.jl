@@ -42,65 +42,70 @@ function solve_ODE(x0, p, tspan, sol_options)
 
     #print(solution.destats)
     # print(solution)
-    display(plot(solution))
+    # display(plot(solution))
 
     return solution
 
 end
 
 function create_simulations(g_options, sim_options, sol_options)
-    tmin = sim_options.tspan[1]
-    tmax = sim_options.tspan[2]
-    sdt = sim_options.sdt
-
-
     for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
         graph_id = "$(tree_id)_$(n_node)"
         vascular_trees = values(trees.vascular_trees[tree_id])
-        inflow_trees = trees.vascular_trees[tree_id][:inflow_trees]
-        outflow_trees = trees.vascular_trees[tree_id][:outflow_trees]
 
-        x0 = Dict(vascular_tree => [0.0] for vascular_tree in Iterators.flatten(vascular_trees))
+        u0 = Dict(vascular_tree => [0.0] for vascular_tree in Iterators.flatten(vascular_trees))
         p = Dict{String, Tuple{Bool, Vector{Float64}, Vector{Float64}, Vector{Int16}, Vector{Vector{Int64}}, Vector{Vector{Int64}}}}()
-        synch_idx = Dict{String, Vector{Int64}}()
+        synch_idxs = Dict{String, Vector{Int64}}()
 
         # preparation step - get starting initial values and get parameters for all trees
         for vascular_tree ∈ Iterators.flatten(vascular_trees)
-            x0[vascular_tree], p[vascular_tree] = get_ODE_components(tree_id, n_node, vascular_tree)
-            if vascular_tree in trees.inflow_trees
-                synch_idx[vascular_tree] = get_indices(p[vascular_tree][4], [groups.preterminal])
-            else
-                synch_idx[vascular_tree] = get_indices(p[vascular_tree][4], [groups.terminal])
-            end
+            u0[vascular_tree], p[vascular_tree] = get_ODE_components(tree_id, n_node, vascular_tree)
+            synch_idxs[vascular_tree] = get_synchronization_indices(vascular_tree, p[vascular_tree])
         end
-        
-        x0_terminal, p_terminal = get_ODE_components(tree_id, n_node, "T")
-        
-        t_left = tmin
-        t_right = sdt
-        while t_right <= tmax
-            tspan .= [t_left, t_right]
-            for vascular_tree ∈ Iterators.flatten(vascular_trees)
-                solution = solve_ODE(x0[vascular_tree], p[vascular_tree], tspan, sol_options)
-                x0[vascular_tree] = solution[end]
-            end
-            solution_terminal = solve_ODE(x0_terminal, p_terminal, tspan, sol_options)
+        u0_terminal, p_terminal = get_ODE_components(tree_id, n_node, "T")
 
-            for inflow_tree in inflow_trees
-                for (ki, inflow) in enumerate(p_terminal[2])
-                    if inflow == inflow_tree
-                        x0_terminal[:, ki] = x0[inflow_tree][synch_idx[inflow_tree]]
-                    end
-                end
-            end
-            for outflow_tree in outflow_trees
-                x0[outflow_tree][synch_idx[outflow_tree]] = solution_terminal[end][:, 1]
-            end
-
-            t_left += sdt
-            t_right += sdt
-        end
+        solve_trees_separately(u0_terminal, p_terminal, u0, p, sim_options, sol_options, vascular_trees)
     end
+end
+
+function solve_trees_separately(u0_terminal, p_terminal, u0, p, sim_options, sol_options, vascular_trees)
+    tmin = sim_options.tspan[1]
+    tmax = sim_options.tspan[2]
+    sdt = sim_options.sdt
+    t_left = tmin
+    t_right = sdt
+
+    while t_right <= tmax
+        tspan .= [t_left, t_right]
+        for vascular_tree ∈ Iterators.flatten(vascular_trees)
+            solution = solve_ODE(x0[vascular_tree], p[vascular_tree], tspan, sol_options)
+            u0[vascular_tree] .= solution[end]
+        end
+        solution_terminal = solve_ODE(u0_terminal, p_terminal, tspan, sol_options)
+        u0_terminal .= solution_terminal[end]
+
+        for (ki, inflow_tree) in enumerate(p_terminal[2])
+            if inflow_tree ∈ trees.inflow_trees
+                u0_terminal[ki, :] .= view(u0[inflow_tree], synch_idxs[inflow_tree])
+            end
+        end
+
+        for outflow_tree in trees.outflow_trees
+            u0[outflow_tree][synch_idxs[outflow_tree]] .= view(solution_terminal, lastindex(solution_terminal))[1, :]
+        end
+
+        t_left += sdt
+        t_right += sdt
+    end
+end
+
+function get_synchronization_indices(graph_id, graph_parameters)
+    if graph_id in trees.inflow_trees
+        synch_idx = get_indices(graph_parameters[4], [groups.preterminal])
+    else
+        synch_idx = get_indices(graph_parameters[4], [groups.terminal])
+    end
+    return synch_idx
 end
 
 function create_simulations(g_options, sim_options, bench_options, sol_options)

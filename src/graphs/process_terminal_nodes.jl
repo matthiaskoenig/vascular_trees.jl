@@ -42,7 +42,7 @@ function process_terminal_nodes(tree_id::String, n_node::Integer)
 
     graphs = Dict{String, DataFrame}()
     collect_graphs_information!(graphs, vascular_trees, graph_id, tree_id)
-    
+
     terminal_nodes_info = prepare_terminal_nodes_information(graphs, n_inflows, outflow_trees)
     save_as_arrow(terminal_nodes_info, tree_id, graph_id, "T", JULIA_RESULTS_DIR, "graphs")
 end
@@ -68,34 +68,34 @@ function prepare_terminal_nodes_information(graphs::Dict{String, DataFrame}, n_i
     # not a good way, but for now its okay
     n_terminals::Integer = length(selection_from_df(graphs["A"], (graphs["A"].ODE_groups .== groups.terminal, :ODE_groups)))
     
-    flow_values = zeros(n_terminals, n_inflows+1)
-    flow_affiliations = fill([""], n_terminals, n_inflows+1)
-    x_affiliations = fill("", n_terminals, n_inflows+1)
+    flow_values::Array = zeros(n_inflows+1, n_terminals)
+    flow_affiliations::Array = fill([""], n_inflows+1, n_terminals)
+    x_affiliations::Array = fill("", n_inflows+1, n_terminals)
     k_inflow::Integer = 2
     
     for graph in values(graphs)
         flows_single_tree = selection_from_df(graph, (graph.ODE_groups .== groups.preterminal, :flows))
         if graph[1, :is_inflow]
-            flow_values[:, k_inflow] = flows_single_tree
-            flow_affiliations[:, k_inflow] .= [[graph[1, :vascular_tree_id]] for _ in 1:n_terminals]
-            x_affiliations[:, k_inflow] = [graph[1, :vascular_tree_id] for _ in 1:n_terminals]
+            flow_values[k_inflow, :] = flows_single_tree
+            flow_affiliations[k_inflow, :] .= [[graph[1, :vascular_tree_id]] for _ in 1:n_terminals]
+            x_affiliations[k_inflow, :] = [graph[1, :vascular_tree_id] for _ in 1:n_terminals]
             k_inflow += 1
         else
-            flow_values[:, 1] .+= flows_single_tree
+            flow_values[1, :] .+= flows_single_tree
         end    
         
     end
 
-    x_affiliations[:, 1] .= "T"
-    flow_affiliations[:, 1] .= [outflow_trees]
+    x_affiliations[1, :] .= "T"
+    flow_affiliations[1, :] .= [outflow_trees]
     volume_terminal = volume_geometry / n_terminals
 
-    terminal_nodes_info = hcat(x_affiliations, flow_affiliations)
     df_x_affiliations = DataFrame(x_affiliations, :auto)
     df_flow_affiliations = DataFrame(flow_affiliations, :auto)
     df_flow_values = DataFrame(flow_values, :auto)
-    terminal_nodes_info = hcat(df_x_affiliations, df_flow_values, df_flow_affiliations, makeunique=true)
-    terminal_nodes_info[:, :volumes] .= volume_terminal
+    terminal_nodes_info = vcat(df_x_affiliations, df_flow_values, df_flow_affiliations)
+    push!(terminal_nodes_info, [volume_terminal for _ in 1:n_terminals])
+    display(terminal_nodes_info)
 
     return terminal_nodes_info 
 end
