@@ -173,32 +173,11 @@ end
 
 #=================================================================================================================================#
 function save_as_arrow(
-    graph::NamedTuple,
-    tree_id::String,
-    graph_id::String,
-    vascular_tree::String,
-    JULIA_RESULTS_DIR::String,
-    folder::String
-)
-    ARROW_DIR::String = normpath(
-        joinpath(@__FILE__, "../../..", JULIA_RESULTS_DIR, tree_id, graph_id, folder),
-    )
-    Arrow.write(joinpath(ARROW_DIR, "$(vascular_tree).arrow"), graph)
-    
-end
-
-function save_as_arrow(
     graph::DataFrame,
-    tree_id::String,
-    graph_id::String,
     vascular_tree::String,
-    JULIA_RESULTS_DIR::String,
-    folder::String
+    GRAPH_DIR::String
 )
-    ARROW_DIR::String = normpath(
-        joinpath(@__FILE__, "../../..", JULIA_RESULTS_DIR, tree_id, graph_id, folder),
-    )
-    Arrow.write(joinpath(ARROW_DIR, "$(vascular_tree).arrow"), graph)
+    Arrow.write(joinpath(GRAPH_DIR, "graphs/$(vascular_tree).arrow"), graph)
     
 end
 

@@ -25,48 +25,40 @@ using DataFrames, Arrow
 const trees = tree_definitions()
 const groups = ODE_groups()
 
-# calculation of terminal volume
-volume_geometry = (0.100 * 0.100 * 0.10) / 1000 # [cm^3] -> [l]
+volume_geometry::Float64 = (0.100 * 0.100 * 0.10) / 1000 # [cm^3] -> [l] # calculation of terminal volume
+
 
 
 # Main function: workflow for whole tree
-function process_terminal_nodes(tree_id::String, n_node::Integer)
+function process_terminal_nodes(tree_info)
     @info "Processing terminal nodes..."
-    # get graph id for correct path definition
-    graph_id::String = "$(tree_id)_$(n_node)"
-    vascular_trees = values(trees.vascular_trees[tree_id])
-    # get number of inflow trees
-    n_inflows = length(trees.vascular_trees[tree_id][:inflow_trees])
-    #get name of outflows
-    outflow_trees = trees.vascular_trees[tree_id][:outflow_trees]
 
     graphs = Dict{String, DataFrame}()
-    collect_graphs_information!(graphs, vascular_trees, graph_id, tree_id)
+    collect_graphs_information!(graphs, tree_info)
 
-    terminal_nodes_info = prepare_terminal_nodes_information(graphs, n_inflows, outflow_trees)
-    save_as_arrow(terminal_nodes_info, tree_id, graph_id, "T", JULIA_RESULTS_DIR, "graphs")
+    terminal_nodes_info = prepare_terminal_nodes_information(graphs, tree_info)
+    save_as_arrow(terminal_nodes_info, "T", tree_info.GRAPH_DIR)
 end
 
-function collect_graphs_information!(graphs::Dict{String, DataFrame}, vascular_trees::Base.ValueIterator, graph_id::String, tree_id::String)
+function collect_graphs_information!(graphs::Dict{String, DataFrame}, tree_info)
+    vascular_trees = values(tree_info.vascular_trees)
     for vascular_tree ∈ Iterators.flatten(vascular_trees)
-        GRAPH_PATH::String = normpath(
+        GRAPH_PATH::String = 
             joinpath(
-                @__FILE__,
-                "../../..",
-                JULIA_RESULTS_DIR,
-                tree_id,
-                graph_id,
-                "graphs/$(vascular_tree).arrow",
-            ),
-        )
+                tree_info.GRAPH_DIR,
+                "graphs",
+                "$(vascular_tree).arrow",
+            )
         graphs[vascular_tree] = load_graph(GRAPH_PATH)
     end
 end
 
-function prepare_terminal_nodes_information(graphs::Dict{String, DataFrame}, n_inflows::Integer, outflow_trees::Vector{String})::DataFrame
+function prepare_terminal_nodes_information(graphs::Dict{String, DataFrame}, tree_info)::DataFrame
 
     # not a good way, but for now its okay
     n_terminals::Integer = length(selection_from_df(graphs["A"], (graphs["A"].ODE_groups .== groups.terminal, :ODE_groups)))
+    n_inflows::Integer = length(tree_info.vascular_trees[:inflow_trees])
+    outflow_trees::Vector{String} = tree_info.vascular_trees[:outflow_trees]
     
     flow_values::Array = zeros(n_inflows+1, n_terminals)
     flow_affiliations::Array = fill([""], n_inflows+1, n_terminals)
@@ -76,9 +68,9 @@ function prepare_terminal_nodes_information(graphs::Dict{String, DataFrame}, n_i
     for graph in values(graphs)
         flows_single_tree = selection_from_df(graph, (graph.ODE_groups .== groups.preterminal, :flows))
         if graph[1, :is_inflow]
-            flow_values[k_inflow, :] = flows_single_tree
+            flow_values[k_inflow, :] .= flows_single_tree
             flow_affiliations[k_inflow, :] .= [[graph[1, :vascular_tree_id]] for _ in 1:n_terminals]
-            x_affiliations[k_inflow, :] = [graph[1, :vascular_tree_id] for _ in 1:n_terminals]
+            x_affiliations[k_inflow, :] .= [graph[1, :vascular_tree_id] for _ in 1:n_terminals]
             k_inflow += 1
         else
             flow_values[1, :] .+= flows_single_tree
@@ -95,7 +87,6 @@ function prepare_terminal_nodes_information(graphs::Dict{String, DataFrame}, n_i
     df_flow_values = DataFrame(flow_values, :auto)
     terminal_nodes_info = vcat(df_x_affiliations, df_flow_values, df_flow_affiliations)
     push!(terminal_nodes_info, [volume_terminal for _ in 1:n_terminals])
-    display(terminal_nodes_info)
 
     return terminal_nodes_info 
 end

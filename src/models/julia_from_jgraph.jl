@@ -111,7 +111,7 @@ function get_graph_parameters(GRAPH_PATH::String, n_inflows::Integer)
     graph_parameters = (
         "T",
         Vector(graph[1:(n_inflows+1), 1]), #x_affiliations
-        Array(graph[(n_inflows+2):(n_inflows+3), :]), #terminal_nodes.flow_values,
+        Array(graph[(n_inflows+2):(n_inflows+2+n_inflows), :]), #terminal_nodes.flow_values,
         # Vector(graph[(n_inflows+4):(n_inflows+5), 1]), #terminal_nodes.flow_affiliations,
         graph[end, 1]  #terminal_nodes.volumes
     )

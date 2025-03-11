@@ -8,7 +8,7 @@ export JULIA_RESULTS_DIR, MODEL_PATH
 
 
     module Definitions
-        export tree_definitions, ODE_groups
+        export tree_definitions, flow_directions, ODE_groups
 
         using Parameters
         using Revise
@@ -20,10 +20,14 @@ export JULIA_RESULTS_DIR, MODEL_PATH
                     :outflow_trees => ["V"]
                 ),
                 "Rectangle_quad" => Dict(
-                    :inflow_trees => ["A"],
-                    :outflow_trees => ["V"]
+                    :inflow_trees => ["A", "P"],
+                    :outflow_trees => ["V", "B"]
                 ) #["P", "A", "V", "B"]
             )
+            
+        end
+
+        @with_kw struct flow_directions
             inflow_trees::Tuple{String, String} = ("A", "P")
             outflow_trees::Tuple{String, String} = ("V", "B")
         end

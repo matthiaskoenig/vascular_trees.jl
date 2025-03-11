@@ -7,11 +7,11 @@ using TimerOutputs, Plots
 
 include("../utils.jl")
 import .Utils: JULIA_RESULTS_DIR, MODEL_PATH 
-import .Utils.Definitions: tree_definitions, ODE_groups
+import .Utils.Definitions: flow_directions, tree_definitions, ODE_groups
 import .Utils.Benchmarking: save_times_as_csv
 
 # using ..Utils: JULIA_RESULTS_DIR, MODEL_PATH
-# using ..Utils.Definitions: tree_definitions, ODE_groups
+# using ..Utils.Definitions: flow_directions, ODE_groups
 # using ..Utils.Benchmarking: save_times_as_csv
 
 include("../models/julia_from_jgraph.jl")
@@ -21,6 +21,7 @@ include("../../" * MODEL_PATH)
 import .Julia_models: jf_dxdt!
 
 # Already specified in utils.jl
+const flow_direction = flow_directions()
 const trees = tree_definitions()
 const groups = ODE_groups()
 const tspan = Vector{Float64}(undef, 2)
@@ -64,11 +65,11 @@ function create_simulations(g_options, sim_options, sol_options)
         end
         u0_terminal, p_terminal = get_ODE_components(tree_id, n_node, "T")
 
-        solve_trees_separately(u0_terminal, p_terminal, u0, p, sim_options, sol_options, vascular_trees)
+        solve_trees_separately(u0_terminal, p_terminal, u0, p, sim_options, sol_options, vascular_trees, synch_idxs)
     end
 end
 
-function solve_trees_separately(u0_terminal, p_terminal, u0, p, sim_options, sol_options, vascular_trees)
+function solve_trees_separately(u0_terminal, p_terminal, u0, p, sim_options, sol_options, vascular_trees, synch_idxs)
     tmin = sim_options.tspan[1]
     tmax = sim_options.tspan[2]
     sdt = sim_options.sdt
@@ -78,20 +79,20 @@ function solve_trees_separately(u0_terminal, p_terminal, u0, p, sim_options, sol
     while t_right <= tmax
         tspan .= [t_left, t_right]
         for vascular_tree ∈ Iterators.flatten(vascular_trees)
-            solution = solve_ODE(x0[vascular_tree], p[vascular_tree], tspan, sol_options)
+            solution = solve_ODE(u0[vascular_tree], p[vascular_tree], tspan, sol_options)
             u0[vascular_tree] .= solution[end]
         end
         solution_terminal = solve_ODE(u0_terminal, p_terminal, tspan, sol_options)
         u0_terminal .= solution_terminal[end]
 
         for (ki, inflow_tree) in enumerate(p_terminal[2])
-            if inflow_tree ∈ trees.inflow_trees
+            if inflow_tree ∈ flow_direction.inflow_trees
                 u0_terminal[ki, :] .= view(u0[inflow_tree], synch_idxs[inflow_tree])
             end
         end
 
-        for outflow_tree in trees.outflow_trees
-            u0[outflow_tree][synch_idxs[outflow_tree]] .= view(solution_terminal, lastindex(solution_terminal))[1, :]
+        for outflow_tree in flow_direction.outflow_trees
+            u0[outflow_tree][synch_idxs[outflow_tree]] .= u0_terminal[1, :]
         end
 
         t_left += sdt
@@ -100,7 +101,7 @@ function solve_trees_separately(u0_terminal, p_terminal, u0, p, sim_options, sol
 end
 
 function get_synchronization_indices(graph_id, graph_parameters)
-    if graph_id in trees.inflow_trees
+    if graph_id in flow_direction.inflow_trees
         synch_idx = get_indices(graph_parameters[4], [groups.preterminal])
     else
         synch_idx = get_indices(graph_parameters[4], [groups.terminal])
