@@ -92,15 +92,14 @@ end
 function get_graph_parameters(GRAPH_PATH::String)
     graph = DataFrame(Arrow.Table(GRAPH_PATH))
     graph_parameters = (
-        # graph.vascular_tree_id[1],
+        graph.vascular_tree_id[1],
         graph.is_inflow[1],
-        # graph.all_edges,
-        graph.flows,
-        graph.volumes,
-        graph.ODE_groups,
-        graph.pre_elements,
-        graph.post_elements
-        # graph.post_elements,
+        Vector(graph.all_edges),
+        Vector(graph.flows),
+        Vector(graph.volumes),
+        Vector(graph.ODE_groups),
+        Vector(graph.pre_elements),
+        Vector(graph.post_elements)
     )
 
     return graph_parameters

@@ -25,7 +25,7 @@ const terminal_in = zeros(1)
 export jf_dxdt!
 
 function jf_dxdt!(du::Vector, u::Vector, p::Tuple, t::Float64)
-    is_inflow = p[1]
+    is_inflow = p[2]
     if is_inflow
         jf_inflow!(du, u, p, t)
     else
@@ -35,11 +35,11 @@ end
 
 function jf_inflow!(du, u, p, t)
     
-    flows = p[2]
-    volumes = p[3]
-    ODE_groups = p[4]
-    pre_elements = p[5]
-    post_elements = p[6]
+    flows = p[4]
+    volumes = p[5]
+    ODE_groups = p[6]
+    pre_elements = p[7]
+    post_elements = p[8]
     u[end] = f_intervention(t)
     @inbounds for (ke, group) in enumerate(ODE_groups)
         # retrieve information for element
@@ -75,11 +75,11 @@ end
 
 function jf_outflow!(du, u, p, t)
 
-    flows = p[2]
-    volumes = p[3]
-    ODE_groups = p[4]
-    pre_elements = p[5]
-    post_elements = p[6]
+    flows = p[4]
+    volumes = p[5]
+    ODE_groups = p[6]
+    pre_elements = p[7]
+    post_elements = p[8]
     @inbounds for (ke, group) in enumerate(ODE_groups)
         # retrieve information for element
         pre_element = pre_elements[ke]

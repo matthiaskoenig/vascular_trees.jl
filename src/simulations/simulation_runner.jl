@@ -45,9 +45,12 @@ g_options = graph_options(
 )
 
 tspan = (0.0, 16.0)
+n_intervals = 10.0
+
+sdt = tspan[2] / n_intervals
 sim_options = simulations_options(
     tspan = tspan,
-    sdt = 4.0,
+    sdt = sdt,
     save_simulations = false,
     benchmark = false,
 )

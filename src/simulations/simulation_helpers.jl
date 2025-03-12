@@ -37,7 +37,7 @@ function solve_ODE(x0, p, tspan, sol_options)
         dense = false,
         reltol = sol_options.relative_tolerance,
         abstol = sol_options.absolute_tolerance,
-        # save_idxs = idxs_tosave,
+        #save_idxs = idxs_tosave,
         #progress = true
     )
 
@@ -50,29 +50,41 @@ function solve_ODE(x0, p, tspan, sol_options)
 end
 
 function create_simulations(g_options, sim_options, sol_options)
+    n_intervals = Integer(sim_options.tspan[2] / sim_options.sdt)
     for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
         graph_id = "$(tree_id)_$(n_node)"
         vascular_trees = values(trees.vascular_trees[tree_id])
 
         u0 = Dict(vascular_tree => [0.0] for vascular_tree in Iterators.flatten(vascular_trees))
-        p = Dict{String, Tuple{Bool, Vector{Float64}, Vector{Float64}, Vector{Int16}, Vector{Vector{Int64}}, Vector{Vector{Int64}}}}()
-        synch_idxs = Dict{String, Vector{Int64}}()
+        p = Dict{String, Tuple}()
+        synch_idxs = Dict{String, Vector{Integer}}()
+        variable_ids = Dict{String, Vector{Symbol}}()
+        solutions = Dict(vascular_tree => [DataFrame() for _ in 1:n_intervals+1] for vascular_tree in Iterators.flatten(vascular_trees))
+        solutions["T"] = [DataFrame() for _ in 1:n_intervals+1]
 
         # preparation step - get starting initial values and get parameters for all trees
         for vascular_tree ∈ Iterators.flatten(vascular_trees)
             u0[vascular_tree], p[vascular_tree] = get_ODE_components(tree_id, n_node, vascular_tree)
             synch_idxs[vascular_tree] = get_synchronization_indices(vascular_tree, p[vascular_tree])
+            variable_ids[vascular_tree] = get_variable_ids(vascular_tree, p[vascular_tree][3])
         end
         u0_terminal, p_terminal = get_ODE_components(tree_id, n_node, "T")
+        variable_ids["T"] = get_variable_ids("T", length(u0_terminal[1, :]))
 
-        solve_trees_separately(u0_terminal, p_terminal, u0, p, sim_options, sol_options, vascular_trees, synch_idxs)
+        solve_trees_separately!(solutions, u0_terminal, p_terminal, u0, p, sim_options, sol_options, vascular_trees, synch_idxs)
+        for key in keys(solutions)
+            solutions[key][end] = reduce(vcat, solutions[key])
+        end
+        (size(solutions["A"][end])[2] == size(solutions["T"][end])[2]) ? (print(true)) : (print(false))
+        
     end
 end
 
-function solve_trees_separately(u0_terminal, p_terminal, u0, p, sim_options, sol_options, vascular_trees, synch_idxs)
+function solve_trees_separately!(solutions, u0_terminal, p_terminal, u0, p, sim_options, sol_options, vascular_trees, synch_idxs)
     tmin = sim_options.tspan[1]
     tmax = sim_options.tspan[2]
     sdt = sim_options.sdt
+    ki = 1
     t_left = tmin
     t_right = sdt
 
@@ -81,9 +93,11 @@ function solve_trees_separately(u0_terminal, p_terminal, u0, p, sim_options, sol
         for vascular_tree ∈ Iterators.flatten(vascular_trees)
             solution = solve_ODE(u0[vascular_tree], p[vascular_tree], tspan, sol_options)
             u0[vascular_tree] .= solution[end]
+            solutions[vascular_tree][ki] = DataFrame(solution)
         end
         solution_terminal = solve_ODE(u0_terminal, p_terminal, tspan, sol_options)
         u0_terminal .= solution_terminal[end]
+        solutions["T"][ki] = DataFrame(solution_terminal)
 
         for (ki, inflow_tree) in enumerate(p_terminal[2])
             if inflow_tree ∈ flow_direction.inflow_trees
@@ -97,14 +111,25 @@ function solve_trees_separately(u0_terminal, p_terminal, u0, p, sim_options, sol
 
         t_left += sdt
         t_right += sdt
+        ki += 1
     end
+end
+
+function get_variable_ids(vascular_tree_id::String, element_ids::Vector{Tuple{T,T}}) where {T<:Integer}
+    variable_ids = [Symbol("$(vascular_tree_id)_$(element_id[1])_$(element_id[2])") for element_id in element_ids]
+    return variable_ids
+end
+
+function get_variable_ids(vascular_tree_id::String, n_elements::Integer)
+    variable_ids = [Symbol("$(vascular_tree_id)_$(kv)") for kv in eachindex(n_elements)]
+    return variable_ids
 end
 
 function get_synchronization_indices(graph_id, graph_parameters)
     if graph_id in flow_direction.inflow_trees
-        synch_idx = get_indices(graph_parameters[4], [groups.preterminal])
+        synch_idx = get_indices(graph_parameters[6], [groups.preterminal])
     else
-        synch_idx = get_indices(graph_parameters[4], [groups.terminal])
+        synch_idx = get_indices(graph_parameters[6], [groups.terminal])
     end
     return synch_idx
 end
