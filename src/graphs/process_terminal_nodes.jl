@@ -12,7 +12,7 @@ Output: .arrow (table) with information about terminal nodes.
 Idea of this module: to get, to store, and to save the information about terminal nodes that we need for correct ODEs.
     These nodes serve as a connection point between individual vessel trees.
 
-TODO: Optimize code
+TODO: Flow affiliations are wrong, DataFrame columns contain data of different types, Optimize code
 """
 
 using ..Utils: JULIA_RESULTS_DIR
@@ -61,25 +61,26 @@ function prepare_terminal_nodes_information(graphs::Dict{String, DataFrame}, tre
     outflow_trees::Vector{String} = tree_info.vascular_trees[:outflow_trees]
     
     flow_values::Array = zeros(n_inflows+1, n_terminals)
-    flow_affiliations::Array = fill([""], n_inflows+1, n_terminals)
+    flow_affiliations::Array = fill("", n_inflows+1, n_terminals)
     x_affiliations::Array = fill("", n_inflows+1, n_terminals)
     k_inflow::Integer = 2
     
     for graph in values(graphs)
-        flows_single_tree = selection_from_df(graph, (graph.ODE_groups .== groups.preterminal, :flows))
+        flow_values_single_tree = selection_from_df(graph, (graph.ODE_groups .== groups.preterminal, :flows))
+        flow_ids_single_tree = selection_from_df(graph, (graph.ODE_groups .== groups.preterminal, :flow_ids))
+        element_ids_single_tree = selection_from_df(graph, (graph.ODE_groups .== groups.preterminal, :element_ids))
         if graph[1, :is_inflow]
-            flow_values[k_inflow, :] .= flows_single_tree
-            flow_affiliations[k_inflow, :] .= [[graph[1, :vascular_tree_id]] for _ in 1:n_terminals]
-            x_affiliations[k_inflow, :] .= [graph[1, :vascular_tree_id] for _ in 1:n_terminals]
+            flow_values[k_inflow, :] .= flow_values_single_tree
+            flow_affiliations[k_inflow, :] = flow_ids_single_tree #[[graph[1, :vascular_tree_id]] for _ in 1:n_terminals]
+            x_affiliations[k_inflow, :] .= element_ids_single_tree #[graph[1, :vascular_tree_id] for _ in 1:n_terminals]
             k_inflow += 1
         else
-            flow_values[1, :] .+= flows_single_tree
+            flow_values[1, :] .+= flow_values_single_tree
         end    
-        
     end
 
-    x_affiliations[1, :] .= "T"
-    flow_affiliations[1, :] .= [outflow_trees]
+    x_affiliations[1, :] .= ["T_$n_terminal" for n_terminal in 1:n_terminals]
+    flow_affiliations[1, :] .= "Outflow"# outflow_trees
     volume_terminal = volume_geometry / n_terminals
 
     df_x_affiliations = DataFrame(x_affiliations, :auto)
@@ -93,7 +94,7 @@ end
 
 function load_graph(GRAPH_PATH::String)::DataFrame
     # this is a duplicate of a function from julia_from_jgraph.jl
-    graph = DataFrame(Arrow.Table(GRAPH_PATH))[:, [:vascular_tree_id, :is_inflow, :terminal_edges, :preterminal_edges, :flows, :ODE_groups]]
+    graph = DataFrame(Arrow.Table(GRAPH_PATH))[:, [:vascular_tree_id, :is_inflow, :terminal_edges, :preterminal_edges, :flows, :element_ids, :flow_ids, :ODE_groups]]
     return graph
 end
 

@@ -79,7 +79,7 @@ function get_ODE_components(tree_id::String, n_node::Integer, vascular_tree::Str
 
     if vascular_tree != "T"
         parameters = get_graph_parameters(GRAPH_PATH)
-        u0 = zeros(size(parameters[3])[1])
+        u0 = zeros(length(parameters[3]))
     else
         n_inflows::Integer = length(trees.vascular_trees[tree_id][:inflow_trees])
         parameters = get_graph_parameters(GRAPH_PATH, n_inflows)
@@ -94,7 +94,7 @@ function get_graph_parameters(GRAPH_PATH::String)
     graph_parameters = (
         graph.vascular_tree_id[1],
         graph.is_inflow[1],
-        Vector(graph.all_edges),
+        Vector(graph.element_ids),
         Vector(graph.flows),
         Vector(graph.volumes),
         Vector(graph.ODE_groups),
@@ -109,10 +109,10 @@ function get_graph_parameters(GRAPH_PATH::String, n_inflows::Integer)
     graph = DataFrame(Arrow.Table(GRAPH_PATH))
     graph_parameters = (
         "T",
-        Vector(graph[1:(n_inflows+1), 1]), #x_affiliations
-        Array(graph[(n_inflows+2):(n_inflows+2+n_inflows), :]), #terminal_nodes.flow_values,
+        Array{String}(graph[1:(n_inflows+1), :]), #x_affiliations
+        Array{AbstractFloat}(graph[(n_inflows+2):(n_inflows+2+n_inflows), :]), #terminal_nodes.flow_values,
         # Vector(graph[(n_inflows+4):(n_inflows+5), 1]), #terminal_nodes.flow_affiliations,
-        graph[end, 1]  #terminal_nodes.volumes
+        AbstractFloat((graph[end, 1]))  #terminal_nodes.volumes
     )
 
     return graph_parameters

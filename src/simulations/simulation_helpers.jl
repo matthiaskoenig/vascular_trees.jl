@@ -57,6 +57,7 @@ function create_simulations(g_options, sim_options, sol_options)
 
         u0 = Dict(vascular_tree => [0.0] for vascular_tree in Iterators.flatten(vascular_trees))
         p = Dict{String, Tuple}()
+        # can be preallocated
         synch_idxs = Dict{String, Vector{Integer}}()
         variable_ids = Dict{String, Vector{Symbol}}()
         solutions = Dict(vascular_tree => [DataFrame() for _ in 1:n_intervals+1] for vascular_tree in Iterators.flatten(vascular_trees))
@@ -66,16 +67,17 @@ function create_simulations(g_options, sim_options, sol_options)
         for vascular_tree ∈ Iterators.flatten(vascular_trees)
             u0[vascular_tree], p[vascular_tree] = get_ODE_components(tree_id, n_node, vascular_tree)
             synch_idxs[vascular_tree] = get_synchronization_indices(vascular_tree, p[vascular_tree])
-            variable_ids[vascular_tree] = get_variable_ids(vascular_tree, p[vascular_tree][3])
+            variable_ids[vascular_tree] = get_variable_ids(p[vascular_tree][3])
         end
         u0_terminal, p_terminal = get_ODE_components(tree_id, n_node, "T")
-        variable_ids["T"] = get_variable_ids("T", length(u0_terminal[1, :]))
+        variable_ids["T"] = get_variable_ids(vec(p_terminal[2]))
 
         solve_trees_separately!(solutions, u0_terminal, p_terminal, u0, p, sim_options, sol_options, vascular_trees, synch_idxs)
         for key in keys(solutions)
             solutions[key][end] = reduce(vcat, solutions[key])
+            rename!(solutions[key][end], variable_ids[key])
+            save_simulations_to_csv(solutions[key][end], joinpath(JULIA_RESULTS_DIR, tree_id, graph_id, "simulations", "$(key)_simulations.csv"))
         end
-        (size(solutions["A"][end])[2] == size(solutions["T"][end])[2]) ? (print(true)) : (print(false))
         
     end
 end
@@ -99,9 +101,10 @@ function solve_trees_separately!(solutions, u0_terminal, p_terminal, u0, p, sim_
         u0_terminal .= solution_terminal[end]
         solutions["T"][ki] = DataFrame(solution_terminal)
 
-        for (ki, inflow_tree) in enumerate(p_terminal[2])
-            if inflow_tree ∈ flow_direction.inflow_trees
-                u0_terminal[ki, :] .= view(u0[inflow_tree], synch_idxs[inflow_tree])
+        for (ki, element_id) in enumerate(p_terminal[2][:,1])
+            vascular_tree_id = first(element_id, 1)
+            if vascular_tree_id ∈ flow_direction.inflow_trees
+                u0_terminal[ki, :] .= view(u0[vascular_tree_id], synch_idxs[vascular_tree_id])
             end
         end
 
@@ -115,13 +118,9 @@ function solve_trees_separately!(solutions, u0_terminal, p_terminal, u0, p, sim_
     end
 end
 
-function get_variable_ids(vascular_tree_id::String, element_ids::Vector{Tuple{T,T}}) where {T<:Integer}
-    variable_ids = [Symbol("$(vascular_tree_id)_$(element_id[1])_$(element_id[2])") for element_id in element_ids]
-    return variable_ids
-end
-
-function get_variable_ids(vascular_tree_id::String, n_elements::Integer)
-    variable_ids = [Symbol("$(vascular_tree_id)_$(kv)") for kv in eachindex(n_elements)]
+function get_variable_ids(element_ids::Array{String})
+    variable_ids = [Symbol(element_id) for element_id in element_ids]
+    pushfirst!(variable_ids, :t)
     return variable_ids
 end
 
@@ -177,16 +176,11 @@ function create_simulations(g_options, sim_options, bench_options, sol_options)
 end
 
 function save_simulations_to_csv(
-    simulations,
-    column_names::Vector{String},
+    simulations::DataFrame,
     simulations_path::String,
 )
-    # Convert solution to DataFrame
-    df = DataFrame(simulations)
-
     # Write DataFrame to CSV
-    header = vcat(["time"], column_names)
-    CSV.write(simulations_path, df, header = header)
+    CSV.write(simulations_path, simulations)
 end
 
 function get_indices(collection, groups)

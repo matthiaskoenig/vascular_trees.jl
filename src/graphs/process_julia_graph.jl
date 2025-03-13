@@ -29,7 +29,7 @@ module Process_Julia_Graph
 
     # ============ Specify options
     g_options = graph_options(
-        n_nodes = [10, 1000000, 10000000],  #750, 1000, 1250, 1500
+        n_nodes = [10],  #750, 1000, 1250, 1500
         tree_ids = [
             "Rectangle_quad",
         ],

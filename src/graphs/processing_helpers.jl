@@ -144,6 +144,9 @@ function collect_terminal_edges_info(
     terminal_node_ids,
 )::DataFrame
     n_terminals = length(terminal_node_ids)
+    element_ids = ["T_$n_terminal" for n_terminal in 1:n_terminals]
+    flow_ids = ["QT_$n_terminal" for n_terminal in 1:n_terminals]
+    volume_ids = ["VT_$n_terminal" for n_terminal in 1:n_terminals]
     volume_terminal = volume_geometry / n_terminals
     terminal_edges_info = DataFrame(
         :source_id => terminal_node_ids,
@@ -151,7 +154,9 @@ function collect_terminal_edges_info(
         :leaf .=> 0,
         ([:radius, :flows, :length, :pressure_drop] .=> 0.0)...,
         :volumes .=> volume_terminal,
-        ([:element_ids, :flow_ids, :volume_ids] .=> ["CT", "QT", "VT"])...,
+        :element_ids => element_ids,
+        :flow_ids => flow_ids,
+        :volume_ids => volume_ids,
         ([:preterminal, :start] .=> false)...,
         :terminal .=> true,
     )
@@ -178,7 +183,6 @@ function save_as_arrow(
     GRAPH_DIR::String
 )
     Arrow.write(joinpath(GRAPH_DIR, "graphs/$(vascular_tree).arrow"), graph)
-    
 end
 
 function get_extended_vector(df_column, df_length)

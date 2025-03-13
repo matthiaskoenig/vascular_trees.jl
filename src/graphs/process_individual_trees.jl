@@ -12,7 +12,7 @@ Output: .arrow (table) for every individual vessel tree (arterial, portal, etc.)
 Idea of this module: to get, to store, and to save the information about individual vessel trees that we need for correct ODEs 
     and for creation correct terminal nodes file. 
 
-TODO: Optimize code
+TODO: Ids of outflows are wrong, Optimize code
 """
 
 using ..Utils.Definitions: flow_directions, ODE_groups
@@ -49,7 +49,7 @@ function process_individual_tree(
 )
     GRAPH_PATH, EDGES_PATH, NODES_PATH = paths_initialization(GRAPH_DIR, vascular_tree)
     graph_structure, nodes_attrib = read_graph(GRAPH_PATH, EDGES_PATH, NODES_PATH)
-    add_graph_characteristics!(graph_structure)
+    add_graph_characteristics!(graph_structure, vascular_tree)
     graph = create_graph_structure(graph_structure, nodes_attrib, vascular_tree)
     save_as_arrow(graph, vascular_tree, GRAPH_DIR)
 end
@@ -78,13 +78,13 @@ function read_graph(
     return graph_structure, nodes_attrib
 end
 
-function add_graph_characteristics!(graph_structure::DataFrame)
+function add_graph_characteristics!(graph_structure::DataFrame, vascular_tree::String)
     transform!(
         graph_structure,
         [:source_id, :target_id] =>
             ByRow(
                 (source_id, target_id) -> (
-                    "C_$(source_id)_$(target_id)",
+                    "$(vascular_tree)_$(source_id)_$(target_id)",
                     "Q_$(source_id)_$(target_id)",
                     "V_$(source_id)_$(target_id)",
                 ),
