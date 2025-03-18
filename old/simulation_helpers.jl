@@ -291,7 +291,7 @@ function create_benchmarked_simulations(;
                         n_species = n_species,
                         model_type = model_type,
                         solver_name = sol_options.solver_name,
-                        n_term = Int32(n_species/3),
+                        n_term = Int32(n_species / 3),
                     ))
                     reset_timer!(to::TimerOutput)
                 end

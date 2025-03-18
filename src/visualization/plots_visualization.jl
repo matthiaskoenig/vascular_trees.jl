@@ -17,15 +17,23 @@ function __init__()
 end
 
 function plot_run_times_trees(df)
-    df = df[df.call_orders .!= "Total time (all iterations)", :]
-    df_error = @by df [:tree_id, :n_terminals, :call_orders, :n_species, :tolerance, :saveat, :version] begin
+    df = df[df.call_orders.!="Total time (all iterations)", :]
+    df_error = @by df [
+        :tree_configuration,
+        :n_terminals,
+        :call_orders,
+        :n_species,
+        :tolerance,
+        :saveat,
+        :version,
+    ] begin
         :time_min_mean = mean(:times_min)
         :time_min_std = std(:times_min)
         :allocated_gbytes_mean = mean(:allocated_gbytes)
         :allocated_gbytes_std = std(:allocated_gbytes)
     end
     replace!.([df_error.time_min_std, df_error.allocated_gbytes_std], NaN => 0.0)
-    sort!(df_error, [:tree_id])
+    sort!(df_error, [:tree_configuration])
 
     f1 = Figure()
 

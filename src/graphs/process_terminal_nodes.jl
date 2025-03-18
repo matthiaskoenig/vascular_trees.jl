@@ -16,70 +16,79 @@ TODO: Flow affiliations are wrong, DataFrame columns contain data of different t
 """
 
 using ..Utils: JULIA_RESULTS_DIR
-using ..Utils.Definitions: tree_definitions, ODE_groups
+using ..Utils.Definitions: ODE_groups
 using ..Processing_Helpers: selection_from_df, save_as_arrow, get_extended_vector
 
 using DataFrames, Arrow
 
 # Already specified in utils.jl
-const trees = tree_definitions()
 const groups = ODE_groups()
 
 volume_geometry::Float64 = (0.100 * 0.100 * 0.10) / 1000 # [cm^3] -> [l] # calculation of terminal volume
-
 
 
 # Main function: workflow for whole tree
 function process_terminal_nodes(tree_info)
     @info "Processing terminal nodes..."
 
-    graphs = Dict{String, DataFrame}()
+    graphs = Dict{String,DataFrame}()
     collect_graphs_information!(graphs, tree_info)
 
     terminal_nodes_info = prepare_terminal_nodes_information(graphs, tree_info)
     save_as_arrow(terminal_nodes_info, "T", tree_info.GRAPH_DIR)
 end
 
-function collect_graphs_information!(graphs::Dict{String, DataFrame}, tree_info)
-    vascular_trees = values(tree_info.vascular_trees)
-    for vascular_tree ∈ Iterators.flatten(vascular_trees)
-        GRAPH_PATH::String = 
-            joinpath(
-                tree_info.GRAPH_DIR,
-                "graphs",
-                "$(vascular_tree).arrow",
-            )
+function collect_graphs_information!(graphs::Dict{String,DataFrame}, tree_info)
+    for vascular_tree ∈ tree_info.vascular_trees
+        GRAPH_PATH::String =
+            joinpath(tree_info.GRAPH_DIR, "graphs", "$(vascular_tree).arrow")
         graphs[vascular_tree] = load_graph(GRAPH_PATH)
     end
 end
 
-function prepare_terminal_nodes_information(graphs::Dict{String, DataFrame}, tree_info)::DataFrame
+function prepare_terminal_nodes_information(
+    graphs::Dict{String,DataFrame},
+    tree_info,
+)::DataFrame
 
     # not a good way, but for now its okay
-    n_terminals::Integer = length(selection_from_df(graphs["A"], (graphs["A"].ODE_groups .== groups.terminal, :ODE_groups)))
-    n_inflows::Integer = length(tree_info.vascular_trees[:inflow_trees])
-    outflow_trees::Vector{String} = tree_info.vascular_trees[:outflow_trees]
-    
-    flow_values::Array = zeros(n_inflows+1, n_terminals)
-    flow_affiliations::Array = fill("", n_inflows+1, n_terminals)
-    x_affiliations::Array = fill("", n_inflows+1, n_terminals)
+    n_terminals::Integer = length(
+        selection_from_df(
+            graphs["A"],
+            (graphs["A"].ODE_groups .== groups.terminal, :ODE_groups),
+        ),
+    )
+    n_inflow::Integer = length(tree_info.tree_components[:inflow_trees])
+
+    # preallocating vectors
+    flow_values::Array = zeros(n_inflow + 1, n_terminals)
+    flow_affiliations::Array = fill("", n_inflow + 1, n_terminals)
+    x_affiliations::Array = fill("", n_inflow + 1, n_terminals)
+
+    # where the inflow concentrations should be stored
+    # row number
     k_inflow::Integer = 2
-    
+
     for graph in values(graphs)
-        flow_values_single_tree = selection_from_df(graph, (graph.ODE_groups .== groups.preterminal, :flows))
-        flow_ids_single_tree = selection_from_df(graph, (graph.ODE_groups .== groups.preterminal, :flow_ids))
-        element_ids_single_tree = selection_from_df(graph, (graph.ODE_groups .== groups.preterminal, :element_ids))
         if graph[1, :is_inflow]
-            flow_values[k_inflow, :] .= flow_values_single_tree
-            flow_affiliations[k_inflow, :] = flow_ids_single_tree #[[graph[1, :vascular_tree_id]] for _ in 1:n_terminals]
-            x_affiliations[k_inflow, :] .= element_ids_single_tree #[graph[1, :vascular_tree_id] for _ in 1:n_terminals]
+            flow_values[k_inflow, :] .=
+                selection_from_df(graph, (graph.ODE_groups .== groups.preterminal, :flows))
+            flow_affiliations[k_inflow, :] .= selection_from_df(
+                graph,
+                (graph.ODE_groups .== groups.preterminal, :flow_ids),
+            ) #[[graph[1, :vascular_tree_id]] for _ in 1:n_terminals]
+            x_affiliations[k_inflow, :] .= selection_from_df(
+                graph,
+                (graph.ODE_groups .== groups.preterminal, :species_ids),
+            ) #[graph[1, :vascular_tree_id] for _ in 1:n_terminals]
             k_inflow += 1
         else
-            flow_values[1, :] .+= flow_values_single_tree
-        end    
+            flow_values[1, :] .+=
+                selection_from_df(graph, (graph.ODE_groups .== groups.preterminal, :flows))
+        end
     end
 
-    x_affiliations[1, :] .= ["T_$n_terminal" for n_terminal in 1:n_terminals]
+    x_affiliations[1, :] .= ["T_$n_terminal" for n_terminal = 1:n_terminals]
     flow_affiliations[1, :] .= "Outflow"# outflow_trees
     volume_terminal = volume_geometry / n_terminals
 
@@ -87,14 +96,26 @@ function prepare_terminal_nodes_information(graphs::Dict{String, DataFrame}, tre
     df_flow_affiliations = DataFrame(flow_affiliations, :auto)
     df_flow_values = DataFrame(flow_values, :auto)
     terminal_nodes_info = vcat(df_x_affiliations, df_flow_values, df_flow_affiliations)
-    push!(terminal_nodes_info, [volume_terminal for _ in 1:n_terminals])
+    push!(terminal_nodes_info, [volume_terminal for _ = 1:n_terminals])
 
-    return terminal_nodes_info 
+    return terminal_nodes_info
 end
 
 function load_graph(GRAPH_PATH::String)::DataFrame
     # this is a duplicate of a function from julia_from_jgraph.jl
-    graph = DataFrame(Arrow.Table(GRAPH_PATH))[:, [:vascular_tree_id, :is_inflow, :terminal_edges, :preterminal_edges, :flows, :element_ids, :flow_ids, :ODE_groups]]
+    graph = DataFrame(Arrow.Table(GRAPH_PATH))[
+        :,
+        [
+            :vascular_tree_id,
+            :is_inflow,
+            :terminal_edges,
+            :preterminal_edges,
+            :flows,
+            :species_ids,
+            :flow_ids,
+            :ODE_groups,
+        ],
+    ]
     return graph
 end
 
