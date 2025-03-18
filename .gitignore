@@ -4,8 +4,4 @@ vascular_trees.jl.code-workspace
 SyntheticVascularTrees.jl
 results
 Manifest.toml
-plot_1.svg
-Project.toml
-Manifest.toml
-Manifest.toml
-Manifest.toml
+*.svg

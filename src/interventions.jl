@@ -2,7 +2,7 @@ module Interventions
 
 export f_intervention
 
-const dose = 1.0
+const dose = 10.0
 const hill = 1.0
 const stop_time = 7.0
 
@@ -12,7 +12,7 @@ function f_intervention(t)
 end
 
 f_saturation(t) = dose * (t^hill / (0.1^hill + t^hill)) # amount per time = mmole / min
-f_decline(t)= dose * (-(t-stop_time)^hill / (0.1^hill + (t-stop_time)^hill) + 1.0) 
+f_decline(t) = dose * (-(t - stop_time)^hill / (0.1^hill + (t - stop_time)^hill) + 1.0)
 
 function f_soft_step(t)
 

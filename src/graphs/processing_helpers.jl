@@ -1,4 +1,4 @@
-module Processing_helpers
+module Processing_Helpers
 """
 Helper functions used in workflow of julia graph processing.
 
@@ -14,14 +14,16 @@ Why id in this df is a target id? In Julia graph all attributes belongs to nodes
     Node 2 has flow value, radius, length and pressure drop ---> these values characterise edge (1, 2).
 """
 
-using CSV, DataFrames, DataFramesMeta, InteractiveUtils, Parameters, Revise
+using CSV, DataFrames, DataFramesMeta, InteractiveUtils, Parameters, Revise, Arrow
 
 export read_edges,
     read_nodes_attributes,
     label_special_edges!,
     create_special_edges!,
     selection_from_df,
-    create_tuples_from_dfrows
+    create_tuples_from_dfrows,
+    save_as_arrow,
+    get_extended_vector
 
 # calculation of terminal volume
 volume_geometry = (0.100 * 0.100 * 0.10) / 1000 # [cm^3] -> [l]
@@ -34,7 +36,7 @@ function read_edges(GRAPH_PATH::String, EDGES_PATH::String)::DataFrame
     # join dfs with graph structure and edges attributes
     leftjoin!(graph_structure, edges_attrib, on = :target_id)
     disallowmissing!(graph_structure)
-    
+
     return graph_structure
 end
 
@@ -109,14 +111,18 @@ end
 
 function create_terminal_edges!(graph_structure)
     # adding self edges for terminal nodes
-    terminal_nodes_ids = selection_from_df(graph_structure, (graph_structure.preterminal .== true, :target_id))
+    terminal_nodes_ids = selection_from_df(
+        graph_structure,
+        (graph_structure.preterminal .== true, :target_id),
+    )
     terminal_nodes_info = collect_terminal_edges_info(terminal_nodes_ids)
     append!(graph_structure, terminal_nodes_info)
 end
 
 function create_marginal_edge!(graph_structure)
     # adding marginal edge (for input)
-    start_node_id = (selection_from_df(graph_structure, (graph_structure.start .== true, :source_id)))[1]
+    start_node_id =
+        (selection_from_df(graph_structure, (graph_structure.start .== true, :source_id)))[1]
     push!(
         graph_structure,
         [
@@ -127,7 +133,7 @@ function create_marginal_edge!(graph_structure)
             0.0,
             0.0,
             0.0,
-            graph_structure[graph_structure.start .== true, :volumes][1], # volume equal to the volume of start edge
+            graph_structure[graph_structure.start.==true, :volumes][1], # volume equal to the volume of start edge
             "Marginal",
             "",
             "",
@@ -138,10 +144,11 @@ function create_marginal_edge!(graph_structure)
     )
 end
 
-function collect_terminal_edges_info(
-    terminal_node_ids,
-)::DataFrame
+function collect_terminal_edges_info(terminal_node_ids)::DataFrame
     n_terminals = length(terminal_node_ids)
+    species_ids = ["T_$n_terminal" for n_terminal = 1:n_terminals]
+    flow_ids = ["QT_$n_terminal" for n_terminal = 1:n_terminals]
+    volume_ids = ["VT_$n_terminal" for n_terminal = 1:n_terminals]
     volume_terminal = volume_geometry / n_terminals
     terminal_edges_info = DataFrame(
         :source_id => terminal_node_ids,
@@ -149,7 +156,9 @@ function collect_terminal_edges_info(
         :leaf .=> 0,
         ([:radius, :flows, :length, :pressure_drop] .=> 0.0)...,
         :volumes .=> volume_terminal,
-        ([:element_ids, :flow_ids, :volume_ids] .=> ["CT", "QT", "VT"])...,
+        :species_ids => species_ids,
+        :flow_ids => flow_ids,
+        :volume_ids => volume_ids,
         ([:preterminal, :start] .=> false)...,
         :terminal .=> true,
     )
@@ -157,16 +166,31 @@ function collect_terminal_edges_info(
 end
 
 #=================================================================================================================================#
-function selection_from_df(df::DataFrame, conditions::Tuple{Union{Colon, BitVector}, Vector{Symbol}})::SubDataFrame
+function selection_from_df(
+    df::AbstractDataFrame,
+    conditions::Tuple{Union{Colon,BitVector},Vector{Symbol}},
+)::SubDataFrame
     return @view df[conditions...]
 end
 
-function selection_from_df(df::DataFrame, conditions::Tuple{Union{Colon, BitVector}, Symbol})::SubArray
+function selection_from_df(
+    df::AbstractDataFrame,
+    conditions::Tuple{Union{Colon,BitVector},Symbol},
+)::SubArray
     return @view df[conditions...]
 end
 
 function create_tuples_from_dfrows(df::AbstractDataFrame)
     return Tuple.(Tables.namedtupleiterator(df))
+end
+
+#=================================================================================================================================#
+function save_as_arrow(graph::DataFrame, vascular_tree::String, GRAPH_DIR::String)
+    Arrow.write(joinpath(GRAPH_DIR, "graphs/$(vascular_tree).arrow"), graph)
+end
+
+function get_extended_vector(df_column, df_length)
+    return [df_column; fill(missing, df_length - length(df_column))]
 end
 
 end
