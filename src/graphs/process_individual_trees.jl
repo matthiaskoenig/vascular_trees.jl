@@ -118,7 +118,7 @@ function create_graph_structure(
         pre_elements = graph_info.pre_elements,
         post_elements = graph_info.post_elements,
     )
-    print(graph)
+
     return graph
 end
 
@@ -211,6 +211,6 @@ function get_pre_postelements(
     return pre_elements, post_elements
 end
 
-condition(df, id, ke, df_index) = df == id && ke != df_index
+condition(column_to_look_in, node_id_to_look, element_index, df_index) = column_to_look_in == node_id_to_look && element_index != df_index
 
 end

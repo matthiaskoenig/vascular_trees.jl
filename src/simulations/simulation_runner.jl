@@ -46,7 +46,7 @@ const trees::tree_definitions = tree_definitions()
 # === Graph options ===
 # options for graph, i.e., number of nodes and type of tree
 g_options = graph_options(
-    n_nodes = [100],  #10
+    n_nodes = [10],  #10
     tree_configurations = [
         "Rectangle_quad",
         # "Rectangle_trio",
@@ -56,7 +56,7 @@ g_options = graph_options(
 # === Simulation options ===
 sim_options = simulations_options(
     tspan = (0.0, 16.0),  # [min]
-    steps = 400,
+    steps = 8.0,
     save_simulations = true,
     benchmark = false,
 )

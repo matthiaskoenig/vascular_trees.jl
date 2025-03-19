@@ -12,6 +12,8 @@ using .Interventions: f_intervention
 using InteractiveUtils
 using ..Utils.Definitions: tree_definitions
 
+using..Simulation_Helpers: terminal_inflow, terminal_outflow, terminal_difference
+
 const inflow_in = zeros(1)
 const inflow_out = zeros(2)
 const inflow_out_term = zeros(1)
@@ -40,7 +42,9 @@ function jf_inflow!(du, u, p, t)
     ODE_groups = p[6]
     pre_elements = p[7]
     post_elements = p[8]
-    u[end] = f_intervention(t)
+    if p[1] == "A"
+        u[end] = f_intervention(t)
+    end
     @inbounds for (ke, group) in enumerate(ODE_groups)
         # retrieve information for element
         pre_element = pre_elements[ke]
@@ -92,21 +96,21 @@ function jf_outflow!(du, u, p, t)
             # output
             outflow_out_margin .= view(flows, pre_element) .* u[ke]
             du[ke] = sum(outflow_in_margin) - sum(outflow_out_margin)
-            # outflow -> out & outflow element not connected to terminal
+        # outflow -> out & outflow element not connected to terminal
         elseif group == 1 #(!is_preterminal .&& !is_terminal .&& target_id != 0) 
             # dV/dt = QV_pre * V_pre / VV - Q * V / VV;
             # species before
             outflow_in .= view(flows, pre_element) .* view(u, pre_element)
             du[ke] = sum(outflow_in) - flows[ke] * u[ke] * length(post_element)
-            # outflow element connected to terminal
+        # outflow element connected to terminal
         elseif group == 2 #(is_preterminal) 
             # dV/dt = QV * T / VV - QV * V / VV;
             # species before and after
             du[ke] =
                 sum(flows[ke] .* view(u, pre_element)) -
                 flows[ke] * u[ke] * length(post_element)
-            # elseif group == 3 #(is_terminal) 
-            #     du[ke] = -sum(view(flows, post_element) .* u[ke])
+        elseif group == 3 #(is_terminal) 
+            du[ke] = 0
         end
     end
     du .= du ./ volumes
@@ -116,11 +120,11 @@ function jf_dxdt!(du::Array, u::Array, p::Tuple, t::Float64)
     n_rows = size(u)[1]
     flow_values = p[3]
     du .= 0
-    du[1, :] .=
-        sum(view(flow_values, 2:n_rows, :) .* view(u, 2:n_rows, :)) -
-        sum(view(flow_values, 1, :) .* view(u, 1, :))
+    global terminal_inflow .= view(flow_values, 2:n_rows, :) .* view(u, 2:n_rows, :)
+    global terminal_outflow .= view(flow_values, 1:1, :) .* view(u, 1:1, :)
+    global terminal_difference .= sum(terminal_inflow, dims=1) .- terminal_outflow
+    du[1, :] .= terminal_difference[1, :]
     du[1, :] ./= p[end]
-    # du .= du / p[end]
 end
 
 end
