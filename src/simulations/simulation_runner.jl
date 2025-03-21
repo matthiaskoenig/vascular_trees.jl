@@ -58,7 +58,7 @@ sim_options = simulations_options(
     tspan = (0.0, 16.0),  # [min]
     steps = 8.0,
     save_simulations = true,
-    benchmark = false,
+    benchmark = true,
 )
 
 # === ODE Solver options ===
@@ -72,7 +72,7 @@ additional_sol_options::NamedTuple =
 # === Benchmark options ===
 # do not write anything here in brackets if you are okay with default variant
 import .Utils.Options: benchmark_options
-bench_options = benchmark_options(save_running_times = true)
+bench_options = benchmark_options(save_running_times = false)
 
 # Basic information about the tree that differs between its types (Rectangle_quad, trio, etc.)
 # and which is used repeatedly in simulations

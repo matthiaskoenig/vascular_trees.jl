@@ -40,6 +40,7 @@ Sundials = "c3572dad-4567-51f8-b174-8c6c989267f4"
 Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
 Term = "22787eb5-b846-44ae-b979-8e399b8463ab"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
+UnsafeArrays = "c4a57d5a-5b31-53a6-b365-19f8c011fbd6"
 
 [compat]
 AlgebraOfGraphics = "0.8.13"
@@ -78,4 +79,5 @@ Sundials = "4.26.1"
 Tables = "1.12.0"
 Term = "2.0.7"
 TimerOutputs = "0.5.26"
+UnsafeArrays = "1.0.6"
 julia = ">=1.5"

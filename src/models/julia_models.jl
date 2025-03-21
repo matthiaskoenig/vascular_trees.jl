@@ -9,16 +9,18 @@ ODEs for inflow trees (arterial and portal) differ from ODEs for
 
 include("../interventions.jl")
 using .Interventions: f_intervention
-using InteractiveUtils
-using ..Utils.Definitions: tree_definitions
 
-using..Simulation_Helpers: terminal_inflow, terminal_outflow, terminal_difference
+using ..Simulation_Helpers: terminal_inflow, terminal_outflow, terminal_difference
+
+using ...Utils.Definitions: tree_definitions, terminal_parameters, vascular_tree_parameters
+using UnsafeArrays
 
 const inflow_in = zeros(1)
 const inflow_out = zeros(2)
 const inflow_out_term = zeros(1)
 
 const outflow_in = zeros(2)
+const outflow_out = zeros(1)
 const outflow_in_margin = zeros(1)
 const outflow_out_margin = zeros(1)
 
@@ -26,9 +28,8 @@ const terminal_in = zeros(2)
 
 export jf_dxdt!
 
-function jf_dxdt!(du::Vector, u::Vector, p::Tuple, t::Float64)
-    is_inflow = p[2]
-    if is_inflow
+function jf_dxdt!(du::Vector, u::Vector, p::vascular_tree_parameters, t::Float64)
+    if p.is_inflow
         jf_inflow!(du, u, p, t)
     else
         jf_outflow!(du, u, p, t)
@@ -37,12 +38,12 @@ end
 
 function jf_inflow!(du, u, p, t)
 
-    flows = p[4]
-    volumes = p[5]
-    ODE_groups = p[6]
-    pre_elements = p[7]
-    post_elements = p[8]
-    if p[1] == "A"
+    flows = p.flow_values
+    volumes = p.volume_values
+    ODE_groups = p.ODE_groups
+    pre_elements = p.pre_elements
+    post_elements = p.post_elements
+    if p.id == "A"
         u[end] = f_intervention(t)
     end
     @inbounds for (ke, group) in enumerate(ODE_groups)
@@ -79,11 +80,11 @@ end
 
 function jf_outflow!(du, u, p, t)
 
-    flows = p[4]
-    volumes = p[5]
-    ODE_groups = p[6]
-    pre_elements = p[7]
-    post_elements = p[8]
+    flows = p.flow_values
+    volumes = p.volume_values
+    ODE_groups = p.ODE_groups
+    pre_elements = p.pre_elements
+    post_elements = p.post_elements
     @inbounds for (ke, group) in enumerate(ODE_groups)
         # retrieve information for element
         pre_element = pre_elements[ke]
@@ -105,9 +106,10 @@ function jf_outflow!(du, u, p, t)
         # outflow element connected to terminal
         elseif group == 2 #(is_preterminal) 
             # dV/dt = QV * T / VV - QV * V / VV;
+            outflow_out .= flows[ke] .* view(u, pre_element)
             # species before and after
             du[ke] =
-                sum(flows[ke] .* view(u, pre_element)) -
+                sum(outflow_out) -
                 flows[ke] * u[ke] * length(post_element)
         elseif group == 3 #(is_terminal) 
             du[ke] = 0
@@ -116,15 +118,21 @@ function jf_outflow!(du, u, p, t)
     du .= du ./ volumes
 end
 
-function jf_dxdt!(du::Array, u::Array, p::Tuple, t::Float64)
+function jf_dxdt!(du::Array, u::Array, p::terminal_parameters, t::Float64)
     n_rows = size(u)[1]
-    flow_values = p[3]
+    flow_values = uview(p.flow_values)
     du .= 0
-    global terminal_inflow .= view(flow_values, 2:n_rows, :) .* view(u, 2:n_rows, :)
-    global terminal_outflow .= view(flow_values, 1:1, :) .* view(u, 1:1, :)
-    global terminal_difference .= sum(terminal_inflow, dims=1) .- terminal_outflow
-    du[1, :] .= terminal_difference[1, :]
-    du[1, :] ./= p[end]
+    # global terminal_inflow .= view(flow_values, 2:n_rows, :) .* view(u, 2:n_rows, :)
+    # global terminal_outflow .= view(flow_values, 1:1, :) .* view(u, 1:1, :)
+    # global terminal_difference .= sum(terminal_inflow, dims=1) .- terminal_outflow
+    # du[1, :] .= terminal_difference[1, :]
+   # @views p.terminal_inflow .= flow_values[2:n_rows, :] .* u[2:n_rows, :]
+    p.terminal_inflow .= view(flow_values, 2:n_rows, :) .* view(u, 2:n_rows, :)
+    p.terminal_outflow .= view(flow_values, 1:1, :) .* view(u, 1:1, :)
+    p.terminal_difference .= sum(p.terminal_inflow, dims=1) .- p.terminal_outflow
+    
+    du[1, :] .= view(p.terminal_difference, 1, :) ./ p.volumes
+
 end
 
 end
