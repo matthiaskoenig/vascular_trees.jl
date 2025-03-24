@@ -46,7 +46,7 @@ const trees::tree_definitions = tree_definitions()
 # === Graph options ===
 # options for graph, i.e., number of nodes and type of tree
 g_options = graph_options(
-    n_nodes = [10],  #10
+    n_nodes = [100],  #10
     tree_configurations = [
         "Rectangle_quad",
         # "Rectangle_trio",
@@ -56,9 +56,9 @@ g_options = graph_options(
 # === Simulation options ===
 sim_options = simulations_options(
     tspan = (0.0, 16.0),  # [min]
-    steps = 8.0,
+    steps = 400.0,
     save_simulations = true,
-    benchmark = true,
+    benchmark = false,
 )
 
 # === ODE Solver options ===
@@ -72,7 +72,7 @@ additional_sol_options::NamedTuple =
 # === Benchmark options ===
 # do not write anything here in brackets if you are okay with default variant
 import .Utils.Options: benchmark_options
-bench_options = benchmark_options(save_running_times = false)
+bench_options = benchmark_options(save_running_times = true)
 
 # Basic information about the tree that differs between its types (Rectangle_quad, trio, etc.)
 # and which is used repeatedly in simulations

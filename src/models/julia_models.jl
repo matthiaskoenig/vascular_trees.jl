@@ -10,7 +10,7 @@ ODEs for inflow trees (arterial and portal) differ from ODEs for
 include("../interventions.jl")
 using .Interventions: f_intervention
 
-using ..Simulation_Helpers: terminal_inflow, terminal_outflow, terminal_difference
+# using ..Simulation_Helpers: terminal_inflow, terminal_outflow, terminal_difference
 
 using ...Utils.Definitions: tree_definitions, terminal_parameters, vascular_tree_parameters
 using UnsafeArrays
@@ -36,7 +36,7 @@ function jf_dxdt!(du::Vector, u::Vector, p::vascular_tree_parameters, t::Float64
     end
 end
 
-function jf_inflow!(du, u, p, t)
+function jf_inflow!(du::Vector, u::Vector, p::vascular_tree_parameters, t::Float64)
 
     flows = p.flow_values
     volumes = p.volume_values
@@ -78,7 +78,7 @@ function jf_inflow!(du, u, p, t)
     du .= du ./ volumes
 end
 
-function jf_outflow!(du, u, p, t)
+function jf_outflow!(du::Vector, u::Vector, p::vascular_tree_parameters, t::Float64)
 
     flows = p.flow_values
     volumes = p.volume_values
@@ -120,15 +120,14 @@ end
 
 function jf_dxdt!(du::Array, u::Array, p::terminal_parameters, t::Float64)
     n_rows = size(u)[1]
-    flow_values = uview(p.flow_values)
     du .= 0
     # global terminal_inflow .= view(flow_values, 2:n_rows, :) .* view(u, 2:n_rows, :)
     # global terminal_outflow .= view(flow_values, 1:1, :) .* view(u, 1:1, :)
     # global terminal_difference .= sum(terminal_inflow, dims=1) .- terminal_outflow
     # du[1, :] .= terminal_difference[1, :]
    # @views p.terminal_inflow .= flow_values[2:n_rows, :] .* u[2:n_rows, :]
-    p.terminal_inflow .= view(flow_values, 2:n_rows, :) .* view(u, 2:n_rows, :)
-    p.terminal_outflow .= view(flow_values, 1:1, :) .* view(u, 1:1, :)
+    p.terminal_inflow .= view(p.flow_values, 2:n_rows, :) .* view(u, 2:n_rows, :)
+    p.terminal_outflow .= view(p.flow_values, 1:1, :) .* view(u, 1:1, :)
     p.terminal_difference .= sum(p.terminal_inflow, dims=1) .- p.terminal_outflow
     
     du[1, :] .= view(p.terminal_difference, 1, :) ./ p.volumes

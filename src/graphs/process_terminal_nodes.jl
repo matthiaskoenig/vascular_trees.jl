@@ -54,16 +54,16 @@ function prepare_terminal_nodes_information(
     # not a good way, but for now its okay
     n_terminals::Integer = length(
         selection_from_df(
-            graphs["A"],
-            (graphs["A"].ODE_groups .== groups.terminal, :ODE_groups),
+            graphs["V"],
+            (graphs["V"].ODE_groups .== groups.terminal, :ODE_groups),
         ),
     )
     n_inflow::Integer = length(tree_info.tree_components[:inflow_trees])
 
     # preallocating vectors
     flow_values::Array = zeros(n_inflow + 1, n_terminals)
-    flow_affiliations::Array = fill("", n_inflow + 1, n_terminals)
-    x_affiliations::Array = fill("", n_inflow + 1, n_terminals)
+    flow_affiliations::Array{String} = fill("", n_inflow + 1, n_terminals)
+    x_affiliations::Array{String} = fill("", n_inflow + 1, n_terminals)
 
     # where the inflow concentrations should be stored
     # row number
@@ -76,11 +76,11 @@ function prepare_terminal_nodes_information(
             flow_affiliations[k_inflow, :] .= selection_from_df(
                 graph,
                 (graph.ODE_groups .== groups.preterminal, :flow_ids),
-            ) #[[graph[1, :vascular_tree_id]] for _ in 1:n_terminals]
+            ) 
             x_affiliations[k_inflow, :] .= selection_from_df(
                 graph,
                 (graph.ODE_groups .== groups.preterminal, :species_ids),
-            ) #[graph[1, :vascular_tree_id] for _ in 1:n_terminals]
+            )
             k_inflow += 1
         else
             flow_values[1, :] .+=

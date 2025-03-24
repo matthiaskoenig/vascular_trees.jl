@@ -1,6 +1,6 @@
 module Simulation_Helpers
 
-export run_simulations, create_benchmarked_simulations, terminal_inflow, terminal_outflow, terminal_difference
+export run_simulations, create_benchmarked_simulations #, terminal_inflow, terminal_outflow, terminal_difference
 
 using DifferentialEquations,
     DataFrames, CSV, Sundials, Dictionaries, TimerOutputs, InteractiveUtils
@@ -16,9 +16,9 @@ const flow_direction = flow_directions()
 const groups = ODE_groups()
 const tspan = Vector{Float64}(undef, 2)
 
-terminal_inflow = zeros(2, 1)
-terminal_outflow = zeros(2)
-terminal_difference = zeros(2)
+# terminal_inflow = zeros(2, 1)
+# terminal_outflow = zeros(2)
+# terminal_difference = zeros(2)
 
 include("../../" * MODEL_PATH)
 using .Julia_models: jf_dxdt!
@@ -51,7 +51,7 @@ function run_simulations(
     # graph_subsystem - vascular trees + terminal part
     graph_subsystems = [tree_info.vascular_trees; ["T"]]
     solutions = dictionary(
-        graph_subsystem => [Float64[] for _ = 1:sim_options.steps+1] for
+        graph_subsystem => [Float64[] for _ = 1:sim_options.steps] for
         graph_subsystem in graph_subsystems
     )
     species_ids = similar(solutions, Vector{Symbol})
@@ -76,11 +76,11 @@ function run_simulations(
     u0_terminal = get_initial_values(p_terminal.flow_values)
 
     species_ids["T"] = collect_species_ids(vec(p_terminal.x_affiliations)) # p_terminal[2] - Matrix with String species ids
-    # prellocating vectors for jf_dxdt! function
-    terminal_matrix_size = size(u0_terminal)
-    global terminal_inflow = zeros(terminal_matrix_size[1]-1, terminal_matrix_size[2])
-    global terminal_outflow = zeros(1, terminal_matrix_size[2])
-    global terminal_difference = zeros(1, terminal_matrix_size[2])
+    # # prellocating vectors for jf_dxdt! function
+    # terminal_matrix_size = size(u0_terminal)
+    # global terminal_inflow = zeros(terminal_matrix_size[1]-1, terminal_matrix_size[2])
+    # global terminal_outflow = zeros(1, terminal_matrix_size[2])
+    # global terminal_difference = zeros(1, terminal_matrix_size[2])
 
     if sim_options.benchmark
         # benchmark solving function
@@ -130,12 +130,10 @@ function run_simulations(
         )
         if sim_options.save_simulations
             @info "Saving results"
-            for (graph_subsystem, solutions) in pairs(solutions)
+            for (graph_subsystem, solution) in pairs(solutions)
                 columns = Vector{Vector}(undef, 0)
-                for (i,r) in enumerate(first(solutions))
-                    column = Vector{typeof(r)}(undef, length(solutions))
-                    column .= getindex.(solutions, i)
-                    push!(columns, column)
+                for species_idx in eachindex(first(solution))
+                    push!(columns, getindex.(solution, species_idx))
                 end
                 solution = DataFrame(columns, species_ids[graph_subsystem], copycols=false)
                 #rename!(solution, species_ids[graph_subsystem])
@@ -188,7 +186,7 @@ function solve_tree!(
     @info "Running integration"
     tmin = sim_options.tspan[1]
     tmax = sim_options.tspan[2]
-    sdt = sim_options.dt
+    dt = sim_options.dt
     kl = 1  # loop iterator
     t = tmin
 
@@ -201,7 +199,7 @@ function solve_tree!(
                 integrator,
                 u0[vascular_tree_id];
                 t0 = t,
-                tf = t + sdt,
+                tf = t + dt,
                 erase_sol = true
             )
             # solve the timestep for the subtree
@@ -210,7 +208,7 @@ function solve_tree!(
             u0[vascular_tree_id] .= integrator.uprev
         end
         # reinitialize terminal integrator problem
-        reinit!(integrator_terminal, u0_terminal; t0 = t, tf = t + sdt, erase_sol = true)
+        reinit!(integrator_terminal, u0_terminal; t0 = t, tf = t + dt, erase_sol = true)
         # solve the timestep for the terminal nodes
         solve!(integrator_terminal)
         # final values at end of integration
@@ -237,7 +235,7 @@ function solve_tree!(
         end
 
         # updating state for next integration step
-        t = t + sdt
+        t = t + dt
         kl += 1
     end
 end
