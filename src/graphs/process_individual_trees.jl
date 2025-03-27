@@ -101,8 +101,8 @@ function create_graph_structure(
         prepare_graph_info(graph_structure, nodes_attrib, vascular_tree)
     df_length::Integer = length(graph_info.all_edges)
     graph = DataFrame(
-        vascular_tree_id = get_extended_vector([vascular_tree], df_length), #[vascular_tree; fill(missing, df_length-length(vascular_tree))], # vascular_tree_id
-        is_inflow = get_extended_vector([graph_info.is_inflow], df_length), #[graph_info.is_inflow; fill(missing, df_length-length(graph_info.is_inflow))], # is_inflow
+        vascular_tree_id = get_extended_vector(vascular_tree, df_length), #[vascular_tree; fill(missing, df_length-length(vascular_tree))], # vascular_tree_id
+        is_inflow = get_extended_vector(graph_info.is_inflow, df_length), #[graph_info.is_inflow; fill(missing, df_length-length(graph_info.is_inflow))], # is_inflow
         nodes_ids = get_extended_vector(nodes_attrib.ids, df_length),
         nodes_coordinates = get_extended_vector(graph_info.nodes_coordinates, df_length),
         all_edges = graph_info.all_edges, # 

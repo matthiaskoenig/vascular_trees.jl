@@ -13,7 +13,7 @@ using .Interventions: f_intervention
 # using ..Simulation_Helpers: terminal_inflow, terminal_outflow, terminal_difference
 
 using ...Utils.Definitions: tree_definitions, terminal_parameters, vascular_tree_parameters
-using UnsafeArrays
+using InteractiveUtils
 
 const inflow_in = zeros(1)
 const inflow_out = zeros(2)
@@ -43,9 +43,10 @@ function jf_inflow!(du::Vector, u::Vector, p::vascular_tree_parameters, t::Float
     ODE_groups = p.ODE_groups
     pre_elements = p.pre_elements
     post_elements = p.post_elements
-    if p.id == "A"
-        u[end] = f_intervention(t)
-    end
+    u[end] = f_intervention(t)
+    # if p.id == "A"
+    #     u[end] = f_intervention(t)
+    # end
     @inbounds for (ke, group) in enumerate(ODE_groups)
         # retrieve information for element
         pre_element = pre_elements[ke]
@@ -119,19 +120,35 @@ function jf_outflow!(du::Vector, u::Vector, p::vascular_tree_parameters, t::Floa
 end
 
 function jf_dxdt!(du::Array, u::Array, p::terminal_parameters, t::Float64)
-    n_rows = size(u)[1]
+    jf_terminal!(du, u, p, t)
+end
+
+function jf_terminal!(du::Array, u::Array, p::terminal_parameters, t::Float64)
     du .= 0
-    # global terminal_inflow .= view(flow_values, 2:n_rows, :) .* view(u, 2:n_rows, :)
-    # global terminal_outflow .= view(flow_values, 1:1, :) .* view(u, 1:1, :)
-    # global terminal_difference .= sum(terminal_inflow, dims=1) .- terminal_outflow
-    # du[1, :] .= terminal_difference[1, :]
-   # @views p.terminal_inflow .= flow_values[2:n_rows, :] .* u[2:n_rows, :]
+    # # terminal_difference = p.terminal_difference
+    # flow_values = p.flow_values
+    # sign = 1
+    # ke = 1
+    # kt = 1
+    # @inbounds for flow_value in flow_values
+    #     if ke == 1
+    #         sign = -1
+    #     else
+    #         sign = 1
+    #     end
+    #     du[1, kt] = du[1, kt] + sign * flow_value * u[ke, kt]
+    #     ke += 1
+    #     if ke == 4
+    #         ke = 1
+    #         kt += 1
+    #     end
+    # end
+    # du[1, :] ./= p.volumes
+    n_rows = size(u)[1]
     p.terminal_inflow .= view(p.flow_values, 2:n_rows, :) .* view(u, 2:n_rows, :)
     p.terminal_outflow .= view(p.flow_values, 1:1, :) .* view(u, 1:1, :)
     p.terminal_difference .= sum(p.terminal_inflow, dims=1) .- p.terminal_outflow
     
-    du[1, :] .= view(p.terminal_difference, 1, :) ./ p.volumes
-
+    du[1, :] = p.terminal_difference ./ p.volumes
 end
-
 end

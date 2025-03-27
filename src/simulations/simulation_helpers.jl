@@ -3,7 +3,7 @@ module Simulation_Helpers
 export run_simulations, create_benchmarked_simulations #, terminal_inflow, terminal_outflow, terminal_difference
 
 using DifferentialEquations,
-    DataFrames, CSV, Sundials, Dictionaries, TimerOutputs, InteractiveUtils
+    DataFrames, CSV, Sundials, Dictionaries, TimerOutputs
 
 using ..Utils: MODEL_PATH
 using ..Utils.Definitions: flow_directions, ODE_groups, terminal_parameters, vascular_tree_parameters
@@ -30,6 +30,7 @@ function run_simulations(
     sim_options,
     sol_options,
     additional_sol_options,
+    flow_scaling_factor::AbstractFloat,
     bench_options,
 )
     """Create and run coupled tree simulations.
@@ -51,7 +52,7 @@ function run_simulations(
     # graph_subsystem - vascular trees + terminal part
     graph_subsystems = [tree_info.vascular_trees; ["T"]]
     solutions = dictionary(
-        graph_subsystem => [Float64[] for _ = 1:sim_options.steps] for
+        graph_subsystem => [Float64[] for _ = 1:sim_options.steps+1] for
         graph_subsystem in graph_subsystems
     )
     species_ids = similar(solutions, Vector{Symbol})
@@ -59,7 +60,7 @@ function run_simulations(
     # preparation step - get starting initial values, 
     # parameters and species ids (as symbols) for all trees
     for vascular_tree ∈ tree_info.vascular_trees
-        p[vascular_tree] = get_ODE_parameters(tree_info, vascular_tree)
+        p[vascular_tree] = get_ODE_parameters(tree_info, vascular_tree, flow_scaling_factor)
         species_ids[vascular_tree] = collect_species_ids(p[vascular_tree].species_ids) # p[vascular_tree][3] - Vector with String species ids
     end
     # create dictionary that stores the initial values of trees (placeholder)
@@ -72,7 +73,7 @@ function run_simulations(
     # species ids (as symbols) for terminal nodes
     # u0 and p for terminal nodes are stored as separate values (not with trees),
     # because they are stored differently 
-    p_terminal = get_ODE_parameters(tree_info, "T")
+    p_terminal = get_ODE_parameters(tree_info, "T", flow_scaling_factor)
     u0_terminal = get_initial_values(p_terminal.flow_values)
 
     species_ids["T"] = collect_species_ids(vec(p_terminal.x_affiliations)) # p_terminal[2] - Matrix with String species ids
@@ -131,6 +132,7 @@ function run_simulations(
         if sim_options.save_simulations
             @info "Saving results"
             for (graph_subsystem, solution) in pairs(solutions)
+                filter!(!isempty, solution)
                 columns = Vector{Vector}(undef, 0)
                 for species_idx in eachindex(first(solution))
                     push!(columns, getindex.(solution, species_idx))
@@ -142,7 +144,7 @@ function run_simulations(
                     joinpath(
                         tree_info.GRAPH_DIR,
                         "simulations",
-                        "$(graph_subsystem)_simulations_$(sim_options.dt)_dt.csv",
+                        "$(graph_subsystem)_$(flow_scaling_factor)Q_simulations_$(sim_options.dt)_dt.csv",
                     ),
                 )
             end

@@ -182,7 +182,7 @@ function save_as_arrow(graph::DataFrame, vascular_tree::String, GRAPH_DIR::Strin
     Arrow.write(joinpath(GRAPH_DIR, "graphs/$(vascular_tree).arrow"), graph)
 end
 
-function get_extended_vector(vector_to_extend::Vector, to_which_length_extend::Integer)
+function get_extended_vector(vector_to_extend, to_which_length_extend::Integer)
     return [vector_to_extend; fill(missing, to_which_length_extend - length(vector_to_extend))]
 end
 

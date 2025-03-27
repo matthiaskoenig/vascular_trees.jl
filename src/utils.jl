@@ -19,7 +19,6 @@ using Revise
         "Rectangle_quad" =>
             Dict(:inflow_trees => ["A", "P"], :outflow_trees => ["V", "B"]), #["P", "A", "V", "B"]
     )
-
 end
 
 @with_kw struct flow_directions
@@ -81,7 +80,7 @@ end
 
 @with_kw struct benchmark_options
     save_running_times::Bool = false
-    n_iterations::Int16 = 2
+    n_iterations::Int16 = 1
 end
 
 # https://docs.sciml.ai/DiffEqDocs/stable/solvers/split_ode_solve/

@@ -46,17 +46,19 @@ const trees::tree_definitions = tree_definitions()
 # === Graph options ===
 # options for graph, i.e., number of nodes and type of tree
 g_options = graph_options(
-    n_nodes = [100],  #10
+    n_nodes = [10, 100, 1000, 10000],  #10
     tree_configurations = [
         "Rectangle_quad",
         # "Rectangle_trio",
     ],
 )
 
+flow_scaling_factors = [1.0] # 1.0/16, 1.0/8, 1.0/4, 1.0/2, 1.0, 1.0*2, 1.0*4, 1.0*8, 1.0*16
+
 # === Simulation options ===
 sim_options = simulations_options(
     tspan = (0.0, 16.0),  # [min]
-    steps = 400.0,
+    steps = 800.0,
     save_simulations = true,
     benchmark = false,
 )
@@ -72,7 +74,7 @@ additional_sol_options::NamedTuple =
 # === Benchmark options ===
 # do not write anything here in brackets if you are okay with default variant
 import .Utils.Options: benchmark_options
-bench_options = benchmark_options(save_running_times = true)
+bench_options = benchmark_options(save_running_times = false)
 
 # Basic information about the tree that differs between its types (Rectangle_quad, trio, etc.)
 # and which is used repeatedly in simulations
@@ -80,7 +82,7 @@ bench_options = benchmark_options(save_running_times = true)
 Base.@kwdef struct Tree_structure
     tree_configuration::String
     n_node::Integer
-    graph_id::String = "$(tree_configuration)_$(n_node)"
+    graph_id::String = "$(tree_configuration)_PVL_nonligated_$(n_node)"
     tree_components::Dict{Symbol,Vector{String}} = trees.vascular_trees[tree_configuration]
     vascular_trees::Vector{String} = reduce(vcat, values(tree_components))
     GRAPH_DIR::String = normpath(
@@ -90,15 +92,18 @@ end
 
 for tree_configuration ∈ g_options.tree_configurations
     for n_node ∈ g_options.n_nodes
-        tree_info =
-            Tree_structure(; tree_configuration = tree_configuration, n_node = n_node)
-        run_simulations(
-            tree_info,
-            sim_options,
-            sol_options,
-            additional_sol_options,
-            bench_options,
-        )
+        for flow_scaling_factor in flow_scaling_factors
+            tree_info =
+                Tree_structure(; tree_configuration = tree_configuration, n_node = n_node)
+            run_simulations(
+                tree_info,
+                sim_options,
+                sol_options,
+                additional_sol_options,
+                flow_scaling_factor,
+                bench_options,
+            )
+        end
     end
 end
 end
