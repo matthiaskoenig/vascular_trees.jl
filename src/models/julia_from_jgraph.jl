@@ -9,57 +9,54 @@ Output: u0 (vector of initial values) and
         p (tuple that contains parameters for the differential equations)
 """
 
-export get_ODE_components
+export get_ODE_parameters, get_initial_values
 
 using DataFrames, Arrow
-include("../utils.jl")
-import .Utils.Definitions: tree_definitions
+# include("../utils.jl")
+using ..Utils.Definitions: tree_definitions, terminal_parameters, vascular_tree_parameters
 
 trees = tree_definitions()
 
 # using InteractiveUtils
 
-function get_ODE_components(tree_info, graph_subsystem::String)
+function get_ODE_parameters(tree_info, graph_subsystem::String, flow_scaling_factor::AbstractFloat)
     # get path to the graph
     GRAPH_PATH::String = normpath(joinpath(tree_info.GRAPH_DIR, "graphs/$(graph_subsystem).arrow"))
 
     if graph_subsystem != "T"
-        p = get_graph_parameters(GRAPH_PATH)
+        p = get_graph_parameters(GRAPH_PATH, flow_scaling_factor)
     else
         n_inflow::Integer = length(tree_info.tree_components[:inflow_trees])
-        p = get_graph_parameters(GRAPH_PATH, n_inflow)
+        p = get_graph_parameters(GRAPH_PATH, n_inflow, flow_scaling_factor)
     end
-    
-    u0 = zeros(size(p[3]))
 
-    return u0, p
+    return p
 end
 
-function get_graph_parameters(GRAPH_PATH::String)
+function get_initial_values(species::Array{T}) where {T<:Number}
+    u0 = zeros(size(species))
+    return u0
+end
+
+function get_graph_parameters(GRAPH_PATH::String, flow_scaling_factor::AbstractFloat)
     graph = DataFrame(Arrow.Table(GRAPH_PATH))
-    p = (
+    p = vascular_tree_parameters(
         graph.vascular_tree_id[1],
         graph.is_inflow[1],
         Vector(graph.species_ids),
-        Vector(graph.flows),
+        Vector(graph.flows) .* flow_scaling_factor,
         Vector(graph.volumes),
         Vector(graph.ODE_groups),
-        Vector(graph.pre_elements),
-        Vector(graph.post_elements),
+        Vector(Vector.(graph.pre_elements)),
+        Vector(Vector.(graph.post_elements)),
     )
 
     return p
 end
 
-function get_graph_parameters(GRAPH_PATH::String, n_inflow::Integer)
+function get_graph_parameters(GRAPH_PATH::String, n_inflow::Integer, flow_scaling_factor::AbstractFloat)
     graph = DataFrame(Arrow.Table(GRAPH_PATH))
-    p = (
-        "T",
-        Array{String}(graph[1:(n_inflow+1), :]), #x_affiliations
-        Array{AbstractFloat}(graph[(n_inflow+2):(n_inflow+2+n_inflow), :]), #terminal_nodes.flow_values,
-        # Vector(graph[(n_inflow+4):(n_inflow+5), 1]), #terminal_nodes.flow_affiliations,
-        AbstractFloat((graph[end, 1])),  #terminal_nodes.volumes
-    )
+    p = terminal_parameters(; id = "T", x_affiliations = Array{String}(graph[1:(n_inflow+1), :]), flow_values = Array{Float64}(graph[(n_inflow+2):(n_inflow+2+n_inflow), :]) .* flow_scaling_factor, volumes = Float64((graph[end, 1])))
 
     return p
 end

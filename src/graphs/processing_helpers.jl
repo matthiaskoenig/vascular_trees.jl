@@ -83,23 +83,23 @@ function read_nodes_attributes(NODES_PATH::String)::DataFrame
 end
 
 #=================================================================================================================================#
-function label_special_edges!(graph_structure)
+function label_special_edges!(graph_structure::DataFrame)
     label_preterminal_edges!(graph_structure)
     label_start_edges!(graph_structure)
     label_terminal_edges!(graph_structure)
 end
 
-function label_preterminal_edges!(graph_structure)
+function label_preterminal_edges!(graph_structure::DataFrame)
     graph_structure[!, :preterminal] =
         .!in.(graph_structure.target_id, [Set(graph_structure.source_id)])
 end
 
-function label_start_edges!(graph_structure)
+function label_start_edges!(graph_structure::DataFrame)
     graph_structure[!, :start] =
         .!in.(graph_structure.source_id, [Set(graph_structure.target_id)])
 end
 
-function label_terminal_edges!(graph_structure)
+function label_terminal_edges!(graph_structure::DataFrame)
     graph_structure[!, :terminal] = [false for _ ∈ 1:nrow(graph_structure)]
 end
 
@@ -119,7 +119,7 @@ function create_terminal_edges!(graph_structure)
     append!(graph_structure, terminal_nodes_info)
 end
 
-function create_marginal_edge!(graph_structure)
+function create_marginal_edge!(graph_structure::DataFrame)
     # adding marginal edge (for input)
     start_node_id =
         (selection_from_df(graph_structure, (graph_structure.start .== true, :source_id)))[1]
@@ -144,7 +144,7 @@ function create_marginal_edge!(graph_structure)
     )
 end
 
-function collect_terminal_edges_info(terminal_node_ids)::DataFrame
+function collect_terminal_edges_info(terminal_node_ids::SubArray)::DataFrame
     n_terminals = length(terminal_node_ids)
     species_ids = ["T_$n_terminal" for n_terminal = 1:n_terminals]
     flow_ids = ["QT_$n_terminal" for n_terminal = 1:n_terminals]
@@ -168,15 +168,8 @@ end
 #=================================================================================================================================#
 function selection_from_df(
     df::AbstractDataFrame,
-    conditions::Tuple{Union{Colon,BitVector},Vector{Symbol}},
-)::SubDataFrame
-    return @view df[conditions...]
-end
-
-function selection_from_df(
-    df::AbstractDataFrame,
-    conditions::Tuple{Union{Colon,BitVector},Symbol},
-)::SubArray
+    conditions::Tuple{Union{Colon,BitVector}, Union{Vector{Symbol}, Symbol}},
+)::Union{SubDataFrame, SubArray}
     return @view df[conditions...]
 end
 
@@ -189,8 +182,8 @@ function save_as_arrow(graph::DataFrame, vascular_tree::String, GRAPH_DIR::Strin
     Arrow.write(joinpath(GRAPH_DIR, "graphs/$(vascular_tree).arrow"), graph)
 end
 
-function get_extended_vector(df_column, df_length)
-    return [df_column; fill(missing, df_length - length(df_column))]
+function get_extended_vector(vector_to_extend, to_which_length_extend::Integer)
+    return [vector_to_extend; fill(missing, to_which_length_extend - length(vector_to_extend))]
 end
 
 end

@@ -8,7 +8,7 @@ MODEL_PATH::String = "src/models/julia_models.jl"
 
 
 module Definitions
-export tree_definitions, flow_directions, ODE_groups
+export tree_definitions, flow_directions, ODE_groups, terminal_parameters, vascular_tree_parameters
 
 using Parameters
 using Revise
@@ -19,7 +19,6 @@ using Revise
         "Rectangle_quad" =>
             Dict(:inflow_trees => ["A", "P"], :outflow_trees => ["V", "B"]), #["P", "A", "V", "B"]
     )
-
 end
 
 @with_kw struct flow_directions
@@ -32,6 +31,28 @@ end
     preterminal::Int16 = 2
     terminal::Int16 = 3
     other::Int16 = 1
+end
+
+Base.@kwdef struct terminal_parameters{T<:AbstractFloat, I<:Integer}
+    id::String
+    x_affiliations::Array{String}
+    flow_values::Array{T}
+    volumes::T
+    terminal_matrix_size::Tuple{I, I} = size(x_affiliations)
+    terminal_inflow::Array{T} = zeros(terminal_matrix_size[1]-1, terminal_matrix_size[2])
+    terminal_outflow::Array{T} = zeros(1, terminal_matrix_size[2])
+    terminal_difference::Array{T} = zeros(1, terminal_matrix_size[2])
+end
+
+struct vascular_tree_parameters{T<:AbstractFloat, I<:Integer}
+    id::String
+    is_inflow::Bool
+    species_ids::Vector{String}
+    flow_values::Vector{T}
+    volume_values::Vector{T}
+    ODE_groups::Vector{Int16}
+    pre_elements::Vector{Vector{I}}
+    post_elements::Vector{Vector{I}}
 end
 
 end

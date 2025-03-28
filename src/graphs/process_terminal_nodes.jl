@@ -54,48 +54,68 @@ function prepare_terminal_nodes_information(
     # not a good way, but for now its okay
     n_terminals::Integer = length(
         selection_from_df(
-            graphs["A"],
-            (graphs["A"].ODE_groups .== groups.terminal, :ODE_groups),
+            graphs["V"],
+            (graphs["V"].ODE_groups .== groups.terminal, :ODE_groups),
         ),
     )
     n_inflow::Integer = length(tree_info.tree_components[:inflow_trees])
+    n_trees::Integer = length(tree_info.tree_components[:inflow_trees]) + length(tree_info.tree_components[:outflow_trees])
 
     # preallocating vectors
     flow_values::Array = zeros(n_inflow + 1, n_terminals)
-    flow_affiliations::Array = fill("", n_inflow + 1, n_terminals)
-    x_affiliations::Array = fill("", n_inflow + 1, n_terminals)
+    flow_affiliations::Array{String} = fill("", n_inflow + 1, n_terminals)
+    x_affiliations::Array{String} = fill("", n_inflow + 1, n_terminals)
+    x_coordinates::Array = fill((0.0, 0.0, 0.0), n_trees, n_terminals)
+    x_coordinates_affiliations::Array = fill("", n_trees, n_terminals)
 
     # where the inflow concentrations should be stored
     # row number
     k_inflow::Integer = 2
 
-    for graph in values(graphs)
+    for (kg, graph) in enumerate(values(graphs))
         if graph[1, :is_inflow]
+            equality_edge_to_node = 2
             flow_values[k_inflow, :] .=
                 selection_from_df(graph, (graph.ODE_groups .== groups.preterminal, :flows))
             flow_affiliations[k_inflow, :] .= selection_from_df(
                 graph,
                 (graph.ODE_groups .== groups.preterminal, :flow_ids),
-            ) #[[graph[1, :vascular_tree_id]] for _ in 1:n_terminals]
+            ) 
             x_affiliations[k_inflow, :] .= selection_from_df(
                 graph,
                 (graph.ODE_groups .== groups.preterminal, :species_ids),
-            ) #[graph[1, :vascular_tree_id] for _ in 1:n_terminals]
+            )
             k_inflow += 1
         else
+            equality_edge_to_node = 1
             flow_values[1, :] .+=
                 selection_from_df(graph, (graph.ODE_groups .== groups.preterminal, :flows))
+        end
+
+        preterminal_edges = selection_from_df(graph, (graph.ODE_groups .== groups.preterminal, :all_edges))
+        node_ids = selection_from_df(graph, (:, :nodes_ids))
+        node_coordinates = selection_from_df(graph, (:, :nodes_coordinates))
+        for (ke, edge_id) in enumerate(preterminal_edges)
+            for (kn, node_id) in enumerate(skipmissing(node_ids))
+                if node_id == edge_id[equality_edge_to_node]
+                    x_coordinates[kg, ke] = node_coordinates[kn]
+                    x_coordinates_affiliations[kg, ke] = graph[1, :vascular_tree_id]
+                    continue
+                end
+            end
         end
     end
 
     x_affiliations[1, :] .= ["T_$n_terminal" for n_terminal = 1:n_terminals]
-    flow_affiliations[1, :] .= "Outflow"# outflow_trees
+    flow_affiliations[1, :] .= "Outflow" # outflow_trees
     volume_terminal = volume_geometry / n_terminals
 
     df_x_affiliations = DataFrame(x_affiliations, :auto)
+    df_x_coordinates = DataFrame(x_coordinates, :auto)
+    df_x_coordinates_affiliations = DataFrame(x_coordinates_affiliations, :auto)
     df_flow_affiliations = DataFrame(flow_affiliations, :auto)
     df_flow_values = DataFrame(flow_values, :auto)
-    terminal_nodes_info = vcat(df_x_affiliations, df_flow_values, df_flow_affiliations)
+    terminal_nodes_info = vcat(df_x_affiliations, df_flow_values, df_flow_affiliations, df_x_coordinates, df_x_coordinates_affiliations)
     push!(terminal_nodes_info, [volume_terminal for _ = 1:n_terminals])
 
     return terminal_nodes_info
@@ -108,6 +128,9 @@ function load_graph(GRAPH_PATH::String)::DataFrame
         [
             :vascular_tree_id,
             :is_inflow,
+            :nodes_ids,
+            :nodes_coordinates,
+            :all_edges,
             :terminal_edges,
             :preterminal_edges,
             :flows,

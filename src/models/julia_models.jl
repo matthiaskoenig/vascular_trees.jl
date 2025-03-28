@@ -9,14 +9,18 @@ ODEs for inflow trees (arterial and portal) differ from ODEs for
 
 include("../interventions.jl")
 using .Interventions: f_intervention
+
+# using ..Simulation_Helpers: terminal_inflow, terminal_outflow, terminal_difference
+
+using ...Utils.Definitions: tree_definitions, terminal_parameters, vascular_tree_parameters
 using InteractiveUtils
-using ..Utils.Definitions: tree_definitions
 
 const inflow_in = zeros(1)
 const inflow_out = zeros(2)
 const inflow_out_term = zeros(1)
 
 const outflow_in = zeros(2)
+const outflow_out = zeros(1)
 const outflow_in_margin = zeros(1)
 const outflow_out_margin = zeros(1)
 
@@ -24,23 +28,25 @@ const terminal_in = zeros(2)
 
 export jf_dxdt!
 
-function jf_dxdt!(du::Vector, u::Vector, p::Tuple, t::Float64)
-    is_inflow = p[2]
-    if is_inflow
+function jf_dxdt!(du::Vector, u::Vector, p::vascular_tree_parameters, t::Float64)
+    if p.is_inflow
         jf_inflow!(du, u, p, t)
     else
         jf_outflow!(du, u, p, t)
     end
 end
 
-function jf_inflow!(du, u, p, t)
+function jf_inflow!(du::Vector, u::Vector, p::vascular_tree_parameters, t::Float64)
 
-    flows = p[4]
-    volumes = p[5]
-    ODE_groups = p[6]
-    pre_elements = p[7]
-    post_elements = p[8]
+    flows = p.flow_values
+    volumes = p.volume_values
+    ODE_groups = p.ODE_groups
+    pre_elements = p.pre_elements
+    post_elements = p.post_elements
     u[end] = f_intervention(t)
+    # if p.id == "A"
+    #     u[end] = f_intervention(t)
+    # end
     @inbounds for (ke, group) in enumerate(ODE_groups)
         # retrieve information for element
         pre_element = pre_elements[ke]
@@ -73,13 +79,13 @@ function jf_inflow!(du, u, p, t)
     du .= du ./ volumes
 end
 
-function jf_outflow!(du, u, p, t)
+function jf_outflow!(du::Vector, u::Vector, p::vascular_tree_parameters, t::Float64)
 
-    flows = p[4]
-    volumes = p[5]
-    ODE_groups = p[6]
-    pre_elements = p[7]
-    post_elements = p[8]
+    flows = p.flow_values
+    volumes = p.volume_values
+    ODE_groups = p.ODE_groups
+    pre_elements = p.pre_elements
+    post_elements = p.post_elements
     @inbounds for (ke, group) in enumerate(ODE_groups)
         # retrieve information for element
         pre_element = pre_elements[ke]
@@ -92,35 +98,57 @@ function jf_outflow!(du, u, p, t)
             # output
             outflow_out_margin .= view(flows, pre_element) .* u[ke]
             du[ke] = sum(outflow_in_margin) - sum(outflow_out_margin)
-            # outflow -> out & outflow element not connected to terminal
+        # outflow -> out & outflow element not connected to terminal
         elseif group == 1 #(!is_preterminal .&& !is_terminal .&& target_id != 0) 
             # dV/dt = QV_pre * V_pre / VV - Q * V / VV;
             # species before
             outflow_in .= view(flows, pre_element) .* view(u, pre_element)
             du[ke] = sum(outflow_in) - flows[ke] * u[ke] * length(post_element)
-            # outflow element connected to terminal
+        # outflow element connected to terminal
         elseif group == 2 #(is_preterminal) 
             # dV/dt = QV * T / VV - QV * V / VV;
+            outflow_out .= flows[ke] .* view(u, pre_element)
             # species before and after
             du[ke] =
-                sum(flows[ke] .* view(u, pre_element)) -
+                sum(outflow_out) -
                 flows[ke] * u[ke] * length(post_element)
-            # elseif group == 3 #(is_terminal) 
-            #     du[ke] = -sum(view(flows, post_element) .* u[ke])
+        elseif group == 3 #(is_terminal) 
+            du[ke] = 0
         end
     end
     du .= du ./ volumes
 end
 
-function jf_dxdt!(du::Array, u::Array, p::Tuple, t::Float64)
-    n_rows = size(u)[1]
-    flow_values = p[3]
-    du .= 0
-    du[1, :] .=
-        sum(view(flow_values, 2:n_rows, :) .* view(u, 2:n_rows, :)) -
-        sum(view(flow_values, 1, :) .* view(u, 1, :))
-    du[1, :] ./= p[end]
-    # du .= du / p[end]
+function jf_dxdt!(du::Array, u::Array, p::terminal_parameters, t::Float64)
+    jf_terminal!(du, u, p, t)
 end
 
+function jf_terminal!(du::Array, u::Array, p::terminal_parameters, t::Float64)
+    du .= 0
+    # # terminal_difference = p.terminal_difference
+    # flow_values = p.flow_values
+    # sign = 1
+    # ke = 1
+    # kt = 1
+    # @inbounds for flow_value in flow_values
+    #     if ke == 1
+    #         sign = -1
+    #     else
+    #         sign = 1
+    #     end
+    #     du[1, kt] = du[1, kt] + sign * flow_value * u[ke, kt]
+    #     ke += 1
+    #     if ke == 4
+    #         ke = 1
+    #         kt += 1
+    #     end
+    # end
+    # du[1, :] ./= p.volumes
+    n_rows = size(u)[1]
+    p.terminal_inflow .= view(p.flow_values, 2:n_rows, :) .* view(u, 2:n_rows, :)
+    p.terminal_outflow .= view(p.flow_values, 1:1, :) .* view(u, 1:1, :)
+    p.terminal_difference .= sum(p.terminal_inflow, dims=1) .- p.terminal_outflow
+    
+    du[1, :] = p.terminal_difference ./ p.volumes
+end
 end
