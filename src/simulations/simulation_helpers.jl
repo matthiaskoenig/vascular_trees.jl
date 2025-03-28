@@ -139,13 +139,22 @@ function run_simulations(
                 end
                 solution = DataFrame(columns, species_ids[graph_subsystem], copycols=false)
                 #rename!(solution, species_ids[graph_subsystem])
-                save_simulations_to_csv(
-                    solution,
-                    joinpath(
+                if flow_scaling_factor == 1.0
+                    path = joinpath(
+                        tree_info.GRAPH_DIR,
+                        "simulations",
+                        "$(graph_subsystem)_simulations_$(sim_options.dt)_dt.csv",
+                    )
+                else
+                    path = joinpath(
                         tree_info.GRAPH_DIR,
                         "simulations",
                         "$(graph_subsystem)_$(flow_scaling_factor)Q_simulations_$(sim_options.dt)_dt.csv",
-                    ),
+                    )
+                end
+                save_simulations_to_csv(
+                    solution,
+                    path
                 )
             end
         end

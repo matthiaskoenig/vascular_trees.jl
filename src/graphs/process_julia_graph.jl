@@ -30,7 +30,7 @@ const trees::tree_definitions = tree_definitions()
 # === Graph options ===
 # options for groph, i.e., number of nodes and type of tree
 g_options = graph_options(
-    n_nodes = [10, 100, 1000, 10000],  #750, 1000, 1250, 1500
+    n_nodes = [10, 10000],  #750, 1000, 1250, 1500, 10000
     tree_configurations = ["Rectangle_quad"],
 )
 
