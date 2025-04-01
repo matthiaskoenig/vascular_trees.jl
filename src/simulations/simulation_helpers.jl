@@ -21,7 +21,7 @@ const tspan = Vector{Float64}(undef, 2)
 # terminal_difference = zeros(2)
 
 include("../../" * MODEL_PATH)
-using .Julia_models: jf_dxdt!
+using .Pharmacokinetic_models: jf_dxdt!
 
 using InteractiveUtils
 

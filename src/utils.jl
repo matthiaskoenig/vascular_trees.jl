@@ -4,7 +4,7 @@ export JULIA_RESULTS_DIR, MODEL_PATH
 RESULTS_DIR::String = "results"
 JULIA_RESULTS_DIR::String = RESULTS_DIR * "/julia_vessel_trees"
 BENCHMARKING_RESULTS_PATH::String = joinpath(JULIA_RESULTS_DIR, "jrunning_times.csv")
-MODEL_PATH::String = "src/models/julia_models.jl"
+MODEL_PATH::String = "src/models/Pharmacokinetic_models.jl"
 
 
 module Definitions

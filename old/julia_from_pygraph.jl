@@ -1,12 +1,12 @@
 module Julia_from_pygraph
 """
 Module which contains functions for creating x0 and p vectors specific for each type of PYTHON MERGED graph for ODESolve function.
-    These matrices are needed for ODE function from julia_models.jl.
+    These matrices are needed for ODE function from Pharmacokinetic_models.jl.
 
-Also this module can be used for checking ODE functions from julia_models.jl.
+Also this module can be used for checking ODE functions from Pharmacokinetic_models.jl.
     1. For this uncomment:
-        #include("./julia_models.jl")
-        #import .Julia_models: f_dxdt!
+        #include("./Pharmacokinetic_models.jl")
+        #import .Pharmacokinetic_models: f_dxdt!
         __init__ function
     2. Specialize what graph do you want to use in  __init__ function
 
@@ -35,8 +35,8 @@ using CSV,
 include("../utils.jl")
 import .Utils: JULIA_RESULTS_DIR
 import .Utils.Options: graph_options
-# include("./julia_models.jl")
-# import .Julia_models: f_dxdt!
+# include("./Pharmacokinetic_models.jl")
+# import .Pharmacokinetic_models: f_dxdt!
 
 export get_ODE_components
 

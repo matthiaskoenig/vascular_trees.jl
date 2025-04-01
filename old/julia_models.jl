@@ -1,4 +1,4 @@
-module Julia_models
+module Pharmacokinetic_models
 
 export pyf_dxdt!, jf_dxdt!, str_jf_dxdt!
 
