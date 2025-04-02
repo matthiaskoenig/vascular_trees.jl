@@ -7,7 +7,7 @@ Make sure that structure of vascular_trees.jl directory is as needed (somewhere 
 
 What must/may be specified in code below:
 1. must
-    1.1. g_options (graph options)
+    1.1. t_options (graph options)
     1.2. sim_options (simulation options)
 2. may (if you want to geet additional data and do not like default variants)
     2.1. benchmark options 
@@ -29,7 +29,7 @@ TODO: run macros @timeit only when you need it - now it is so, but it is dirty
 """
 
 include("../utils.jl")
-import .Utils.Options: graph_options, simulations_options, benchmark_options, solver_options
+import .Utils.Options: tree_options, simulations_options, benchmark_options, solver_options
 import .Utils: JULIA_RESULTS_DIR, MODEL_PATH 
 import .Utils.Definitions: tree_definitions
 import .Utils.Benchmarking: save_times_as_csv
@@ -45,7 +45,7 @@ const trees::tree_definitions = tree_definitions()
 
 # === Graph options ===
 # options for graph, i.e., number of nodes and type of tree
-g_options = graph_options(
+t_options = tree_options(
     n_nodes = [10, 100, 1000, 10000, 100000],  #10
     tree_configurations = [
         "Rectangle_quad",
@@ -90,8 +90,8 @@ Base.@kwdef struct Tree_structure
     )
 end
 
-for tree_configuration ∈ g_options.tree_configurations
-    for n_node ∈ g_options.n_nodes
+for tree_configuration ∈ t_options.tree_configurations
+    for n_node ∈ t_options.n_nodes
         for flow_scaling_factor in flow_scaling_factors
             tree_info =
                 Tree_structure(; tree_configuration = tree_configuration, n_node = n_node)

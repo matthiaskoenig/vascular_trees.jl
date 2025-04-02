@@ -14,8 +14,6 @@ Also, variables (initial values and differentials) and parts of parameters struc
 include("../interventions.jl")
 using .Interventions: f_intervention
 
-# using ..Simulation_Helpers: terminal_inflow, terminal_outflow, terminal_difference
-
 using ...Utils.Definitions: tree_definitions, terminal_parameters, vascular_tree_parameters
 using InteractiveUtils
 

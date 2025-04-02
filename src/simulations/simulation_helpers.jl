@@ -1,6 +1,6 @@
 module Simulation_Helpers
 
-export run_simulations, create_benchmarked_simulations #, terminal_inflow, terminal_outflow, terminal_difference
+export run_simulations, create_benchmarked_simulations
 
 using DifferentialEquations,
     DataFrames, CSV, Sundials, Dictionaries, TimerOutputs
@@ -15,10 +15,6 @@ using ..Julia_from_jgraph: get_ODE_parameters, get_initial_values
 const flow_direction = flow_directions()
 const groups = ODE_groups()
 const tspan = Vector{Float64}(undef, 2)
-
-# terminal_inflow = zeros(2, 1)
-# terminal_outflow = zeros(2)
-# terminal_difference = zeros(2)
 
 include("../../" * MODEL_PATH)
 using .Pharmacokinetic_models: jf_dxdt!
@@ -35,7 +31,7 @@ function run_simulations(
 )
     """Create and run coupled tree simulations.
 
-    g_options: Graph options
+    t_options: Graph options
     sim_options: Simulation options
     sol_options: ODE Solver options
     additional_sol_options:: Additional integrator arguments which are not mandatory
@@ -77,11 +73,6 @@ function run_simulations(
     u0_terminal = get_initial_values(p_terminal.flow_values)
 
     species_ids["T"] = collect_species_ids(vec(p_terminal.x_affiliations)) # p_terminal[2] - Matrix with String species ids
-    # # prellocating vectors for jf_dxdt! function
-    # terminal_matrix_size = size(u0_terminal)
-    # global terminal_inflow = zeros(terminal_matrix_size[1]-1, terminal_matrix_size[2])
-    # global terminal_outflow = zeros(1, terminal_matrix_size[2])
-    # global terminal_difference = zeros(1, terminal_matrix_size[2])
 
     if sim_options.benchmark
         # benchmark solving function

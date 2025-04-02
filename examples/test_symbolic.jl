@@ -1,12 +1,12 @@
 include("../utils.jl")
 import .Utils: JULIA_RESULTS_DIR
-import .Utils.Options: graph_options, simulations_options
+import .Utils.Options: tree_options, simulations_options
 
 include("simulation_helpers.jl")
 import .Simulation_helpers: ODE_solver
 
 # ============ Specify options
-g_options::graph_options = graph_options(
+t_options::tree_options = tree_options(
     n_nodes = [10],
     tree_ids = [
         #"Rectangle_quad",
@@ -25,11 +25,11 @@ sim_options::simulations_options = simulations_options(
 
 graph_id::String = ""
 file_name::String = ""
-for n_node ∈ g_options.n_nodes
-    for tree_id ∈ g_options.tree_ids
+for n_node ∈ t_options.n_nodes
+    for tree_id ∈ t_options.tree_ids
 
         graph_id = "$(tree_id)_$(n_node)"
-        file_name = "$(graph_id)_$(g_options.model_type)"
+        file_name = "$(graph_id)_$(t_options.model_type)"
         MODEL_PATH = normpath(
             joinpath(
                 @__FILE__,
