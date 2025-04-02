@@ -30,7 +30,7 @@ const trees::tree_definitions = tree_definitions()
 # === Graph options ===
 # options for tree, i.e., number of nodes and type of tree
 t_options = tree_options(
-    n_nodes = [10, 10000],  #750, 1000, 1250, 1500, 10000
+    n_nodes = [500],  #750, 1000, 1250, 1500, 10000
     tree_configurations = ["Rectangle_quad"],
 )
 
@@ -40,7 +40,7 @@ t_options = tree_options(
 Base.@kwdef struct Tree_structure
     tree_configuration::String
     n_node::Integer
-    graph_id::String = "$(tree_configuration)_PVL_nonligated_$(n_node)"
+    graph_id::String = "$(tree_configuration)_$(n_node)"
     tree_components::Dict{Symbol,Vector{String}} = trees.vascular_trees[tree_configuration]
     vascular_trees::Vector{String} = reduce(vcat, values(tree_components))
     GRAPH_DIR::String = normpath(

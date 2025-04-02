@@ -179,7 +179,7 @@ function create_tuples_from_dfrows(df::AbstractDataFrame)
 end
 
 #=================================================================================================================================#
-function get_path_to_file(path::Tuple)
+function get_path_to_file(path::Vector{String})
     return joinpath(path...)
 end
 
