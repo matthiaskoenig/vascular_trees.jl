@@ -23,7 +23,8 @@ export read_edges,
     selection_from_df,
     create_tuples_from_dfrows,
     save_as_arrow,
-    get_extended_vector
+    get_extended_vector,
+    get_path_to_file
 
 # calculation of terminal volume
 volume_geometry = (0.100 * 0.100 * 0.10) / 1000 # [cm^3] -> [l]
@@ -178,6 +179,10 @@ function create_tuples_from_dfrows(df::AbstractDataFrame)
 end
 
 #=================================================================================================================================#
+function get_path_to_file(path::Vector{String})
+    return joinpath(path...)
+end
+
 function save_as_arrow(graph::DataFrame, vascular_tree::String, GRAPH_DIR::String)
     Arrow.write(joinpath(GRAPH_DIR, "graphs/$(vascular_tree).arrow"), graph)
 end

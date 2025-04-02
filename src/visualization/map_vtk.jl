@@ -14,7 +14,7 @@ Note for understanding the workflow with T.arrow file (terminal part of the tree
 
 include("../utils.jl")
 import .Utils: JULIA_RESULTS_DIR
-import .Utils.Options: graph_options
+import .Utils.Options: tree_options
 import .Utils.Definitions: tree_definitions
 
 using DataFrames, Arrow, CSV
@@ -22,7 +22,7 @@ using DataFrames, Arrow, CSV
 const trees::tree_definitions = tree_definitions()
 # === Graph options ===
 # options for graph, i.e., number of nodes and type of tree
-const g_options = graph_options(
+const t_options = tree_options(
     n_nodes = [10, 100, 1000],  #10
     tree_configurations = [
         "Rectangle_quad",
@@ -45,8 +45,8 @@ end
 
 
 function __init__()
-    for tree_configuration ∈ g_options.tree_configurations
-        for n_node in g_options.n_nodes
+    for tree_configuration ∈ t_options.tree_configurations
+        for n_node in t_options.n_nodes
             tree_info = Tree_structure(; tree_configuration = tree_configuration, n_node = n_node)
             map_vtk_with_jgraphs(tree_info)
         end

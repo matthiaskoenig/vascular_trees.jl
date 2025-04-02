@@ -5,14 +5,19 @@ export process_julia_graph
 """
 Module for processing individual vessel trees (arterial, portal, etc.).
 
+Idea of this module: to get, to store, and to save the information about individual 
+    vessel trees that we need for correct ODEs  and for creation correct terminal
+    nodes file.
+
 Input: .lg and .csv files for every individual vessel tree (arterial, portal, etc.).
+        Each vessel tree (graph) has three files: 
+        1 - .lg (basic structure of the graph - list of edges), 
+        2 - .csv (edges and nodes info).
 
-Output: .arrow (table) for every individual vessel tree (arterial, portal, etc.).
+Output: .arrow (table) for every individual vessel tree (arterial, portal, etc.): 1 file
+        for 1 vessel tree.
 
-Idea of this module: to get, to store, and to save the information about individual vessel trees that we need for correct ODEs 
-    and for creation correct terminal nodes file. 
-
-TODO: Ids of outflows are wrong, Optimize code
+TODO: Ids of outflows are wrong (they are not source.id_target.id, but target.id_source.id), Optimize code
 """
 
 using ..Utils.Definitions: flow_directions, ODE_groups
@@ -24,7 +29,8 @@ using ..Processing_Helpers:
     create_tuples_from_dfrows,
     selection_from_df,
     save_as_arrow,
-    get_extended_vector
+    get_extended_vector,
+    get_path_to_file
 
 using DataFrames, InteractiveUtils
 
@@ -32,21 +38,28 @@ using DataFrames, InteractiveUtils
 const groups::ODE_groups = ODE_groups()
 const flow_direction = flow_directions()
 
-# Main function: workflow for whole tree
 function process_julia_graph(tree_info)
+    """Main function: workflow for whole tree"""
     @info "Processing individual trees..."
-
+    # iterate over all parts of the tree, process them and save info
     for vascular_tree ∈ tree_info.vascular_trees
         process_individual_tree(tree_info.GRAPH_DIR, vascular_tree)
     end
 end
 
-# Workflow for individual vessel trees
 function process_individual_tree(GRAPH_DIR::String, vascular_tree::String)
+    """Workflow for individual vessel tree"""
+    # initialize paths for every file that contain info about this graph
     GRAPH_PATH, EDGES_PATH, NODES_PATH = paths_initialization(GRAPH_DIR, vascular_tree)
+    # load info about the graph from all three files (graph basic structure and edges info
+    # are merged in one dataframe)
     graph_structure, nodes_attrib = read_graph(GRAPH_PATH, EDGES_PATH, NODES_PATH)
+    # figure out additional info that we need for constructing correct ODE system and add 
+    # it to the dataframe that contains edges info
     add_graph_characteristics!(graph_structure, vascular_tree)
+    # collect all info from two dataframes and store it in one structure 
     graph = create_graph_structure(graph_structure, nodes_attrib, vascular_tree)
+    # save structure with graph info as .arrow file
     save_as_arrow(graph, vascular_tree, GRAPH_DIR)
 end
 
@@ -55,9 +68,11 @@ function paths_initialization(
     GRAPH_DIR::String,
     vascular_tree::String,
 )::Tuple{String,String,String}
-    GRAPH_PATH::String = joinpath(GRAPH_DIR, "julia", "$(vascular_tree).lg")
-    EDGES_PATH::String = joinpath(GRAPH_DIR, "julia", "$(vascular_tree)_edges.csv")
-    NODES_PATH::String = joinpath(GRAPH_DIR, "julia", "$(vascular_tree)_nodes.csv")
+    """Function that initialises paths to graph files"""
+    GRAPH_PATH::String = get_path_to_file([GRAPH_DIR, "julia/$(vascular_tree).lg"])
+    EDGES_PATH::String = get_path_to_file([GRAPH_DIR, "julia/$(vascular_tree)_edges.csv"])
+    NODES_PATH::String = get_path_to_file([GRAPH_DIR, "julia/$(vascular_tree)_nodes.csv"])
+
     return GRAPH_PATH, EDGES_PATH, NODES_PATH
 end
 
@@ -66,7 +81,11 @@ function read_graph(
     EDGES_PATH::String,
     NODES_PATH::String,
 )::Tuple{DataFrame,DataFrame}
-    # read, prepare and join files with information about edges and their attributes
+    """
+    Function that loads all graph files as dataframes and makes first transformations.
+    """
+    # read, prepare, collect first info and join files with information about edges and 
+    # their attributes
     graph_structure::DataFrame = read_edges(GRAPH_PATH, EDGES_PATH)
     # read and prepare csv file with nodes attributes
     nodes_attrib::DataFrame = read_nodes_attributes(NODES_PATH)
@@ -75,6 +94,14 @@ function read_graph(
 end
 
 function add_graph_characteristics!(graph_structure::DataFrame, vascular_tree::String)
+    """
+    Function that collects additional info that we need for the right ODE model and adds it
+        to the dataframe from which it was found out: to dataframe with edges info.
+    """
+    # add to the dataframe columns with species ids, flow ids, volume ids
+    # we need them to be able to then save simulations with informative columns,
+    # and to be able to find out for each flow and volume value to what edge they 
+    # belong
     transform!(
         graph_structure,
         [:source_id, :target_id] =>
@@ -86,9 +113,21 @@ function add_graph_characteristics!(graph_structure::DataFrame, vascular_tree::S
                 ),
             ) => [:species_ids, :flow_ids, :volume_ids],
     )
+    # add columns which will indicate whether the edge is preterminal, terminal
+    # or first (start) one. We need this info to right correct equations, but
+    # at this stage of graph processing, its dataframe does not have terminal edges,
+    # so column :terminal is filled with "false"
     label_special_edges!(graph_structure)
+    # create terminal edges and marginal edge (the one to where we add
+    # intervention)
     create_special_edges!(graph_structure)
+    # add column which will indicate to which ODE group (defined in utils.jl)
+    # belongs each edge, storing this info in one column will fasten solving ODE
+    # system
     assign_ODE_group!(graph_structure)
+    # add column which will store the position (index) of each edge in the dataframe,
+    # we need them to then for asch edge store indices of its preedges and postedges,
+    # storing this info separately will fasten solving the ODE model
     set_index!(graph_structure)
 end
 
@@ -97,9 +136,24 @@ function create_graph_structure(
     nodes_attrib::DataFrame,
     vascular_tree::String
 )::DataFrame
+    """
+    Function that transforms columns of the dataframes with edges and nodes to separate vectors,
+        prepares them to be saved as one dataframe in .arrow format, additional transforms outflow graphs.
+    
+    Note: .arrow format can only store tables/dataframes. To create a table/dataframe out of several vectors,
+        they must have the same length. In our case these vectors have different lengths, so
+        some of them must be extended with "missing" values.
+    """
+    # transform columns of both dataframes to separate vectors and return them in one tuple,
+    # if the graph is an outflow, change source nodes to targets and vice versa, add some more additional info
     graph_info::NamedTuple =
         prepare_graph_info(graph_structure, nodes_attrib, vascular_tree)
+    # number of edges graph define the number of rows in the table that will contain all info
+    # about the graph that we need, so we need to store this number (see note in the describtion of this
+    # function)
     df_length::Integer = length(graph_info.all_edges)
+    # collect all the info in one dataframe
+    # for this some vectors must be extended for them all to be the same length
     graph = DataFrame(
         vascular_tree_id = get_extended_vector(vascular_tree, df_length), #[vascular_tree; fill(missing, df_length-length(vascular_tree))], # vascular_tree_id
         is_inflow = get_extended_vector(graph_info.is_inflow, df_length), #[graph_info.is_inflow; fill(missing, df_length-length(graph_info.is_inflow))], # is_inflow
@@ -124,24 +178,25 @@ end
 
 #=================================================================================================================================#
 function assign_ODE_group!(graph_structure::DataFrame)
-    graph_structure.ODE_group .= groups.other
-    graph_structure[:, :ODE_group] .=
+    """Function that adds to the dataframe with edges column which indicate ODE group for each edge"""
+    graph_structure.ODE_group .=
+    ifelse.(
+        graph_structure[:, :preterminal] .== true,
+        groups.preterminal,
         ifelse.(
-            graph_structure[:, :preterminal] .== true,
-            groups.preterminal,
+            graph_structure[:, :terminal] .== true,
+            groups.terminal,
             ifelse.(
-                graph_structure[:, :terminal] .== true,
-                groups.terminal,
-                ifelse.(
-                    graph_structure[:, :source_id] .== 0,
-                    groups.marginal,
-                    graph_structure.ODE_group,
-                ),
+                graph_structure[:, :source_id] .== 0,
+                groups.marginal,
+                groups.other,
             ),
-        )
+        ),
+    )
 end
 
 function set_index!(graph_structure::DataFrame)
+    """Function that adds to the dataframe with edges column which indicate position of every edge in the dataframe"""
     graph_structure.index = 1:nrow(graph_structure)
 end
 
@@ -150,6 +205,10 @@ function prepare_graph_info(
     nodes_attrib::DataFrame,
     vascular_tree::String,
 )::NamedTuple
+    """
+    Function that transforms columns of both dataframes to separate vectors, collect more info, transform outflow graph
+        and returns this vectors in one tuple.
+    """
     is_inflow::Bool = in(vascular_tree, flow_direction.inflow_trees)
     # reverse edges if the tree is an outflow
     (!is_inflow) &&

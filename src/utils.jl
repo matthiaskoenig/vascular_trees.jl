@@ -58,14 +58,14 @@ end
 end
 
 module Options
-export graph_options, simulations_options, benchmark_options, solver_options, edge_options
+export tree_options, simulations_options, benchmark_options, solver_options, edge_options
 using Parameters
 
 using OrdinaryDiffEq
 using Revise # this package must not be in final version
 using Sundials
 
-@with_kw struct graph_options
+@with_kw struct tree_options
     n_nodes::Vector{Int64}
     tree_configurations::Vector{String}
 end

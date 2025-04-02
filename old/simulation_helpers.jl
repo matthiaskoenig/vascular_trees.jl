@@ -63,14 +63,14 @@ function save_simulations_to_csv(;
     CSV.write(simulations_path, df, header = header)
 end
 
-function create_simulations(; g_options, sim_options, sol_options)
+function create_simulations(; t_options, sim_options, sol_options)
 
     graph_id::String = ""
     file_name::String = ""
 
-    for model_type in g_options.model_types
+    for model_type in t_options.model_types
         if model_type ∈ m_types.templates
-            for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
+            for n_node ∈ t_options.n_nodes, tree_id ∈ t_options.tree_ids
                 graph_id = "$(tree_id)_$(n_node)"
                 file_name = "$(graph_id)_$(model_type)"
                 print("\r...Working with $(file_name)...")
@@ -123,7 +123,7 @@ function create_simulations(; g_options, sim_options, sol_options)
                 f_dxdt = Pharmacokinetic_models.jf_dxdt!
                 get_ODE_components = Julia_from_jgraph.get_ODE_components
             end
-            for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
+            for n_node ∈ t_options.n_nodes, tree_id ∈ t_options.tree_ids
                 graph_id = "$(tree_id)_$(n_node)"
                 printstyled(
                     "------------------------------------------------------------------------------------\n";
@@ -168,7 +168,7 @@ function create_simulations(; g_options, sim_options, sol_options)
 end
 
 function create_benchmarked_simulations(;
-    g_options,
+    t_options,
     sim_options,
     bench_options,
     sol_options,
@@ -179,9 +179,9 @@ function create_benchmarked_simulations(;
 
     pbar = ProgressBar()
 
-    for model_type in g_options.model_types
+    for model_type in t_options.model_types
         if model_type ∈ m_types.templates
-            for n_node ∈ g_options.n_nodes, tree_id ∈ g_options.tree_ids
+            for n_node ∈ t_options.n_nodes, tree_id ∈ t_options.tree_ids
                 graph_id = "$(tree_id)_$(n_node)"
                 file_name = "$(graph_id)_$(model_type)"
                 printstyled(
@@ -255,7 +255,7 @@ function create_benchmarked_simulations(;
                 f_dxdt = Pharmacokinetic_models.jf_dxdt!
                 get_ODE_components = Julia_from_jgraph.get_ODE_components
             end
-            for tree_id ∈ g_options.tree_ids, n_node ∈ g_options.n_nodes
+            for tree_id ∈ t_options.tree_ids, n_node ∈ t_options.n_nodes
                 graph_id = "$(tree_id)_$(n_node)"
                 printstyled(
                     "------------------------------------------------------------------------------------\n";
