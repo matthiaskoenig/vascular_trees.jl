@@ -4,7 +4,7 @@ export JULIA_RESULTS_DIR, MODEL_PATH
 RESULTS_DIR::String = "results"
 JULIA_RESULTS_DIR::String = RESULTS_DIR * "/julia_vessel_trees"
 BENCHMARKING_RESULTS_PATH::String = joinpath(JULIA_RESULTS_DIR, "jrunning_times.csv")
-MODEL_PATH::String = "src/models/Pharmacokinetic_models.jl"
+MODEL_PATH::String = "src/models/pharmacokinetic_models.jl"
 
 
 module Definitions
@@ -35,10 +35,10 @@ end
 
 Base.@kwdef struct terminal_parameters{T<:AbstractFloat, I<:Integer}
     id::String
-    x_affiliations::Array{String}
+    species_ids::Array{String}
     flow_values::Array{T}
     volumes::T
-    terminal_matrix_size::Tuple{I, I} = size(x_affiliations)
+    terminal_matrix_size::Tuple{I, I} = size(species_ids)
     terminal_inflow::Array{T} = zeros(terminal_matrix_size[1]-1, terminal_matrix_size[2])
     terminal_outflow::Array{T} = zeros(1, terminal_matrix_size[2])
     terminal_difference::Array{T} = zeros(1, terminal_matrix_size[2])

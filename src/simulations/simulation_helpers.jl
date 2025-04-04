@@ -19,7 +19,7 @@ const tspan = Vector{Float64}(undef, 2)
 include("../../" * MODEL_PATH)
 using .Pharmacokinetic_models: jf_dxdt!
 
-using InteractiveUtils
+using InteractiveUtils, ProgressMeter
 
 function run_simulations(
     tree_info,
@@ -72,7 +72,7 @@ function run_simulations(
     p_terminal = get_ODE_parameters(tree_info, "T", flow_scaling_factor)
     u0_terminal = get_initial_values(p_terminal.flow_values)
 
-    species_ids["T"] = collect_species_ids(vec(p_terminal.x_affiliations)) # p_terminal[2] - Matrix with String species ids
+    species_ids["T"] = collect_species_ids(vec(p_terminal.species_ids)) # p_terminal[2] - Matrix with String species ids
 
     if sim_options.benchmark
         # benchmark solving function
@@ -192,6 +192,7 @@ function solve_tree!(
     kl = 1  # loop iterator
     t = tmin
 
+    p = Progress(Int(sim_options.steps); dt=dt, barglyphs=BarGlyphs('|','█', ['▁' ,'▂' ,'▃' ,'▄' ,'▅' ,'▆', '▇'],' ','|',), color=:magenta)
     while t <= tmax
 
         # solve current step
@@ -224,7 +225,7 @@ function solve_tree!(
 
         # updating initial values
         # update in terminal part
-        for (ki, species_id) in enumerate(view(p_terminal.x_affiliations, :, 1))
+        for (ki, species_id) in enumerate(view(p_terminal.species_ids, :, 1))
             vascular_tree_id = first(species_id, 1)
             if vascular_tree_id ∈ flow_direction.inflow_trees
                 u0_terminal[ki, :] .=
@@ -239,6 +240,7 @@ function solve_tree!(
         # updating state for next integration step
         t = t + dt
         kl += 1
+        next!(p)
     end
 end
 

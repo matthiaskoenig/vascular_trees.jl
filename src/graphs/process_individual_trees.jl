@@ -29,8 +29,7 @@ using ..Processing_Helpers:
     create_tuples_from_dfrows,
     selection_from_df,
     save_as_arrow,
-    get_extended_vector,
-    get_path_to_file
+    get_extended_vector
 
 using DataFrames, InteractiveUtils
 
@@ -69,9 +68,9 @@ function paths_initialization(
     vascular_tree::String,
 )::Tuple{String,String,String}
     """Function that initialises paths to graph files"""
-    GRAPH_PATH::String = get_path_to_file([GRAPH_DIR, "julia/$(vascular_tree).lg"])
-    EDGES_PATH::String = get_path_to_file([GRAPH_DIR, "julia/$(vascular_tree)_edges.csv"])
-    NODES_PATH::String = get_path_to_file([GRAPH_DIR, "julia/$(vascular_tree)_nodes.csv"])
+    GRAPH_PATH::String = joinpath(GRAPH_DIR, "julia/$(vascular_tree).lg")
+    EDGES_PATH::String = joinpath(GRAPH_DIR, "julia/$(vascular_tree)_edges.csv")
+    NODES_PATH::String = joinpath(GRAPH_DIR, "julia/$(vascular_tree)_nodes.csv")
 
     return GRAPH_PATH, EDGES_PATH, NODES_PATH
 end
@@ -253,15 +252,26 @@ function get_pre_postelements(
     edges::Vector{Tuple{T,T}},
     graph_structure::DataFrame,
 ) where {T<:Integer}
+    """
+    Function that finds and returns for every edge in the graph its preedges (predecessors) and its postedges (successors).
+
+    We need them to write ODEs correctly.
+    """
+    # preallocating vectors
     pre_elements = [Int64[] for _ in eachindex(edges)]
     post_elements = [Int64[] for _ in eachindex(edges)]
+    # take from the dataframe with edges info only columns we need to find predecessors and successors for each edge
     df = @view graph_structure[:, [:source_id, :target_id, :index]]
+    # iterate over all edges and get indices of the predecessors and successors for each edge
     @inbounds for (ke, element) in enumerate(edges)
+        # unpack edge on its elements
         source_id, target_id = element
+        # predecessors for the edge are edges which target ids are the same as source id of the iterated edge 
         pre_elements[ke] = selection_from_df(
             df,
             (condition.(df.target_id, source_id, ke, df.index), :index),
         )
+        # successors for the edge are edges which source ids are the same as target id of the iterated edge 
         post_elements[ke] = selection_from_df(
             df,
             (condition.(df.source_id, target_id, ke, df.index), :index),
@@ -270,6 +280,32 @@ function get_pre_postelements(
     return pre_elements, post_elements
 end
 
-condition(column_to_look_in, node_id_to_look, element_index, df_index) = column_to_look_in == node_id_to_look && element_index != df_index
+function condition(
+    column_to_look_in::I, 
+    node_id_to_look::I, 
+    element_index::I, 
+    df_index::I
+) where {I<:Integer}
+    """
+    Function that contains condition for the edge to be predecessor or successors of the current 
+        iterated edge.
+        
+    :column_to_look_in - where should we search for the passed node id 
+    :node_id_to_look - what node we should look for (this is a sourcs id or target id from the
+        current iterated edge)
+    :element_index - index (position) of the iterated edge in the vector of all edges
+    :df_index - indices (positions) of the edges that we check whether they are a predecessors or 
+        successors of the current iterated edge      
 
+    Example for the predecessors:
+        1. First part of the condition: check ids from the target id column in dataframe and find
+            those who have the same ids as the source id of the current iterated edge
+        2. Second part: becase we check whole dataframe, including terminal nodes (their source ids 
+            are equal to their target ids), if we must make sure that we don't mark the current 
+            iterated edge in the dataframe as predecessor or successor of itself. So,
+            index of the current iterated edge must not be equal to the index of the edge we are
+            checking to be predecessor or successor of it.    
+    """
+    return column_to_look_in == node_id_to_look && element_index != df_index
+end
 end

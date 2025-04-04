@@ -46,7 +46,7 @@ const trees::tree_definitions = tree_definitions()
 # === Graph options ===
 # options for graph, i.e., number of nodes and type of tree
 t_options = tree_options(
-    n_nodes = [10, 100, 1000, 10000, 100000],  #10
+    n_nodes = [10, 100000],  #10, 100, 1000, 10000, 100000
     tree_configurations = [
         "Rectangle_quad",
         # "Rectangle_trio",
@@ -82,7 +82,7 @@ bench_options = benchmark_options(save_running_times = false)
 Base.@kwdef struct Tree_structure
     tree_configuration::String
     n_node::Integer
-    graph_id::String = "$(tree_configuration)_$(n_node)"
+    graph_id::String = "$(tree_configuration)_PVL_nonligated_$(n_node)"
     tree_components::Dict{Symbol,Vector{String}} = trees.vascular_trees[tree_configuration]
     vascular_trees::Vector{String} = reduce(vcat, values(tree_components))
     GRAPH_DIR::String = normpath(
@@ -95,6 +95,7 @@ for tree_configuration ∈ t_options.tree_configurations
         for flow_scaling_factor in flow_scaling_factors
             tree_info =
                 Tree_structure(; tree_configuration = tree_configuration, n_node = n_node)
+            @info "Working on $(tree_info.graph_id)"
             run_simulations(
                 tree_info,
                 sim_options,
