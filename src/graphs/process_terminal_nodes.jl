@@ -32,7 +32,7 @@ function process_terminal_nodes(tree_info)
 
     # initialize dictionary to store dataframes with all graphs info (container)
     graphs = Dict{String,DataFrame}()
-    # collect all graphs, beloning to this tree, info 
+    # collect info from all graphs, beloning to this tree 
     collect_graphs_information!(graphs, tree_info)
 
     terminal_nodes_info = prepare_terminal_nodes_information(graphs, tree_info)
@@ -54,7 +54,17 @@ function prepare_terminal_nodes_information(
     graphs::Dict{String,DataFrame},
     tree_info,
 )::DataFrame
-
+    """
+    
+    :equality_edge_to_node - we need to assign each edge (and thus to each species) coordinates. We have
+        only nodes' coordinates. So, we need to understand how to match nodes to edges. The principle is 
+        as in Processing_helpers.jl (see Note), but now, because for the outflow graphs we reversed edges,
+        matching for the inflow and outflow graphs is different. Edges from inflow graphs are matched with
+        nodes by the target id. That means, for example, that coordinates of node with id 6 are mapped with
+        the edge (3, 6). For outflow graphs mapping is done by the source id.
+        :equality_edge_to_node can only have values 1 or 2, which indicate source id (it has index 1 in an
+        edge) and target id (index 2). 
+    """
     @info "Preparation steps"
     # next lines are for being able to allocate vectors below
     # get the number of terminal nodes
@@ -84,22 +94,31 @@ function prepare_terminal_nodes_information(
     k_inflow::Integer = 2
 
     p = Progress(length(values(graphs)); dt=0.5, color=:magenta)
+    # iterate over all graphs' dataframes
     for (kg, graph) in enumerate(values(graphs))
         if graph[1, :is_inflow]
+            # map edge with node by target id (see function's description)
             equality_edge_to_node = 2
+            # get flow's values from this graph
             flow_values[k_inflow, :] .=
                 selection_from_df(graph, (graph.ODE_groups .== groups.preterminal, :flows))
+            # get flow's ids from this graph
             flow_ids[k_inflow, :] .= selection_from_df(
                 graph,
                 (graph.ODE_groups .== groups.preterminal, :flow_ids),
             ) 
+            # get species' ids from this graph
             species_ids[k_inflow, :] .= selection_from_df(
                 graph,
                 (graph.ODE_groups .== groups.preterminal, :species_ids),
             )
+            # update inflows' iterator: next inflow values will go to the next row 
             k_inflow += 1
         else
+            # map edge with node by source id (see function's description)
             equality_edge_to_node = 1
+            # because of the ODE's struncture for the terminal part, we can sum outflows' flows,
+            # but not store them separately for the place economy and for convinience
             flow_values[1, :] .+=
                 selection_from_df(graph, (graph.ODE_groups .== groups.preterminal, :flows))
         end
