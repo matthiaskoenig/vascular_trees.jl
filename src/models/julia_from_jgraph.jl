@@ -56,7 +56,7 @@ end
 
 function get_graph_parameters(GRAPH_PATH::String, n_inflow::Integer, flow_scaling_factor::AbstractFloat)
     graph = DataFrame(Arrow.Table(GRAPH_PATH))
-    p = terminal_parameters(; id = "T", x_affiliations = Array{String}(graph[1:(n_inflow+1), :]), flow_values = Array{Float64}(graph[(n_inflow+2):(n_inflow+2+n_inflow), :]) .* flow_scaling_factor, volumes = Float64((graph[end, 1])))
+    p = terminal_parameters(; id = "T", species_ids = Array{String}(graph[1:(n_inflow+1), :]), flow_values = Array{Float64}(graph[(n_inflow+2):(n_inflow+2+n_inflow), :]) .* flow_scaling_factor, volumes = Float64((graph[end, 1])))
 
     return p
 end

@@ -98,12 +98,12 @@ function map_vtk_with_terminal_file(tree_info::Tree_structure)::NamedTuple
 
     # =========== Get more needed further information
     # number of terminal nodes
-    n_terminals = size(terminal_info.x_affiliations)[2]
+    n_terminals = size(terminal_info.species_ids)[2]
     # ids of terminal species
-    terminal_ids = view(terminal_info.x_affiliations, 1, :)
+    terminal_ids = view(terminal_info.species_ids, 1, :)
     # get ids of NON TERMINAL species from T.arrow file. They are all from inflow
     # tree components
-    inflow_species_ids = vec(view(terminal_info.x_affiliations, 2:size(terminal_info.x_affiliations)[1], :))
+    inflow_species_ids = vec(view(terminal_info.species_ids, 2:size(terminal_info.species_ids)[1], :))
     # get ids of inflow tree components
     inflow_file_names = map(x-> split(x, "_")[1], inflow_species_ids)
     
@@ -325,7 +325,7 @@ function get_graph_parameters(GRAPH_PATH::String, n_inflow::Integer, n_tree_comp
         Each of this instance has DIFFERENT coordinates, so we need to store them all.
         Example for Rectangle quad: one terminal node from T.arrow has four coordinate points.
     :id - terminal part id
-    :x_affiliations - species ids
+    :species_ids - species ids
     :terminal_coordinates - coordinates of only TERMINAL NODES (only for Ts, not for preterminals)
     :terminal_coordinates_affiliations - array for understanding what coordinate point came from what tree component.
     """
@@ -333,7 +333,7 @@ function get_graph_parameters(GRAPH_PATH::String, n_inflow::Integer, n_tree_comp
     graph = DataFrame(Arrow.Table(GRAPH_PATH))
     # get info that we need for mapping for terminal file
     p = (id = "T", 
-        x_affiliations = Array{String}(graph[1:(n_inflow+1), :]), 
+        species_ids = Array{String}(graph[1:(n_inflow+1), :]), 
         terminal_coordinates = Array(graph[(3*n_inflow+4):(3*n_inflow+3+n_tree_components), :]), 
         terminal_coordinates_affiliations = Array(graph[(3*n_inflow+4+n_tree_components):(3*n_inflow+3+2*n_tree_components), :]))
     return p
