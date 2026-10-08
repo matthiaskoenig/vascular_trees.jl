@@ -4,7 +4,8 @@ module Benchmarking
     using CSV
     using TimerOutputs
     using Tables
-    import ..JULIA_RESULTS_DIR, ..BENCHMARKING_RESULTS_PATH
+    
+    using ..Paths: JULIA_RESULTS_DIR, BENCHMARKING_RESULTS_PATH
 
     function save_times_as_csv(
         times::TimerOutput,

@@ -20,7 +20,7 @@ Output: .arrow (table) for every individual vessel tree (arterial, portal, etc.)
 TODO: Ids of outflows are wrong (they are not source.id_target.id, but target.id_source.id), Optimize code
 """
 
-using ..Utils.Definitions: flow_directions, ODE_groups
+using ..Definitions: flow_directions, ODE_groups
 using ..Processing_Helpers:
     read_edges,
     read_nodes_attributes,

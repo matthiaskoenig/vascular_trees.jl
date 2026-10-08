@@ -14,7 +14,7 @@ Also, variables (initial values and differentials) and parts of parameters struc
 include("interventions.jl")
 using .Interventions: f_intervention
 
-import ..tree_definitions, ..terminal_parameters, ..vascular_tree_parameters
+using ..Definitions: tree_definitions, terminal_parameters, vascular_tree_parameters
 
 using InteractiveUtils
 
@@ -204,8 +204,9 @@ function jf_terminal!(du::Array, u::Array, p::terminal_parameters, t::Float64)
     # output
     p.terminal_outflow .= view(p.flow_values, 1:1, :) .* view(u, 1:1, :)
     # full equation
-    p.terminal_difference .= sum(p.terminal_inflow, dims=1) .- p.terminal_outflow
+    sum!(p.terminal_difference, p.terminal_inflow)
+    p.terminal_difference .-= p.terminal_outflow
     
-    du[1, :] = p.terminal_difference ./ p.volumes
+    du[1, :] .= view(p.terminal_difference, 1, :) ./ p.volumes
 end
 end

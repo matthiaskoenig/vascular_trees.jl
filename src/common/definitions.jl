@@ -26,13 +26,13 @@ module Definitions
 
     Base.@kwdef struct terminal_parameters{T<:AbstractFloat, I<:Integer}
         id::String
-        species_ids::Array{String}
-        flow_values::Array{T}
+        species_ids::Array{String,2}
+        flow_values::Array{T,2}
         volumes::T
         terminal_matrix_size::Tuple{I, I} = size(species_ids)
-        terminal_inflow::Array{T} = zeros(terminal_matrix_size[1]-1, terminal_matrix_size[2])
-        terminal_outflow::Array{T} = zeros(1, terminal_matrix_size[2])
-        terminal_difference::Array{T} = zeros(1, terminal_matrix_size[2])
+        terminal_inflow::Array{T,2} = zeros(terminal_matrix_size[1]-1, terminal_matrix_size[2])
+        terminal_outflow::Array{T,2} = zeros(1, terminal_matrix_size[2])
+        terminal_difference::Array{T,2} = zeros(1, terminal_matrix_size[2])
     end
 
     struct vascular_tree_parameters{T<:AbstractFloat, I<:Integer}

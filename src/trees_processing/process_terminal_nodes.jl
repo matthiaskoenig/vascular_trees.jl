@@ -15,8 +15,8 @@ Idea of this module: to get, to store, and to save the information about termina
 TODO: Flow affiliations are wrong, DataFrame columns contain data of different types, Optimize code
 """
 
-using ..Utils: JULIA_RESULTS_DIR
-using ..Utils.Definitions: ODE_groups
+using ..Paths: JULIA_RESULTS_DIR
+using ..Definitions: ODE_groups
 using ..Processing_Helpers: selection_from_df, save_as_arrow, get_extended_vector
 
 using DataFrames, Arrow, ProgressMeter

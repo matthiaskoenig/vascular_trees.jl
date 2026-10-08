@@ -12,17 +12,16 @@ Data flow of `run_simulations`:
 
 Subsystem = vascular tree (e.g. "A") or the terminal part ("T").
 """
-module helpers
+module Helpers
 
 export run_simulations
 
 using DifferentialEquations, DataFrames, CSV, Dictionaries, TimerOutputs, ProgressMeter
 
-import ..JULIA_RESULTS_DIR, ..MODEL_PATH
+using ..Paths: JULIA_RESULTS_DIR, MODEL_PATH
 
-import ..flow_directions, ..ODE_groups, ..vascular_tree_parameters
-include("benchmarking.jl")
-using .Benchmarking: save_times_as_csv
+using ..Definitions: flow_directions, ODE_groups, vascular_tree_parameters
+using ..Benchmarking: save_times_as_csv
 
 using ..get_ode_parameters: get_ODE_parameters, get_initial_values
 
@@ -132,7 +131,8 @@ function run_simulations(
         end
         reset_timer!(to)
     else
-        solve_tree!(
+        Profile.Allocs.clear()
+        Profile.Allocs.@profile sample_rate = 0.0001 solve_tree!(
             solutions,
             u0_terminal,
             p_terminal,
@@ -143,6 +143,7 @@ function run_simulations(
             synch_idxs,
             additional_sol_options,
         )
+        PProf.Allocs.pprof(; from_c=false)
         if sim_options.save_simulations
             save_solutions(solutions, species_ids, tree_info, sim_options.dt, flow_scaling_factor)
         end

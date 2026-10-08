@@ -35,122 +35,110 @@ Outputs:
 TODO: run macros @timeit only when you need it - now it is so, but it is dirty
 """
 module Simulation_Runner
-# === Imports ===
-include("common/definitions.jl")
-import .Definitions: tree_definitions, flow_directions, ODE_groups, vascular_tree_parameters, terminal_parameters
-include("common/options.jl")
-import .Options: tree_options, simulations_options, benchmark_options, solver_options
-include("common/paths.jl")
-import .Paths: JULIA_RESULTS_DIR, MODEL_PATH, BENCHMARKING_RESULTS_PATH
+    # === Imports ===
+    using Revise
+    using VascularTrees
+    using VascularTrees.Helpers: run_simulations
 
-include("models/pharmacokinetic_models.jl")
-import .Pharmacokinetic_models: jf_dxdt!
-
-include("simulation/get_ode_parameters.jl")
-include("simulation/helpers.jl")
-import .helpers: run_simulations
+    # Definitions of the available tree configurations (inflow / outflow trees)
+    const trees::tree_definitions = tree_definitions()
 
 
+    # ============================ Options ============================
 
-# Definitions of the available tree configurations (inflow / outflow trees)
-const trees::tree_definitions = tree_definitions()
-
-
-# ============================ Options ============================
-
-# === Graph options ===
-# options for graph, i.e., number of nodes and type of tree
-t_options = tree_options(
-    n_nodes = [10],  #10, 100, 1000, 10000, 100000
-    tree_configurations = [
-        "Rectangle_quad",
-        # "Rectangle_trio",
-    ],
-)
-
-# factors by which the flow is scaled, 1.0 is the original flow
-flow_scaling_factors = [1.0] # 1.0/16, 1.0/8, 1.0/4, 1.0/2, 1.0, 1.0*2, 1.0*4, 1.0*8, 1.0*16
-
-# === Simulation options ===
-sim_options = simulations_options(
-    tspan = (0.0, 16.0),  # [min]
-    steps = 800,          # number of time steps, dt = tspan[2] / steps
-    save_simulations = true,
-    benchmark = false,
-)
-
-# === ODE Solver options ===
-# integrator, tolerances
-sol_options = solver_options()
-# additional integrator arguments
-# these arguments are not mandatory
-additional_sol_options::NamedTuple =
-    (dense = false, save_everystep = false, progress = true)
-
-# === Benchmark options ===
-# do not write anything here in brackets if you are okay with default variant
-bench_options = benchmark_options(save_running_times = false)
-
-
-# ======================= Tree information =======================
-
-"""
-    Tree_structure(; tree_configuration, n_node)
-
-Basic information about the tree that differs between its types (Rectangle_quad, trio, etc.)
-and which is used repeatedly in simulations. Only `tree_configuration` and `n_node` are meant
-to be given, the other fields are derived from them (DO NOT CHANGE).
-
-# Fields
-- `tree_configuration`: type of the tree, e.g. `"Rectangle_quad"`.
-- `n_node`: number of nodes of the graph.
-- `graph_id`: `"<tree_configuration>_<n_node>"`, name of the graph folder.
-- `tree_components`: tree ids of the configuration, grouped as `:inflow_trees` / `:outflow_trees`.
-- `vascular_trees`: flat list of all tree ids, e.g. `["A", "P", "V", "B"]`.
-- `GRAPH_DIR`: directory with the graph files; simulation results go to its `simulations` subfolder.
-"""
-Base.@kwdef struct Tree_structure
-    tree_configuration::String
-    n_node::Int
-    graph_id::String = "$(tree_configuration)_$(n_node)"
-    tree_components::Dict{Symbol,Vector{String}} = trees.vascular_trees[tree_configuration]
-    vascular_trees::Vector{String} = reduce(vcat, values(tree_components))
-    GRAPH_DIR::String = normpath(
-        joinpath(@__DIR__, "../", JULIA_RESULTS_DIR, tree_configuration, graph_id),
+    # === Graph options ===
+    # options for graph, i.e., number of nodes and type of tree
+    t_options = tree_options(
+        n_nodes = [100000],  #10, 100, 1000, 10000, 100000
+        tree_configurations = [
+            "Rectangle_quad",
+            # "Rectangle_trio",
+        ],
     )
-end
 
+    # factors by which the flow is scaled, 1.0 is the original flow
+    flow_scaling_factors = [1.0] # 1.0/16, 1.0/8, 1.0/4, 1.0/2, 1.0, 1.0*2, 1.0*4, 1.0*8, 1.0*16
 
-# ============================== Run ==============================
-
-"""
-    simulate_all_trees()
-
-Run the simulation for every combination of tree configuration, number of nodes and flow
-scaling factor from the options above. Order: configurations (outermost), number of nodes,
-flow scaling factors (innermost).
-"""
-function simulate_all_trees()
-    # product varies its first iterator fastest, so the order is reversed here
-    for (flow_scaling_factor, n_node, tree_configuration) ∈ Iterators.product(
-        flow_scaling_factors,
-        t_options.n_nodes,
-        t_options.tree_configurations,
+    # === Simulation options ===
+    sim_options = simulations_options(
+        tspan = (0.0, 16.0),  # [min]
+        steps = 800,          # number of time steps, dt = tspan[2] / steps
+        save_simulations = true,
+        benchmark = false,
     )
-        tree_info =
-            Tree_structure(; tree_configuration = tree_configuration, n_node = n_node)
-        @info "Working on $(tree_info.graph_id)"
-        run_simulations(
-            tree_info,
-            sim_options,
-            sol_options,
-            additional_sol_options,
-            flow_scaling_factor,
-            bench_options,
+
+    # === ODE Solver options ===
+    # integrator, tolerances
+    sol_options = solver_options()
+    # additional integrator arguments
+    # these arguments are not mandatory
+    additional_sol_options::NamedTuple =
+        (dense = false, save_everystep = false, progress = true)
+
+    # === Benchmark options ===
+    # do not write anything here in brackets if you are okay with default variant
+    bench_options = benchmark_options(save_running_times = false)
+
+
+    # ======================= Tree information =======================
+
+    """
+        Tree_structure(; tree_configuration, n_node)
+
+    Basic information about the tree that differs between its types (Rectangle_quad, trio, etc.)
+    and which is used repeatedly in simulations. Only `tree_configuration` and `n_node` are meant
+    to be given, the other fields are derived from them (DO NOT CHANGE).
+
+    # Fields
+    - `tree_configuration`: type of the tree, e.g. `"Rectangle_quad"`.
+    - `n_node`: number of nodes of the graph.
+    - `graph_id`: `"<tree_configuration>_<n_node>"`, name of the graph folder.
+    - `tree_components`: tree ids of the configuration, grouped as `:inflow_trees` / `:outflow_trees`.
+    - `vascular_trees`: flat list of all tree ids, e.g. `["A", "P", "V", "B"]`.
+    - `GRAPH_DIR`: directory with the graph files; simulation results go to its `simulations` subfolder.
+    """
+    Base.@kwdef struct Tree_structure
+        tree_configuration::String
+        n_node::Int
+        graph_id::String = "$(tree_configuration)_$(n_node)"
+        tree_components::Dict{Symbol,Vector{String}} = trees.vascular_trees[tree_configuration]
+        vascular_trees::Vector{String} = reduce(vcat, values(tree_components))
+        GRAPH_DIR::String = normpath(
+            joinpath(@__DIR__, "../", JULIA_RESULTS_DIR, tree_configuration, graph_id),
         )
     end
-end
 
-simulate_all_trees()
+
+    # ============================== Run ==============================
+
+    """
+        simulate_all_trees()
+
+    Run the simulation for every combination of tree configuration, number of nodes and flow
+    scaling factor from the options above. Order: configurations (outermost), number of nodes,
+    flow scaling factors (innermost).
+    """
+    function simulate_all_trees()
+        # product varies its first iterator fastest, so the order is reversed here
+        for (flow_scaling_factor, n_node, tree_configuration) ∈ Iterators.product(
+            flow_scaling_factors,
+            t_options.n_nodes,
+            t_options.tree_configurations,
+        )
+            tree_info =
+                Tree_structure(; tree_configuration = tree_configuration, n_node = n_node)
+            @info "Working on $(tree_info.graph_id)"
+            run_simulations(
+                tree_info,
+                sim_options,
+                sol_options,
+                additional_sol_options,
+                flow_scaling_factor,
+                bench_options,
+            )
+        end
+    end
+
+    simulate_all_trees()
 
 end
