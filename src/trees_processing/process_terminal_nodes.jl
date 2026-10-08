@@ -155,7 +155,7 @@ function prepare_terminal_nodes_information(
 end
 
 function load_graph(GRAPH_PATH::String)::DataFrame
-    # this is a duplicate of a function from julia_from_jgraph.jl
+    # this is a duplicate of a function from get_ode_parametershelpers.jl
     graph = DataFrame(Arrow.Table(GRAPH_PATH))[
         :,
         [

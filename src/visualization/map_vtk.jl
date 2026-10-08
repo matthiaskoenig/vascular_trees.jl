@@ -39,7 +39,7 @@ Base.@kwdef struct Tree_structure
     tree_components::Dict{Symbol,Vector{String}} = trees.vascular_trees[tree_configuration]
     vascular_trees::Vector{String} = reduce(vcat, values(tree_components))
     GRAPH_DIR::String = normpath(
-        joinpath(@__FILE__, "../../..", JULIA_RESULTS_DIR, tree_configuration, graph_id),
+        joinpath(@__FILE__, "../..", JULIA_RESULTS_DIR, tree_configuration, graph_id),
     )
 end
 
@@ -301,7 +301,7 @@ function paths_initialization(GRAPH_DIR::String, vascular_tree::String)::Tuple{S
 end
 
 
-#duplicate function from julia_from_jgraph.jl
+#duplicate function from get_ode_parametershelpers.jl
 function get_graph_parameters(GRAPH_PATH::String)
     graph = DataFrame(Arrow.Table(GRAPH_PATH))
     p = (
@@ -317,7 +317,7 @@ function get_graph_parameters(GRAPH_PATH::String)
 end
 
 
-#duplicate function from julia_from_jgraph.jl
+#duplicate function from get_ode_parametershelpers.jl
 function get_graph_parameters(GRAPH_PATH::String, n_inflow::Integer, n_tree_components::Integer)
     """"
     Note for understanding (Duplicate): each tree component has terminal nodes. So, when we have terminal node 1 (T_1),

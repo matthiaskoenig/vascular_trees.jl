@@ -11,10 +11,11 @@ Also, variables (initial values and differentials) and parts of parameters struc
     (arrays).
 """
 
-include("../interventions.jl")
+include("interventions.jl")
 using .Interventions: f_intervention
 
-using ...Utils.Definitions: tree_definitions, terminal_parameters, vascular_tree_parameters
+import ..tree_definitions, ..terminal_parameters, ..vascular_tree_parameters
+
 using InteractiveUtils
 
 # vectors preallocation

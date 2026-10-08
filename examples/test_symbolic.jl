@@ -2,8 +2,8 @@ include("../utils.jl")
 import .Utils: JULIA_RESULTS_DIR
 import .Utils.Options: tree_options, simulations_options
 
-include("simulation_helpers.jl")
-import .Simulation_helpers: ODE_solver
+include("helpers.jl")
+import .helpers: ODE_solver
 
 # ============ Specify options
 t_options::tree_options = tree_options(

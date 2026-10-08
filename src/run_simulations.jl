@@ -35,15 +35,22 @@ Outputs:
 TODO: run macros @timeit only when you need it - now it is so, but it is dirty
 """
 module Simulation_Runner
-
 # === Imports ===
-include("../utils.jl")
-import .Utils.Options: tree_options, simulations_options, benchmark_options, solver_options
-import .Utils: JULIA_RESULTS_DIR
-import .Utils.Definitions: tree_definitions
-include("../models/julia_from_jgraph.jl")
-include("simulation_helpers.jl")
-import .Simulation_Helpers: run_simulations
+include("common/definitions.jl")
+import .Definitions: tree_definitions, flow_directions, ODE_groups, vascular_tree_parameters, terminal_parameters
+include("common/options.jl")
+import .Options: tree_options, simulations_options, benchmark_options, solver_options
+include("common/paths.jl")
+import .Paths: JULIA_RESULTS_DIR, MODEL_PATH, BENCHMARKING_RESULTS_PATH
+
+include("models/pharmacokinetic_models.jl")
+import .Pharmacokinetic_models: jf_dxdt!
+
+include("simulation/get_ode_parameters.jl")
+include("simulation/helpers.jl")
+import .helpers: run_simulations
+
+
 
 # Definitions of the available tree configurations (inflow / outflow trees)
 const trees::tree_definitions = tree_definitions()
@@ -109,7 +116,7 @@ Base.@kwdef struct Tree_structure
     tree_components::Dict{Symbol,Vector{String}} = trees.vascular_trees[tree_configuration]
     vascular_trees::Vector{String} = reduce(vcat, values(tree_components))
     GRAPH_DIR::String = normpath(
-        joinpath(@__DIR__, "../..", JULIA_RESULTS_DIR, tree_configuration, graph_id),
+        joinpath(@__DIR__, "../", JULIA_RESULTS_DIR, tree_configuration, graph_id),
     )
 end
 

@@ -1,4 +1,4 @@
-module Julia_from_jgraph
+module get_ode_parameters
 """
 Module which contains functions to load .arrow files (contain information of julia graph needed for ODE model)
     and to prepare vector of initial values and parameters for the ODE function.
@@ -13,7 +13,7 @@ export get_ODE_parameters, get_initial_values
 
 using DataFrames, Arrow
 # include("../utils.jl")
-using ..Utils.Definitions: tree_definitions, terminal_parameters, vascular_tree_parameters
+using ..Definitions: tree_definitions, terminal_parameters, vascular_tree_parameters
 
 trees = tree_definitions()
 

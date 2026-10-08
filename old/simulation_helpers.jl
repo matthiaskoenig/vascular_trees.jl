@@ -1,4 +1,4 @@
-module Simulation_helpers
+module helpers
 
 export create_simulations, create_benchmarked_simulations
 
@@ -18,8 +18,8 @@ import .Utils.Options: model_types
 
 include("../models/julia_from_pygraph.jl")
 import .Julia_from_pygraph: get_ODE_components
-include("../models/julia_from_jgraph.jl")
-import .Julia_from_jgraph: get_ODE_components
+include("../models/get_ode_parametershelpers.jl")
+import .get_ode_parametershelpers: get_ODE_components
 
 # Already specified in utils.jl
 m_types::model_types = model_types()
@@ -121,7 +121,7 @@ function create_simulations(; t_options, sim_options, sol_options)
                 get_ODE_components = Julia_from_pygraph.get_ODE_components
             elseif endswith(model_type, "_julia")
                 f_dxdt = Pharmacokinetic_models.jf_dxdt!
-                get_ODE_components = Julia_from_jgraph.get_ODE_components
+                get_ODE_components = get_ode_parametershelpers.get_ODE_components
             end
             for n_node ∈ t_options.n_nodes, tree_id ∈ t_options.tree_ids
                 graph_id = "$(tree_id)_$(n_node)"
@@ -253,7 +253,7 @@ function create_benchmarked_simulations(;
             #     get_ODE_components = Julia_from_pygraph.get_ODE_components
             if endswith(model_type, "_julia")
                 f_dxdt = Pharmacokinetic_models.jf_dxdt!
-                get_ODE_components = Julia_from_jgraph.get_ODE_components
+                get_ODE_components = get_ode_parametershelpers.get_ODE_components
             end
             for tree_id ∈ t_options.tree_ids, n_node ∈ t_options.n_nodes
                 graph_id = "$(tree_id)_$(n_node)"
