@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(~/examples/**)",
+      "Read(~/results/**)",
+      "Read(~/old/**)",
+      "Read(~/SyntheticVascularTrees.jl/**)"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  }
+}
