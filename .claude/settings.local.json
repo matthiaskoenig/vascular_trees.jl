@@ -5,6 +5,9 @@
       "Read(~/results/**)",
       "Read(~/old/**)",
       "Read(~/SyntheticVascularTrees.jl/**)"
+    ],
+    "allow": [
+      "Bash(julia --startup-file=no -e 'ex = Meta.parseall\\(read\\(\"src/trees_processing/process_individual_trees.jl\", String\\)\\); println\\(any\\(e -> e isa Expr && e.head in \\(:error, :incomplete\\), ex.args\\) ? \"PARSE ERROR\" : \"parses OK\"\\)')"
     ]
   },
   "sandbox": {

@@ -38,7 +38,7 @@ module Simulation_Runner
     # === Imports ===
     using Revise
     using VascularTrees
-    using VascularTrees.Helpers: run_simulations
+    using VascularTrees.SimulationHelpers: run_simulations
 
     # Definitions of the available tree configurations (inflow / outflow trees)
     const trees::tree_definitions = tree_definitions()
@@ -77,7 +77,7 @@ module Simulation_Runner
 
     # === Benchmark options ===
     # do not write anything here in brackets if you are okay with default variant
-    bench_options = benchmark_options(save_running_times = false)
+    bench_options = benchmark_options(save_running_times = true)
 
 
     # ============================== Run ==============================

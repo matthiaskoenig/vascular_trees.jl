@@ -20,15 +20,15 @@ Outputs, in the `graphs/` folder of the graph directory:
 2. `T.arrow`      - terminal nodes, i.e. the connection points between the trees
 """
 
-module ProcessJuliaGraph
+module ProcessSyntheticVascularTrees
     """
     TODO: Optimize code
     """
     # === Imports ===
     using Revise
     using VascularTrees
-    using VascularTrees.Process_Individual_Trees: process_julia_graph
-    using VascularTrees.Process_Terminal_Nodes: process_terminal_nodes
+    using VascularTrees.ProcessIndividualTrees: process_julia_graph
+    using VascularTrees.ProcessTerminalNodes: process_terminal_nodes
 
     # Definitions of the available tree configurations (inflow / outflow trees)
     const trees::tree_definitions = tree_definitions()
@@ -39,7 +39,7 @@ module ProcessJuliaGraph
     # === Graph options ===
     # options for graph, i.e., number of nodes and type of tree
     t_options = tree_options(
-        n_nodes = [100],  #1000, 10000, 100000, 100000
+        n_nodes = [10],  #100, 1000, 10000, 100000
         tree_configurations = [
             "Rectangle_quad",
         ],
