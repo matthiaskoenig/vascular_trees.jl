@@ -49,7 +49,7 @@ module Simulation_Runner
     # === Graph options ===
     # options for graph, i.e., number of nodes and type of tree
     t_options = tree_options(
-        n_nodes = [10, 1000, 10000, 100000, 100000],  #
+        n_nodes = [10, 100, 1000],  #1000, 10000, 100000, 100000
         tree_configurations = [
             "Rectangle_quad",
             "Rectangle_trio",
@@ -78,36 +78,7 @@ module Simulation_Runner
     # === Benchmark options ===
     # do not write anything here in brackets if you are okay with default variant
     bench_options = benchmark_options(save_running_times = false)
-
-
-    # ======================= Tree information =======================
-
-    """
-        Tree_structure(; tree_configuration, n_node)
-
-    Basic information about the tree that differs between its types (Rectangle_quad, trio, etc.)
-    and which is used repeatedly in simulations. Only `tree_configuration` and `n_node` are meant
-    to be given, the other fields are derived from them (DO NOT CHANGE).
-
-    # Fields
-    - `tree_configuration`: type of the tree, e.g. `"Rectangle_quad"`.
-    - `n_node`: number of nodes of the graph.
-    - `graph_id`: `"<tree_configuration>_<n_node>"`, name of the graph folder.
-    - `tree_components`: tree ids of the configuration, grouped as `:inflow_trees` / `:outflow_trees`.
-    - `vascular_trees`: flat list of all tree ids, e.g. `["A", "P", "V", "B"]`.
-    - `GRAPH_DIR`: directory with the graph files; simulation results go to its `simulations` subfolder.
-    """
-    Base.@kwdef struct Tree_structure
-        tree_configuration::String
-        n_node::Int
-        graph_id::String = "$(tree_configuration)_$(n_node)"
-        tree_components::Dict{Symbol,Vector{String}} = trees.vascular_trees[tree_configuration]
-        vascular_trees::Vector{String} = reduce(vcat, values(tree_components))
-        GRAPH_DIR::String = normpath(
-            joinpath(@__DIR__, "../", JULIA_RESULTS_DIR, tree_configuration, graph_id),
-        )
-    end
-
+    
 
     # ============================== Run ==============================
 
@@ -126,7 +97,7 @@ module Simulation_Runner
             t_options.tree_configurations,
         )
             tree_info =
-                Tree_structure(; tree_configuration = tree_configuration, n_node = n_node)
+                Tree_structure(; tree_configuration = tree_configuration, n_node = n_node, tree_components = trees.vascular_trees[tree_configuration])
             @info "Working on $(tree_info.graph_id)"
             run_simulations(
                 tree_info,
