@@ -2,7 +2,7 @@
 Load graph files in arrow format and run the coupled-tree simulations.
 
 The simulations start as soon as this file is included
-(e.g. `julia --project src/simulations/simulation_runner.jl`), using the options
+(e.g. `julia --project src/simulation_runner.jl`), using the options
 defined in the options sections below.
 
 Make sure that the structure of the vascular_trees.jl directory is as needed
@@ -49,10 +49,10 @@ module Simulation_Runner
     # === Graph options ===
     # options for graph, i.e., number of nodes and type of tree
     t_options = tree_options(
-        n_nodes = [10, 100, 1000],  #1000, 10000, 100000, 100000
+        n_nodes = [10],  #100, 1000, 10000, 100000, 100000
         tree_configurations = [
             "Rectangle_quad",
-            "Rectangle_trio",
+            #"Rectangle_trio",
         ],
     )
 
@@ -64,7 +64,7 @@ module Simulation_Runner
         tspan = (0.0, 16.0),  # [min]
         steps = 800,          # number of time steps, dt = tspan[2] / steps
         save_simulations = true,
-        benchmark = true,
+        benchmark = false,
     )
 
     # === ODE Solver options ===
@@ -73,12 +73,12 @@ module Simulation_Runner
     # additional integrator arguments
     # these arguments are not mandatory
     additional_sol_options::NamedTuple =
-        (dense = false, save_everystep = false, progress = true)
+        (dense = false, save_everystep = false, progress = false)
 
     # === Benchmark options ===
     # do not write anything here in brackets if you are okay with default variant
     bench_options = benchmark_options(save_running_times = false)
-    
+
 
     # ============================== Run ==============================
 
@@ -110,6 +110,7 @@ module Simulation_Runner
         end
     end
 
-    simulate_all_trees()
+    simulate_all_trees() 
+    #Main.@profview_allocs simulate_all_trees() #  
 
 end

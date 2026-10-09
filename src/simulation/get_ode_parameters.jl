@@ -26,7 +26,7 @@ function get_ODE_parameters(tree_info, graph_subsystem::String, flow_scaling_fac
     if graph_subsystem != "T"
         p = get_graph_parameters(GRAPH_PATH, flow_scaling_factor)
     else
-        n_inflow::Integer = length(tree_info.tree_components[:inflow_trees])
+        n_inflow::Int = length(tree_info.tree_components[:inflow_trees])
         p = get_graph_parameters(GRAPH_PATH, n_inflow, flow_scaling_factor)
     end
 
@@ -54,7 +54,7 @@ function get_graph_parameters(GRAPH_PATH::String, flow_scaling_factor::AbstractF
     return p
 end
 
-function get_graph_parameters(GRAPH_PATH::String, n_inflow::Integer, flow_scaling_factor::AbstractFloat)
+function get_graph_parameters(GRAPH_PATH::String, n_inflow::Int, flow_scaling_factor::AbstractFloat)
     graph = DataFrame(Arrow.Table(GRAPH_PATH))
     p = terminal_parameters(; id = "T", species_ids = Array{String}(graph[1:(n_inflow+1), :]), flow_values = Array{Float64}(graph[end-n_inflow-1:end-1, :]) .* flow_scaling_factor, volumes = Float64((graph[end, 1])))
 

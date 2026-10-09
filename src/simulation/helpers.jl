@@ -16,7 +16,7 @@ module Helpers
 
 export run_simulations
 
-using DifferentialEquations, DataFrames, CSV, Dictionaries, TimerOutputs, ProgressMeter
+using DifferentialEquations, DataFrames, CSV, Dictionaries, TimerOutputs, ProgressMeter, Arrow
 
 using ..Paths: JULIA_RESULTS_DIR, MODEL_PATH
 
@@ -64,38 +64,41 @@ function run_simulations(
 )
 
     # TODO: mostly all of this can be preallocated
-
-    # graph_subsystem - vascular trees + terminal part ("T")
-    graph_subsystems = [tree_info.vascular_trees; ["T"]]
-    # solutions[graph_subsystem][k] - values of all species at the k-th time point (first value is t)
-    solutions = dictionary(
-        graph_subsystem => [Float64[] for _ = 1:sim_options.steps+1] for
-        graph_subsystem in graph_subsystems
+    # 1. parameters of trees and of the terminal part
+    p = dictionary(
+    vascular_tree => get_ODE_parameters(tree_info, vascular_tree, flow_scaling_factor) for
+        vascular_tree in tree_info.vascular_trees
     )
-    species_ids = similar(solutions, Vector{Symbol})
+    # terminal nodes are stored separately from trees, because they are stored differently
+    p_terminal = get_ODE_parameters(tree_info, "T", flow_scaling_factor)
 
-    # preparation step - get parameters and species ids (as symbols) for all trees
-    p = Dict{String,vascular_tree_parameters}()
-    for vascular_tree ∈ tree_info.vascular_trees
-        p[vascular_tree] = get_ODE_parameters(tree_info, vascular_tree, flow_scaling_factor)
-        species_ids[vascular_tree] = collect_species_ids(p[vascular_tree].species_ids)
-    end
-    # starting initial values of trees
+    # 2. initial values and synchronization indices
     u0 = dictionary(
         vascular_tree => get_initial_values(p[vascular_tree].ODE_groups) for
         vascular_tree in tree_info.vascular_trees
     )
+    u0_terminal = get_initial_values(p_terminal.flow_values)
     # indices of the species that connect trees and terminal nodes
     synch_idxs = dictionary(
         vascular_tree => get_synchronization_indices(vascular_tree, p[vascular_tree].ODE_groups)
         for vascular_tree in tree_info.vascular_trees
     )
 
-    # parameters, initial values and species ids for terminal nodes
-    # they are stored separately from trees, because they are stored differently
-    p_terminal = get_ODE_parameters(tree_info, "T", flow_scaling_factor)
-    u0_terminal = get_initial_values(p_terminal.flow_values)
+    # 3. preallocated solutions
+    # solutions[graph_subsystem][j][k] - value of the j-th column (t, then species) at the k-th time point
+    n_rows = sim_options.steps + 1
+    solutions = dictionary(
+        tree => [zeros(n_rows) for _ = 1:length(u0[tree])+1] for tree in tree_info.vascular_trees
+    )
+    insert!(solutions, "T", [zeros(n_rows) for _ = 1:length(u0_terminal)+1])
+
+    # 4. species ids (as symbols, with :t first) — same keys as solutions
+    species_ids = similar(solutions, Vector{Symbol})
+    for vascular_tree ∈ tree_info.vascular_trees
+        species_ids[vascular_tree] = collect_species_ids(p[vascular_tree].species_ids)
+    end
     species_ids["T"] = collect_species_ids(vec(p_terminal.species_ids))
+
 
     if sim_options.benchmark
         # benchmark solving function
@@ -119,7 +122,7 @@ function run_simulations(
         show(to, sortby = :firstexec)
         if bench_options.save_running_times
             @info "Pay attention to the number of species, they can be calculated wrong"
-            n_terminal::Integer = size(u0_terminal)[1]
+            n_terminal::Int = size(u0_terminal)[1]
             save_times_as_csv(
                 to,
                 tree_info.n_node,
@@ -131,8 +134,7 @@ function run_simulations(
         end
         reset_timer!(to)
     else
-        Profile.Allocs.clear()
-        Profile.Allocs.@profile sample_rate = 0.0001 solve_tree!(
+        solve_tree!(
             solutions,
             u0_terminal,
             p_terminal,
@@ -143,7 +145,6 @@ function run_simulations(
             synch_idxs,
             additional_sol_options,
         )
-        PProf.Allocs.pprof(; from_c=false)
         if sim_options.save_simulations
             save_solutions(solutions, species_ids, tree_info, sim_options.dt, flow_scaling_factor)
         end
@@ -187,33 +188,43 @@ function solve_tree!(
     additional_sol_options,
 )
 
-    # storing integrators for reuse
-    integrators = Dict{String,Any}()
     # collecting integrator arguments together
-    integrator_options::NamedTuple = (
+    integrator_options = (
         reltol = sol_options.relative_tolerance,
         abstol = sol_options.absolute_tolerance,
+        save_start = false,
         save_end = false,
+        maxiters = (sim_options.steps + 1) * 100_000,
         additional_sol_options...
     )
-
-    # setup integrators for tree problems
-    for vascular_tree_id ∈ keys(u0)
-        problem = ODEProblem(jf_dxdt!, u0[vascular_tree_id], [0, 0.01], p[vascular_tree_id])
-        integrators[vascular_tree_id] =
-            init(problem, sol_options.solver; integrator_options...)
-    end
-
-    # setup integrator for terminal node problem
-    problem_terminal = ODEProblem(jf_dxdt!, u0_terminal, [0, 0.01], p_terminal)
-    integrator_terminal = init(problem_terminal, sol_options.solver; integrator_options...)
-
+    
     @info "Running integration"
     tmin = sim_options.tspan[1]
     tmax = sim_options.tspan[2]
     dt = sim_options.dt
-    kl = 1  # loop iterator
-    t = tmin
+    # integrate over the whole time span; the loop advances it in steps of dt
+    # (tmax + 2dt as margin so that float drift in t never steps past tf)
+    tspan = (tmin, tmax + 2dt)
+
+    # setup integrators for tree problems
+    integrators = dictionary(
+        vascular_tree_id => init(
+            ODEProblem(jf_dxdt!, u0[vascular_tree_id], tspan, p[vascular_tree_id]),
+            sol_options.solver;
+            integrator_options...,
+        ) for vascular_tree_id in keys(u0)
+    )
+    # setup integrator for terminal node problem
+    problem_terminal = ODEProblem(jf_dxdt!, u0_terminal, tspan, p_terminal)
+    integrator_terminal = init(problem_terminal, sol_options.solver; integrator_options...)
+
+    # terminal rows that receive inflow from an inflow tree: (row index, tree id)
+    # computed once, because the assignment of terminal rows to trees does not change
+    inflow_rows = [
+        (ki, tree_id) for (ki, tree_id) in
+        enumerate(first.(view(p_terminal.species_ids, :, 1), 1)) if
+        tree_id ∈ flow_direction.inflow_trees
+    ]
 
     progress = Progress(
         Int(sim_options.steps);
@@ -221,49 +232,53 @@ function solve_tree!(
         barglyphs = BarGlyphs('|', '█', ['▁', '▂', '▃', '▄', '▅', '▆', '▇'], ' ', '|'),
         color = :magenta,
     )
+    integrate!(solutions, integrators, integrator_terminal, inflow_rows, synch_idxs, tmin, tmax, dt, progress)
+
+end
+
+function integrate!(solutions, integrators, integrator_terminal, inflow_rows, synch_idxs,
+                    tmin, tmax, dt, progress)
+    kl = 1
+    t = tmin
     while t <= tmax
-
-        # solve current step
+        # store numerical solutions (state at time t)
         for (vascular_tree_id, integrator) ∈ pairs(integrators)
-            # reinitialize trees' integrator problem
-            reinit!(
-                integrator,
-                u0[vascular_tree_id];
-                t0 = t,
-                tf = t + dt,
-                erase_sol = true
-            )
-            # solve the timestep for the subtree
-            solve!(integrator)
-            # final values at end of integration
-            u0[vascular_tree_id] .= integrator.uprev
-        end
-        # reinitialize terminal integrator problem
-        reinit!(integrator_terminal, u0_terminal; t0 = t, tf = t + dt, erase_sol = true)
-        # solve the timestep for the terminal nodes
-        solve!(integrator_terminal)
-        # final values at end of integration
-        u0_terminal .= integrator_terminal.uprev
-
-        # store numerical solutions
-        for (vascular_tree_id, integrator) ∈ pairs(integrators)
-            solutions[vascular_tree_id][kl] = [t ; Vector(integrator.sol)]
-        end
-        solutions["T"][kl] = [t ; vec(integrator_terminal.sol)]
-
-        # updating initial values
-        # update in terminal part (inflow from the inflow trees)
-        for (ki, species_id) in enumerate(view(p_terminal.species_ids, :, 1))
-            vascular_tree_id = first(species_id, 1)
-            if vascular_tree_id ∈ flow_direction.inflow_trees
-                u0_terminal[ki, :] .=
-                    view(u0[vascular_tree_id], synch_idxs[vascular_tree_id])
+            columns = solutions[vascular_tree_id]
+            columns[1][kl] = t
+            @inbounds for (j, value) in enumerate(integrator.u)   # linear order, also for the terminal Matrix
+                columns[j+1][kl] = value
             end
+        end
+        columns = solutions["T"]
+        columns[1][kl] = t
+        @inbounds for (j, value) in enumerate(integrator_terminal.u)   # linear order, also for the terminal Matrix
+            columns[j+1][kl] = value
+        end
+        
+        # solve current step: advance every subsystem exactly to t + dt
+        for integrator ∈ integrators
+            step!(integrator, dt, true)
+        end
+        step!(integrator_terminal, dt, true)
+
+        # updating values at the connecting species
+        # update in terminal part (inflow from the inflow trees)
+        for (ki, tree_id) in inflow_rows
+            copyto!(
+                view(integrator_terminal.u, ki, :),
+                view(integrators[tree_id].u, synch_idxs[tree_id]),
+            )
         end
         # update for outflow trees (outflow from the terminal part)
         for outflow_tree in flow_direction.outflow_trees
-            u0[outflow_tree][synch_idxs[outflow_tree]] .= view(u0_terminal, 1, :)
+            integrators[outflow_tree].u[synch_idxs[outflow_tree]] .=
+                view(integrator_terminal.u, 1, :)
         end
+        # u was changed from outside the solver: reset its cached derivative
+        for integrator ∈ integrators
+            u_modified!(integrator, true)
+        end
+        u_modified!(integrator_terminal, true)
 
         # updating state for next integration step
         t = t + dt
@@ -271,7 +286,6 @@ function solve_tree!(
         next!(progress)
     end
 end
-
 
 """
     collect_species_ids(species_ids)
@@ -309,19 +323,18 @@ function get_indices(collection, targets)
     return findall(in(targets), collection)
 end
 
-
 """
-    simulation_csv_path(tree_info, graph_subsystem, flow_scaling_factor, dt)
+    simulation_path(tree_info, graph_subsystem, flow_scaling_factor, dt, format)
 
-Path of the CSV file with the simulation of `graph_subsystem`. The flow scaling factor
+Path of the ARROW file with the simulation of `graph_subsystem`. The flow scaling factor
 is part of the file name only if it differs from 1.0.
 """
-function simulation_csv_path(tree_info, graph_subsystem, flow_scaling_factor, dt)
+function simulation_path(tree_info, graph_subsystem, flow_scaling_factor, dt, format::String)
     flow_part = flow_scaling_factor == 1.0 ? "" : "_$(flow_scaling_factor)Q"
     return joinpath(
         tree_info.GRAPH_DIR,
         "simulations",
-        "$(graph_subsystem)$(flow_part)_simulations_$(dt)_dt.csv",
+        "$(graph_subsystem)$(flow_part)_simulations_$(dt)_dt.$(format)",
     )
 end
 
@@ -337,16 +350,15 @@ function save_solutions(solutions, species_ids, tree_info, dt, flow_scaling_fact
     for (graph_subsystem, solution) in pairs(solutions)
         # skip time points that were not filled
         filter!(!isempty, solution)
-        # turn the vector of states into columns: one column per species
-        columns = Vector{Vector}(undef, 0)
-        for species_idx in eachindex(first(solution))
-            push!(columns, getindex.(solution, species_idx))
-        end
-        table = DataFrame(columns, species_ids[graph_subsystem], copycols = false)
-        save_simulations_to_csv(
+        table = DataFrame(solution, species_ids[graph_subsystem], copycols = false)
+        save_simulations_to_arrow(
             table,
-            simulation_csv_path(tree_info, graph_subsystem, flow_scaling_factor, dt),
+            simulation_path(tree_info, graph_subsystem, flow_scaling_factor, dt, "arrow"),
         )
+        # save_simulations_to_csv(
+        #     table,
+        #     simulation_csv_path(tree_info, graph_subsystem, flow_scaling_factor, dt, "csv"),
+        # )
     end
 end
 
@@ -357,7 +369,27 @@ end
 Write the `simulations` table to the CSV file `simulations_path`.
 """
 function save_simulations_to_csv(simulations::DataFrame, simulations_path::String)
-    CSV.write(simulations_path, simulations)
+    #CSV.write(simulations_path, simulations)
+    print(eltype.(eachcol(simulations)))
+    # open(simulations_path, "w") do f
+    #     write(f, join(names(simulations), "\t") * "\n") # print header
+    #     for row in 1:size(simulations)[1]
+    #         line = string(simulations[row,1])
+    #         for col in 2:size(simulations)[2]
+    #             if typeof(simulations[row, col]) == String 
+    #                 c = simulations[row, col] 
+    #             else 
+    #                 c = string(simulations[row, col])
+    #             end
+    #             line = line * "\t" * c  # merge all cells of one row
+    #         end
+    #         write(f, "$line\n") # print df line by line
+    #     end
+    # end
+end
+
+function save_simulations_to_arrow(simulations::DataFrame, simulations_path::String)
+    Arrow.write(simulations_path, simulations, ntasks=1)
 end
 
 end

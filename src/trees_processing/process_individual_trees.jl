@@ -150,7 +150,7 @@ function create_graph_structure(
     # number of edges graph define the number of rows in the table that will contain all info
     # about the graph that we need, so we need to store this number (see note in the describtion of this
     # function)
-    df_length::Integer = length(graph_info.all_edges)
+    df_length::Int = length(graph_info.all_edges)
     # collect all the info in one dataframe
     # for this some vectors must be extended for them all to be the same length
     graph = DataFrame(
@@ -251,7 +251,7 @@ end
 function get_pre_postelements(
     edges::Vector{Tuple{T,T}},
     graph_structure::DataFrame,
-) where {T<:Integer}
+) where {T<:Int}
     """
     Function that finds and returns for every edge in the graph its preedges (predecessors) and its postedges (successors).
 
@@ -285,7 +285,7 @@ function condition(
     node_id_to_look::I, 
     element_index::I, 
     df_index::I
-) where {I<:Integer}
+) where {I<:Int}
     """
     Function that contains condition for the edge to be predecessor or successors of the current 
         iterated edge.

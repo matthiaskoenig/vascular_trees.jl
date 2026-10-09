@@ -69,16 +69,16 @@ function prepare_terminal_nodes_information(
     # next lines are for being able to allocate vectors below
     # get the number of terminal nodes
     # not a good way, but for now its okay
-    n_terminals::Integer = length(
+    n_terminals::Int = length(
         selection_from_df(
             graphs["V"],
             (graphs["V"].ODE_groups .== groups.terminal, :ODE_groups),
         ),
     )
     # get number of inflows for this tree
-    n_inflow::Integer = length(tree_info.tree_components[:inflow_trees])
+    n_inflow::Int = length(tree_info.tree_components[:inflow_trees])
     # get number of all graphs (vascular trees)
-    n_vascular_trees::Integer = length(tree_info.tree_components[:inflow_trees]) + length(tree_info.tree_components[:outflow_trees])
+    n_vascular_trees::Int = length(tree_info.tree_components[:inflow_trees]) + length(tree_info.tree_components[:outflow_trees])
 
     # === preallocating arrays which will store values/strings that are needed to write correct ODEs for terminal part
     # or to be able to understand to which element of the model values belongs
@@ -91,7 +91,7 @@ function prepare_terminal_nodes_information(
 
     # where the inflow species, concentrations should be stored (row number in an array)
     # inflows start from the row two
-    k_inflow::Integer = 2
+    k_inflow::Int = 2
 
     p = Progress(length(values(graphs)); dt=0.5, color=:magenta)
     # iterate over all graphs' dataframes

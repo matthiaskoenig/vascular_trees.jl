@@ -55,10 +55,9 @@ module ProcessJuliaGraph
                 tree_info =
                     Tree_structure(; tree_configuration = tree_configuration, n_node = n_node, tree_components = trees.vascular_trees[tree_configuration])
                 @info "Working on $(tree_info.graph_id)"
-                # load (.lg and .csv), process and save (as .arrow) each graph (vascular tree) that this 
-                # tree includes structure individually
+                # load (.lg and .csv), process and save (as .arrow) each graph (vascular tree)
                 process_julia_graph(tree_info)
-                # load (.arrow) every graph that this tree includes similtaneously, collect info that we
+                # load (.arrow) every graph that this tree includes, collect info that we
                 # need for the correct ODEs for the terminal part that connects all the parts of this tree
                 # together and save it in one file (as .arrow)
                 process_terminal_nodes(tree_info)

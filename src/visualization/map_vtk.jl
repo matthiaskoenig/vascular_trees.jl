@@ -34,7 +34,7 @@ const t_options = tree_options(
 # and which is used repeatedly in its processing
 Base.@kwdef struct Tree_structure
     tree_configuration::String
-    n_node::Integer
+    n_node::Int
     graph_id::String = "$(tree_configuration)_PVL_ligated_$(n_node)"
     tree_components::Dict{Symbol,Vector{String}} = trees.vascular_trees[tree_configuration]
     vascular_trees::Vector{String} = reduce(vcat, values(tree_components))
@@ -89,8 +89,8 @@ function map_vtk_with_terminal_file(tree_info::Tree_structure)::NamedTuple
 
     # get number of inflows and number of tree components (number of vascular systems)
     # they are needed to separate T.arrow file on its components correctly
-    n_inflows::Integer = length(tree_info.tree_components[:inflow_trees])
-    n_tree_components::Integer = length(tree_info.tree_components[:inflow_trees]) + length(tree_info.tree_components[:outflow_trees])
+    n_inflows::Int = length(tree_info.tree_components[:inflow_trees])
+    n_tree_components::Int = length(tree_info.tree_components[:inflow_trees]) + length(tree_info.tree_components[:outflow_trees])
 
     # get info needed for mapping
     terminal_info = get_graph_parameters(TERMINAL_NODES_PATH, n_inflows, n_tree_components)
@@ -110,7 +110,7 @@ function map_vtk_with_terminal_file(tree_info::Tree_structure)::NamedTuple
     # allocate vectors needed below
     species_ids = Vector{String}(undef, n_terminals * (n_tree_components + n_inflows))
     file_names = Vector{String}(undef, n_terminals * (n_tree_components + n_inflows))
-    node_line = Vector{Integer}(undef, n_terminals * (n_tree_components + n_inflows))
+    node_line = Vector{Int}(undef, n_terminals * (n_tree_components + n_inflows))
     nodes_coordinates = []
 
     # terminal node's index, we start from the first one
@@ -171,7 +171,7 @@ function map_vtk_with_individual_jgraphs!(terminal_nodes_mapping, tree_info, vas
     # we MUST be sure that components of these vectors with the same ids BELONG TO THE SAME NODE
     species_to_nodes_ids = Vector{String}(undef, count(!ismissing, nodes_coordinates))
     flows_to_node_ids = Vector{AbstractFloat}(undef, count(!ismissing, nodes_coordinates))
-    nodes_lines = Vector{Integer}(undef, count(!ismissing, nodes_coordinates))
+    nodes_lines = Vector{Int}(undef, count(!ismissing, nodes_coordinates))
     
     # species ids in the model belong to edges, for the visualization we need to map species 
     # to nodes from vtk file 
@@ -318,7 +318,7 @@ end
 
 
 #duplicate function from get_ode_parametershelpers.jl
-function get_graph_parameters(GRAPH_PATH::String, n_inflow::Integer, n_tree_components::Integer)
+function get_graph_parameters(GRAPH_PATH::String, n_inflow::Int, n_tree_components::Int)
     """"
     Note for understanding (Duplicate): each tree component has terminal nodes. So, when we have terminal node 1 (T_1),
         this means that we have for it instance (affiliation) from arterial tree, venous tree, etc.

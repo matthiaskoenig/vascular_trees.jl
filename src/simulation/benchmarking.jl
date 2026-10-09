@@ -17,7 +17,7 @@ module Benchmarking
     )
 
         total_times = TimerOutputs.todict(times)["inner_timers"]
-        n_calls::Vector{Integer} = []
+        n_calls::Vector{Int} = []
         call_orders::Vector{String} = []
         times_ns::Vector{Float64} = []
         allocated_bytes::Vector{Float64} = []
@@ -44,10 +44,10 @@ module Benchmarking
         end
         tree_configurations::Vector{String} =
             ["$(tree_configuration)" for _ ∈ eachindex(allocated_bytes)]
-        n_nodes::Vector{Integer} = [n_node for _ ∈ eachindex(allocated_bytes)]
-        n_sp::Vector{Integer} = [n_species for _ ∈ eachindex(allocated_bytes)]
+        n_nodes::Vector{Int} = [n_node for _ ∈ eachindex(allocated_bytes)]
+        n_sp::Vector{Int} = [n_species for _ ∈ eachindex(allocated_bytes)]
         solver_names::Vector{String} = [solver_name for _ ∈ eachindex(allocated_bytes)]
-        n_terminals::Vector{Integer} = [n_term for _ ∈ eachindex(allocated_bytes)]
+        n_terminals::Vector{Int} = [n_term for _ ∈ eachindex(allocated_bytes)]
         table = (
             n_calls = n_calls,
             call_orders = call_orders,
