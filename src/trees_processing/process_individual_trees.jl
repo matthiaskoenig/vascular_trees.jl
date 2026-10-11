@@ -27,13 +27,24 @@ module ProcessIndividualTrees
 
     export process_julia_graph
 
-    using ..Definitions: flow_directions, ODE_groups
-    using ..ReadTreeFiles: read_edges, read_nodes
-    using ..TableUtils: get_extended_vector, create_tuples_from_dfrows, selection_from_df, save_as_arrow
+    using ..Definitions: 
+        flow_directions, 
+        ODE_groups
+    using ..ReadTreeFiles: 
+        read_edges, 
+        read_nodes
+    using ..TableUtils: 
+        get_extended_vector, 
+        create_tuples_from_dfrows, 
+        selection_from_df, 
+        save_as_arrow
 
-    using ..ProcessingHelpers: label_special_edges!, create_special_edges!
+    using ..TreesProcessingHelpers: 
+        label_special_edges!, 
+        create_special_edges!
 
-    using DataFrames, InteractiveUtils
+    using DataFrames, 
+        InteractiveUtils
 
     # ODE group codes and inflow/outflow tree names, defined in definitions.jl
     const groups::ODE_groups = ODE_groups()
@@ -62,7 +73,6 @@ module ProcessIndividualTrees
     """
     function process_individual_tree(GRAPH_DIR::String, vascular_tree::String)
         GRAPH_PATH, EDGES_PATH, NODES_PATH = paths_initialization(GRAPH_DIR, vascular_tree)
-        # graph skeleton and edge attributes are joined in one dataframe
         edges_df, nodes_df = read_graph(GRAPH_PATH, EDGES_PATH, NODES_PATH)
         add_graph_characteristics!(edges_df, vascular_tree)
         graph = build_arrow_table(edges_df, nodes_df, vascular_tree)
@@ -97,7 +107,7 @@ module ProcessIndividualTrees
       attributes (`leaf`, `radius`, `flows` [L/min], `length`, `pressure_drop`, `volumes` [L]).
     - `nodes_df`: one row per node; `ids`, `x`, `y`, `z`.
 
-    See `read_edges` / `read_nodes` in helpers.jl for renaming and unit conversion.
+    See `read_edges` / `read_nodes` in read_tree_files.jl for renaming and unit conversion.
     """
     function read_graph(
         GRAPH_PATH::String,
@@ -125,8 +135,6 @@ module ProcessIndividualTrees
     and ODE groups / indices must be assigned after all rows exist.
     """
     function add_graph_characteristics!(edges_df::DataFrame, vascular_tree::String)
-        # ids are used to name the columns of simulation results and to map every
-        # flow/volume value back to its edge
         transform!(
             edges_df,
             [:source_id, :target_id] =>
@@ -142,7 +150,7 @@ module ProcessIndividualTrees
         label_special_edges!(edges_df)
         # one self-edge per terminal node + the marginal edge, where the dose is applied
         create_special_edges!(edges_df)
-        # one integer per edge lets the ODE function choose the right equation quickly
+        # lets the ODE function choose the right equation quickly
         assign_ODE_group!(edges_df)
     end
 
@@ -208,7 +216,6 @@ module ProcessIndividualTrees
     marginal (`source_id == 0`) → `groups.marginal`, everything else → `groups.other`.
     """
     function assign_ODE_group!(edges_df::DataFrame)
-        """Function that adds to the dataframe with edges column which indicate ODE group for each edge"""
         edges_df.ODE_group .=
         ifelse.(
             edges_df[:, :preterminal] .== true,
@@ -244,7 +251,7 @@ module ProcessIndividualTrees
         nodes_df::DataFrame,
         vascular_tree::String,
     )::NamedTuple
-        is_inflow::Bool = in(vascular_tree, flow_direction.inflow_trees)
+        is_inflow = in(vascular_tree, flow_direction.inflow_trees)
         # outflow trees: swap source and target so that edges follow the blood flow
         (!is_inflow) &&
             (rename!(edges_df, [:source_id => :target_id, :target_id => :source_id]))

@@ -17,9 +17,14 @@ module ProcessTerminalNodes
 
     using ..Paths: JULIA_RESULTS_DIR
     using ..Definitions: ODE_groups
-    using ..TableUtils: selection_from_df, save_as_arrow, get_extended_vector
+    using ..TableUtils: 
+        selection_from_df, 
+        save_as_arrow, 
+        get_extended_vector
 
-    using DataFrames, Arrow, ProgressMeter
+    using DataFrames, 
+        Arrow, 
+        ProgressMeter
 
     # Already specified in utils.jl
     const groups = ODE_groups()
@@ -58,7 +63,7 @@ module ProcessTerminalNodes
         
         :equality_edge_to_node - we need to assign each edge (and thus to each species) coordinates. We have
             only nodes' coordinates. So, we need to understand how to match nodes to edges. The principle is 
-            as in ProcessingHelpers.jl (see Note), but now, because for the outflow graphs we reversed edges,
+            as in TreesProcessingHelpers.jl (see Note), but now, because for the outflow graphs we reversed edges,
             matching for the inflow and outflow graphs is different. Edges from inflow graphs are matched with
             nodes by the target id. That means, for example, that coordinates of node with id 6 are mapped with
             the edge (3, 6). For outflow graphs mapping is done by the source id.

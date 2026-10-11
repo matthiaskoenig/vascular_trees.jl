@@ -1,31 +1,75 @@
 """
-Why id in this df is a target id? In Julia graph all attributes belongs to nodes.
-    That is why while writing file edges_df in julia iteration goes through nnodes, but not nedges.
-    Also at this step we don't care about whether graph is in inflow or an outflow,
-    because the direction of the flow for every graph goes from the "highest" to "lowest" nodes
-    (change of direction happens fare below this function).
-    So, attributes of a node belong to the edge to this node.
-    For example, 1 -> 2 -> 3. Node 1 has flow value, radius, but does not have length and pressure drop,
-    because it is a start node (this is by default, check algorithm).
-    Node 2 has flow value, radius, length and pressure drop ---> these values characterise edge (1, 2).
+    ReadTreeFiles
+
+Read vascular tree data from CSV files produced by the SyntheticVascularTree generator
+and assemble them into DataFrames ready for graph construction.
+
+## Edge attribute convention
+
+In the SyntheticVascularTree format, all attributes are stored on *nodes*, not edges.
+The file writer therefore iterates over nodes (nnodes) rather than edges (nedges).
+Attributes of a node describe the edge *arriving at* that node (the "target" edge):
+
+    1 → 2 → 3
+
+- Node 1 (root): has `flow`, `radius` — no `length` or `pressure_drop` (no incoming edge).
+- Node 2: has `flow`, `radius`, `length`, `pressure_drop` → these values characterise edge (1, 2).
+
+Inflow/outflow direction is irrelevant at this stage; every tree is read as flowing from
+the highest-index node to the lowest. Direction reversal is handled downstream.
 """
 module ReadTreeFiles
-    using CSV, DataFrames, DataFramesMeta, Parameters, Revise
+    using CSV, 
+        DataFrames, 
+        DataFramesMeta, 
+        Parameters, 
+        Revise
 
-    export read_edges, read_graph_skeleton, read_edges_attributes, read_nodes_attributes
+    export read_edges, 
+        read_graph_skeleton, 
+        read_edge_attributes, 
+        read_nodes_attributes
 
+    MM3_PER_L = 1e6
+    S_PER_MIN = 60
+    """
+        read_edges(GRAPH_PATH, EDGES_PATH) -> DataFrame
+
+    Load a complete edge table by joining the graph skeleton (connectivity) with edge
+    attributes (physical quantities).
+
+    The two CSVs are joined on `:target_id`. Missing values are not allowed in the
+    result and will raise an error if any join keys are unmatched.
+
+    # Arguments
+    - `GRAPH_PATH`: path to the CSV containing edge connectivity (source/target node ids).
+    - `EDGES_PATH`: path to the CSV containing per-edge physical attributes.
+
+    # Returns
+    A `DataFrame` with columns from both sources, with units converted as described in
+    [`read_edge_attributes`](@ref).
+    """
     function read_edges(GRAPH_PATH::String, EDGES_PATH::String)::DataFrame
-        # read and prepare lg file with information about edges
-        graph_structure::DataFrame = read_graph_skeleton(GRAPH_PATH)
-        # read and prepare csv file with edges attributes
-        edges_attrib::DataFrame = read_edges_attributes(EDGES_PATH)
-        # join dfs with graph structure and edges attributes
-        leftjoin!(graph_structure, edges_attrib, on = :target_id)
-        disallowmissing!(graph_structure)
+        edges_df::DataFrame = read_graph_skeleton(GRAPH_PATH)
+        edges_attrib_df::DataFrame = read_edge_attributes(EDGES_PATH)
+        leftjoin!(edges_df, edges_attrib_df, on = :target_id)
+        disallowmissing!(edges_df)
 
-        return graph_structure
+        return edges_df
     end
 
+    """
+        read_graph_skeleton(GRAPH_PATH) -> DataFrame
+
+    Read edge connectivity from a two-column CSV file and return it as a `DataFrame`
+    with columns `[:source_id, :target_id]`.
+
+    Any columns that contain only missing values are dropped before renaming, so the
+    function is robust to trailing empty columns written by some exporters.
+
+    # Arguments
+    - `GRAPH_PATH`: path to the CSV file with source and target node ids.
+    """
     function read_graph_skeleton(GRAPH_PATH::String)::DataFrame
         graph_skeleton::DataFrame = CSV.read(GRAPH_PATH, DataFrame)
         select!(graph_skeleton, Not(names(graph_skeleton, Missing)))
@@ -34,29 +78,58 @@ module ReadTreeFiles
         return graph_skeleton
     end
 
-    function read_edges_attributes(EDGES_PATH::String)::DataFrame
-        edges_attrib::DataFrame = CSV.read(EDGES_PATH, DataFrame)
-        @chain edges_attrib begin
+    """
+        read_edge_attributes(EDGES_PATH) -> DataFrame
+
+    Read per-edge physical attributes from CSV, rename columns to short canonical names,
+    and convert units to SI-adjacent values used throughout the pipeline:
+
+    | Original column            | Renamed to      | Unit conversion              |
+    |:---------------------------|:----------------|:-----------------------------|
+    | `edge_idx`                 | `target_id`     | —                            |
+    | `leaf_count`               | `leaf`          | —                            |
+    | `radius_in_mm`             | `radius`        | mm (unchanged)               |
+    | `flow_in_mm3_per_s`        | `flows`         | mm³/s → L/min                |
+    | `length_in_mm`             | `length`        | mm (unchanged)               |
+    | `pressure_drop_in_kg_per_mm_s2` | `pressure_drop` | kg/(mm·s²) (unchanged)  |
+
+    A new column `volumes` (in L) is computed as `π · radius² · length / 10⁶`.
+
+    # Arguments
+    - `EDGES_PATH`: path to the CSV file with edge attributes.
+    """
+    function read_edge_attributes(EDGES_PATH::String)::DataFrame
+        edges_attrib_df::DataFrame = CSV.read(EDGES_PATH, DataFrame)
+        @chain edges_attrib_df begin
             @rename! begin
                 :target_id = :edge_idx
                 :leaf = :leaf_count
                 :radius = :radius_in_mm
-                :flows = :flow_in_mm3_per_s # units are changed below
+                :flows = :flow_in_mm3_per_s
                 :length = :length_in_mm
                 :pressure_drop = :pressure_drop_in_kg_per_mm_s2
             end
             @transform! begin
-                :flows = (:flows ./ 1000000 * 60) # Change units of the flow [mm3/s --> L/min]
-                :volumes = π .* :radius .^ 2 .* :length ./ 1000000 # [mm3 --> L] 
+                :flows = (:flows ./ MM3_PER_L * S_PER_MIN)           # mm³/s → L/min
+                :volumes = π .* :radius .^ 2 .* :length ./ MM3_PER_L  # mm³ → L
             end
         end
 
-        return edges_attrib
+        return edges_attrib_df
     end
 
+    """
+        read_nodes(NODES_PATH) -> DataFrame
+
+    Read node spatial coordinates from CSV and return a `DataFrame` with columns
+    `[:ids, :x, :y, :z]` (coordinates in mm, unchanged from source).
+
+    # Arguments
+    - `NODES_PATH`: path to the CSV file with node coordinates.
+    """
     function read_nodes(NODES_PATH::String)::DataFrame
-        nodes_attrib::DataFrame = CSV.read(NODES_PATH, DataFrame)
-        @chain nodes_attrib begin
+        nodes_df::DataFrame = CSV.read(NODES_PATH, DataFrame)
+        @chain nodes_df begin
             @rename! begin
                 :ids = :node_idx
                 :x = :x_coord_in_mm
@@ -65,7 +138,7 @@ module ReadTreeFiles
             end
         end
 
-        return nodes_attrib
+        return nodes_df
     end
 
 end
