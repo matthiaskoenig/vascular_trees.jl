@@ -19,7 +19,6 @@ Outputs, in the `graphs/` folder of the graph directory:
 1. `<tree>.arrow` - one table per vascular tree (ODE groups, ids, flows, volumes, ...)
 2. `T.arrow`      - terminal nodes, i.e. the connection points between the trees
 """
-
 module ProcessSyntheticVascularTrees
     """
     TODO: Optimize code

@@ -29,8 +29,7 @@ module ProcessTerminalNodes
 
     using DataFrames,
         Arrow,
-        ProgressMeter,
-        OrderedCollections
+        ProgressMeter
 
     const groups = ODE_groups()
     # Volume of the liver cube in which the tree was grown (0.1 cm sides): [cm^3] -> [L].
@@ -51,7 +50,7 @@ module ProcessTerminalNodes
         @info "Processing terminal nodes..."
 
         # ordered, so that rows of the output follow the order of tree_info.vascular_trees
-        graphs = OrderedDict{String,DataFrame}()
+        graphs = Dict{String,DataFrame}()
         # collect info from all graphs, beloning to this tree 
         collect_graphs_information!(graphs, tree_info)
 
@@ -60,13 +59,13 @@ module ProcessTerminalNodes
     end
 
     """
-        collect_graphs_information!(graphs::OrderedDict{String,DataFrame}, tree_info)
+        collect_graphs_information!(graphs::Dict{String,DataFrame}, tree_info)
 
     Load the `.arrow` table of every tree in `tree_info.vascular_trees` into `graphs`,
     keyed by the tree name (e.g. `"A"`, `"V"`). Only the columns needed for the terminal
     nodes are loaded.
     """
-    function collect_graphs_information!(graphs::OrderedDict{String,DataFrame}, tree_info)
+    function collect_graphs_information!(graphs::Dict{String,DataFrame}, tree_info)
         # iterate over all graphs (tree) that belongs to this tree
         for vascular_tree ∈ tree_info.vascular_trees
             # get path to the .arrow file of this currently iterated graph
@@ -93,7 +92,7 @@ module ProcessTerminalNodes
     end
 
     """
-        prepare_tnodes_info(graphs::OrderedDict{String,DataFrame}, tree_info) -> DataFrame
+        prepare_tnodes_info(graphs::Dict{String,DataFrame}, tree_info) -> DataFrame
 
     Build the terminal node table from the loaded trees in `graphs`.
 
@@ -127,7 +126,7 @@ module ProcessTerminalNodes
     source, `2` for the target.
     """
     function prepare_tnodes_info(
-        graphs::OrderedDict{String,DataFrame},
+        graphs::Dict{String,DataFrame},
         tree_info,
     )::DataFrame
         @info "Preparation steps"

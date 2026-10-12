@@ -29,7 +29,7 @@ module TableUtils
         return [vector_to_extend; fill(missing, to_which_length_extend - length(vector_to_extend))]
     end
 
-    function load_arrow(ARROW_PATH::String, col_selection::List)::DataFrame
+    function load_arrow(ARROW_PATH::String, col_selection::Vector{String})::DataFrame
         # this is a duplicate of a function from get_ode_parameters.jl
         graph_df = DataFrame(Arrow.Table(ARROW_PATH))[
             :,
