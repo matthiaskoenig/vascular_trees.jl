@@ -1,7 +1,14 @@
 module TableUtils
-    using DataFrames, DataFramesMeta, Arrow
 
-    export selection_from_df, create_tuples_from_dfrows, save_as_arrow, get_extended_vector
+    export selection_from_df, 
+        create_tuples_from_dfrows, 
+        save_as_arrow, 
+        get_extended_vector,
+        load_arrow
+
+    using DataFrames, 
+        DataFramesMeta, 
+        Arrow
 
     function selection_from_df(
         df::AbstractDataFrame,
@@ -20,5 +27,14 @@ module TableUtils
 
     function get_extended_vector(vector_to_extend, to_which_length_extend::Int)
         return [vector_to_extend; fill(missing, to_which_length_extend - length(vector_to_extend))]
+    end
+
+    function load_arrow(ARROW_PATH::String, col_selection::List)::DataFrame
+        # this is a duplicate of a function from get_ode_parameters.jl
+        graph_df = DataFrame(Arrow.Table(ARROW_PATH))[
+            :,
+            col_selection,
+        ]
+        return graph
     end
 end

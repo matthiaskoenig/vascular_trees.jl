@@ -11,7 +11,7 @@ everything the ODE model and the terminal-nodes processing need.
 - `<tree>_nodes.csv` - node attributes (id, x/y/z coordinates).
 
 # Output
-- `<GRAPH_DIR>/graphs/<tree>.arrow` - one table per tree, see [`build_arrow_table`](@ref).
+- `<GRAPH_DIR>/graphs/<tree>.arrow` - one table per tree, see [`build_arrow_df`](@ref).
 
 # Main steps
 1. read the files into an edges dataframe and a nodes dataframe;
@@ -75,8 +75,8 @@ module ProcessIndividualTrees
         GRAPH_PATH, EDGES_PATH, NODES_PATH = paths_initialization(GRAPH_DIR, vascular_tree)
         edges_df, nodes_df = read_graph(GRAPH_PATH, EDGES_PATH, NODES_PATH)
         add_graph_characteristics!(edges_df, vascular_tree)
-        graph = build_arrow_table(edges_df, nodes_df, vascular_tree)
-        save_as_arrow(graph, joinpath(GRAPH_DIR, "graphs/$(vascular_tree).arrow"))
+        graph_df = build_arrow_df(edges_df, nodes_df, vascular_tree)
+        save_as_arrow(graph_df, joinpath(GRAPH_DIR, "graphs/$(vascular_tree).arrow"))
     end
 
     #=================================================================================================================================#
@@ -155,11 +155,11 @@ module ProcessIndividualTrees
     end
 
     """
-        build_arrow_table(edges_df, nodes_df, vascular_tree) -> DataFrame
+        build_arrow_df(edges_df, nodes_df, vascular_tree) -> DataFrame
 
-    Build the table that is saved as `<vascular_tree>.arrow`.
+    Build the df that is saved as `<vascular_tree>.arrow`.
 
-    The table has one row per edge (including terminal and marginal edges). Arrow can only store
+    The df has one row per edge (including terminal and marginal edges). Arrow can only store
     columns of equal length, so columns that are shorter are padded with `missing`.
 
     # Columns - one value per edge
@@ -176,16 +176,15 @@ module ProcessIndividualTrees
 
     Note: modifies `edges_df` (edges of outflow trees are reversed, see [`prepare_graph_info`](@ref)).
     """
-    function build_arrow_table(
+    function build_arrow_df(
         edges_df::DataFrame,
         nodes_df::DataFrame,
         vascular_tree::String
     )::DataFrame
-        graph_info::NamedTuple =
-            prepare_graph_info(edges_df, nodes_df, vascular_tree)
-        df_length::Int = length(graph_info.all_edges)
+        graph_info = prepare_graph_info(edges_df, nodes_df, vascular_tree)
+        df_length = length(graph_info.all_edges)
 
-        graph = DataFrame(
+        return DataFrame(
             vascular_tree_id = get_extended_vector(vascular_tree, df_length),
             is_inflow = get_extended_vector(graph_info.is_inflow, df_length),
             nodes_ids = get_extended_vector(nodes_df.ids, df_length),
@@ -203,8 +202,6 @@ module ProcessIndividualTrees
             pre_elements = graph_info.pre_elements,
             post_elements = graph_info.post_elements,
         )
-
-        return graph
     end
 
     #=================================================================================================================================#
@@ -236,7 +233,7 @@ module ProcessIndividualTrees
     """
         prepare_graph_info(edges_df, nodes_df, vascular_tree) -> NamedTuple
 
-    Extract from both dataframes the vectors needed by [`build_arrow_table`](@ref).
+    Extract from both dataframes the vectors needed by [`build_arrow_df`](@ref).
 
     For outflow trees the edges are reversed **in place** (`source_id` and `target_id` columns
     are swapped), so that every tree is described in the direction of blood flow.

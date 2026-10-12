@@ -1,7 +1,7 @@
 name = "VascularTrees"
 uuid = "87ddc3cc-728b-4545-b71e-e2b9cf7abe66"
-authors = ["Mariia Myshkina", "Matthias König"]
 version = "0.1.0"
+authors = ["Mariia Myshkina", "Matthias König"]
 
 [deps]
 AlgebraOfGraphics = "cbdf2221-f076-402e-a563-3d30da359d67"
@@ -27,6 +27,7 @@ JuliaFormatter = "98e50ef6-434e-11e9-1051-2b60c6c9e899"
 KahanSummation = "8e2b3108-d4c1-50be-a7a2-16352aec75c3"
 MetaGraphs = "626554b9-1ddb-594c-aa3c-2596fe9399a5"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
+OrderedCollections = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
 OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
 PProf = "e4faabce-9ead-11e9-39d9-4379958e3056"
 ParameterizedFunctions = "65888b18-ceab-5e60-b2b9-181511a3b968"
@@ -71,6 +72,7 @@ JuliaFormatter = "1.0.62"
 KahanSummation = "0.3.1"
 MetaGraphs = "0.7.2"
 ModelingToolkit = "9.59.0"
+OrderedCollections = "1.8.0"
 OrdinaryDiffEq = "6.90.1"
 PProf = "3.2.0"
 ParameterizedFunctions = "5.17.0"

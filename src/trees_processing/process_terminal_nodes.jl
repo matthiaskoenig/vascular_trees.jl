@@ -1,75 +1,135 @@
+"""
+Module for collecting information about terminal nodes using all individual vessel trees (arterial, portal, etc.) files.
+
+Input: .arrow (table) for every individual vessel tree (arterial, portal, etc.).
+
+Output: .arrow (table) with information about terminal nodes.
+
+Idea of this module: to get, to store, and to save the information about terminal nodes that we need for correct ODEs.
+    These nodes serve as a connection point between individual vessel trees.
+
+TODO: Flow affiliations are wrong, DataFrame columns contain data of different types, Optimize code
+
+TODO: prepare_tnodes_info assumes that every tree lists its preterminal edges in the same order,
+    so that the k-th preterminal edge of each tree belongs to terminal k (column k of the output).
+    This is not checked. If it does not hold, values of different terminals get mixed up
+    (possible cause of the wrong flow affiliations).
+"""
 module ProcessTerminalNodes
 
     export process_terminal_nodes
-
-    """
-    Module for collecting information about terminal nodes using all individual vessel trees (arterial, portal, etc.) files.
-
-    Input: .arrow (table) for every individual vessel tree (arterial, portal, etc.).
-
-    Output: .arrow (table) with information about terminal nodes.
-
-    Idea of this module: to get, to store, and to save the information about terminal nodes that we need for correct ODEs.
-        These nodes serve as a connection point between individual vessel trees.
-
-    TODO: Flow affiliations are wrong, DataFrame columns contain data of different types, Optimize code
-    """
 
     using ..Paths: JULIA_RESULTS_DIR
     using ..Definitions: ODE_groups
     using ..TableUtils: 
         selection_from_df, 
         save_as_arrow, 
-        get_extended_vector
+        get_extended_vector,
+        load_arrow
 
-    using DataFrames, 
-        Arrow, 
-        ProgressMeter
+    using DataFrames,
+        Arrow,
+        ProgressMeter,
+        OrderedCollections
 
-    # Already specified in utils.jl
     const groups = ODE_groups()
-    # volume of liver in which tree was grown
-    volume_geometry::Float64 = (0.100 * 0.100 * 0.10) / 1000 # [cm^3] -> [l] 
+    # Volume of the liver cube in which the tree was grown (0.1 cm sides): [cm^3] -> [L].
+    # It is split equally between all terminal nodes.
+    volume_geometry::Float64 = (0.100 * 0.100 * 0.10) / 1000
 
+    """
+        process_terminal_nodes(tree_info)
+
+    Load every individual vessel tree listed in `tree_info.vascular_trees`, collect the
+    terminal node information with [`prepare_tnodes_info`](@ref), and save it to
+    `<tree_info.GRAPH_DIR>/graphs/T.arrow`.
+
+    `tree_info` must provide `GRAPH_DIR`, `vascular_trees` and `tree_components`
+    (with the keys `:inflow_trees` and `:outflow_trees`).
+    """
     function process_terminal_nodes(tree_info)
-        """Main function: workflow for getting and saving info about terminal nodes for the tree"""
         @info "Processing terminal nodes..."
 
-        # initialize dictionary to store dataframes with all graphs info (container)
-        graphs = Dict{String,DataFrame}()
+        # ordered, so that rows of the output follow the order of tree_info.vascular_trees
+        graphs = OrderedDict{String,DataFrame}()
         # collect info from all graphs, beloning to this tree 
         collect_graphs_information!(graphs, tree_info)
 
-        terminal_nodes_info = prepare_terminal_nodes_information(graphs, tree_info)
-        save_as_arrow(terminal_nodes_info, joinpath(tree_info.GRAPH_DIR, "graphs/T.arrow"))
+        tnodes_info_df = prepare_tnodes_info(graphs, tree_info)
+        save_as_arrow(tnodes_info_df, joinpath(tree_info.GRAPH_DIR, "graphs/T.arrow"))
     end
 
-    function collect_graphs_information!(graphs::Dict{String,DataFrame}, tree_info)
+    """
+        collect_graphs_information!(graphs::OrderedDict{String,DataFrame}, tree_info)
+
+    Load the `.arrow` table of every tree in `tree_info.vascular_trees` into `graphs`,
+    keyed by the tree name (e.g. `"A"`, `"V"`). Only the columns needed for the terminal
+    nodes are loaded.
+    """
+    function collect_graphs_information!(graphs::OrderedDict{String,DataFrame}, tree_info)
         # iterate over all graphs (tree) that belongs to this tree
         for vascular_tree ∈ tree_info.vascular_trees
             # get path to the .arrow file of this currently iterated graph
             GRAPH_PATH::String =
                 joinpath(tree_info.GRAPH_DIR, "graphs", "$(vascular_tree).arrow")
             # load .arrow file as dataframe and store it in the dictionary with corresponding key
-            graphs[vascular_tree] = load_graph(GRAPH_PATH)
+            graphs[vascular_tree] = load_arrow(
+                GRAPH_PATH, 
+                [
+                    :vascular_tree_id,
+                    :is_inflow,
+                    :nodes_ids,
+                    :nodes_coordinates,
+                    :all_edges,
+                    :terminal_edges,
+                    :preterminal_edges,
+                    :flows,
+                    :species_ids,
+                    :flow_ids,
+                    :ODE_groups,
+                ]
+            )
         end
     end
 
-    function prepare_terminal_nodes_information(
-        graphs::Dict{String,DataFrame},
+    """
+        prepare_tnodes_info(graphs::OrderedDict{String,DataFrame}, tree_info) -> DataFrame
+
+    Build the terminal node table from the loaded trees in `graphs`.
+
+    Each column (`x1`, `x2`, …) is one terminal node. The number of terminals is taken
+    from the `"V"` graph, and the preterminal edges of every tree are assumed to be in the
+    same order, so that the k-th preterminal edge of each tree belongs to terminal k.
+    The rows are blocks stacked on top of each other (`n_in` = number of inflow trees,
+    `n_trees` = number of all trees):
+
+    | Rows      | Content                                                              |
+    |:----------|:---------------------------------------------------------------------|
+    | `1+n_in`  | species ids: row 1 is the terminal `T_k`, then one row per inflow tree |
+    | `n_trees` | coordinates `(x, y, z)` of the terminal, one row per tree            |
+    | `n_trees` | tree id each coordinate row belongs to                               |
+    | `1+n_in`  | flow ids: row 1 is `"Outflow"`, then one row per inflow tree         |
+    | `1+n_in`  | flow values: row 1 is the sum of all outflow flows, then one row per inflow tree |
+    | `1`       | terminal volume, `volume_geometry / n_terminals`                     |
+
+    Inflow rows and coordinate rows follow the order of `tree_info.vascular_trees`.
+
+    # Matching edges to node coordinates
+
+    Only nodes have coordinates, so each preterminal edge takes the coordinates of one of
+    its two nodes (the attribute convention is described in `ReadTreeFiles`). Edges in
+    outflow trees were reversed earlier, so the leaf node is on a different side:
+
+    - inflow trees: the target node, e.g. edge `(3, 6)` gets the coordinates of node 6;
+    - outflow trees: the source node.
+
+    `equality_edge_to_node` holds the index of that node in the edge tuple: `1` for the
+    source, `2` for the target.
+    """
+    function prepare_tnodes_info(
+        graphs::OrderedDict{String,DataFrame},
         tree_info,
     )::DataFrame
-        """
-        
-        :equality_edge_to_node - we need to assign each edge (and thus to each species) coordinates. We have
-            only nodes' coordinates. So, we need to understand how to match nodes to edges. The principle is 
-            as in TreesProcessingHelpers.jl (see Note), but now, because for the outflow graphs we reversed edges,
-            matching for the inflow and outflow graphs is different. Edges from inflow graphs are matched with
-            nodes by the target id. That means, for example, that coordinates of node with id 6 are mapped with
-            the edge (3, 6). For outflow graphs mapping is done by the source id.
-            :equality_edge_to_node can only have values 1 or 2, which indicate source id (it has index 1 in an
-            edge) and target id (index 2). 
-        """
         @info "Preparation steps"
         # next lines are for being able to allocate vectors below
         # get the number of terminal nodes
@@ -153,31 +213,10 @@ module ProcessTerminalNodes
         df_species_affiliations = DataFrame(species_affiliations, :auto)
         df_flow_ids = DataFrame(flow_ids, :auto)
         df_flow_values = DataFrame(flow_values, :auto)
-        terminal_nodes_info = vcat(df_species_ids, df_species_coordinates, df_species_affiliations, df_flow_ids, df_flow_values)
-        push!(terminal_nodes_info, [volume_terminal for _ = 1:n_terminals])
-
-        return terminal_nodes_info
-    end
-
-    function load_graph(GRAPH_PATH::String)::DataFrame
-        # this is a duplicate of a function from get_ode_parameters.jl
-        graph = DataFrame(Arrow.Table(GRAPH_PATH))[
-            :,
-            [
-                :vascular_tree_id,
-                :is_inflow,
-                :nodes_ids,
-                :nodes_coordinates,
-                :all_edges,
-                :terminal_edges,
-                :preterminal_edges,
-                :flows,
-                :species_ids,
-                :flow_ids,
-                :ODE_groups,
-            ],
-        ]
-        return graph
+        tnodes_info_df = vcat(df_species_ids, df_species_coordinates, df_species_affiliations, df_flow_ids, df_flow_values)
+        push!(tnodes_info_df, [volume_terminal for _ = 1:n_terminals])
+        printl(tnodes_info_df)
+        return tnodes_info_df
     end
 
 end
