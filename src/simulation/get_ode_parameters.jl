@@ -27,8 +27,7 @@ module ODEparameters
         if graph_subsystem != "T"
             p = get_graph_parameters(GRAPH_PATH, flow_scaling_factor)
         else
-            n_inflow::Int = length(tree_info.tree_components[:inflow_trees])
-            p = get_graph_parameters(GRAPH_PATH, n_inflow, flow_scaling_factor)
+            p = get_tnodes_parameters(GRAPH_PATH, flow_scaling_factor)
         end
 
         return p
@@ -55,13 +54,14 @@ module ODEparameters
         return p
     end
 
-    function get_graph_parameters(GRAPH_PATH::String, n_inflow::Int, flow_scaling_factor::AbstractFloat)
+    function get_tnodes_parameters(GRAPH_PATH::String, flow_scaling_factor::AbstractFloat)
         graph = DataFrame(Arrow.Table(GRAPH_PATH))
         p = terminal_parameters(
-            ; id = "T", 
-            species_ids = Array{String}(graph[1:(n_inflow+1), :]), 
-            flow_values = Array{Float64}(graph[end-n_inflow-1:end-1, :]) .* flow_scaling_factor, 
-            volumes = Float64((graph[end, 1]))
+            ; id = "T",
+            # (n_inflow+1) × n_terminals, same shape as before
+            species_ids = permutedims(Matrix{String}(graph[:, r"^species_id_"])),
+            flow_values = permutedims(Matrix{Float64}(graph[:, r"^flow_value_"])) .* flow_scaling_factor,
+            volumes = graph.volume[1],
         )
 
         return p

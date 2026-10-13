@@ -4,6 +4,7 @@ module TableUtils
         create_tuples_from_dfrows, 
         save_as_arrow, 
         get_extended_vector,
+        block_to_df,
         load_arrow
 
     using DataFrames, 
@@ -27,6 +28,18 @@ module TableUtils
 
     function get_extended_vector(vector_to_extend, to_which_length_extend::Int)
         return [vector_to_extend; fill(missing, to_which_length_extend - length(vector_to_extend))]
+    end
+
+    """
+    block_to_df(block, prefix) -> DataFrame
+
+    Turn one block (`rows * n_terminals`) into a table with one row per terminal and one column
+    per block row, named `<prefix>_1`, `<prefix>_2`, …. The block is transposed on its own, so
+    the columns keep the element type of the block (`String`, `Float64` or `NTuple{3,Float64}`).
+    """
+    function block_to_df(block::AbstractMatrix, prefix::String)
+        # n_terminals × rows, eltype stays String / Float64 / NTuple{3,Float64}
+        return DataFrame(permutedims(block), ["$(prefix)_$k" for k in 1:size(block, 1)])
     end
 
     function load_arrow(ARROW_PATH::String, col_selection::Vector{String})::DataFrame

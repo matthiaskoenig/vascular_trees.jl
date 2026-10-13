@@ -36,6 +36,7 @@ module ProcessTerminalNodes
         selection_from_df, 
         save_as_arrow, 
         get_extended_vector,
+        block_to_df,
         load_arrow
 
     using DataFrames,
@@ -108,25 +109,26 @@ module ProcessTerminalNodes
 
     Build the terminal node table from the loaded trees in `graphs`.
 
-    Each column (`x1`, `x2`, …) is one terminal node. The number of terminals is taken
-    from the `"V"` graph, and the preterminal edges of every tree are assumed to be in the
-    same order, so that the k-th preterminal edge of each tree belongs to terminal k.
-    The rows are blocks stacked on top of each other (`n_in` = number of inflow trees,
-    `n_trees` = number of all trees):
+    The output has one row per terminal node. The number of terminals is taken from the `"V"`
+    graph, and the preterminal edges of every tree are assumed to be in the same order, so that
+    the k-th preterminal edge of each tree belongs to terminal k (row k).
 
-    | Rows      | Content                                                              |
-    |:----------|:---------------------------------------------------------------------|
-    | `1+n_in`  | species ids: row 1 is the terminal `T_k`, then one row per inflow tree |
-    | `n_trees` | coordinates `(x, y, z)` of the terminal, one row per tree            |
-    | `n_trees` | tree id each coordinate row belongs to                               |
-    | `1+n_in`  | flow ids: row 1 is `"Outflow"`, then one row per inflow tree         |
-    | `1+n_in`  | flow values: row 1 is the sum of all outflow flows, then one row per inflow tree |
-    | `1`       | terminal volume, `volume_geometry / n_terminals`                     |
+    Inside this function the data are collected in blocks of size `rows × n_terminals`
+    (`n_in` = number of inflow trees, `n_trees` = number of all trees), column k of a block
+    belongs to terminal k. [`assemble_tnodes_table`](@ref) turns each block into columns of the
+    output, see there for the column names.
+
+    | Block                  | Rows      | Content                                                              |
+    |:-----------------------|:----------|:---------------------------------------------------------------------|
+    | `species_ids`          | `1+n_in`  | row 1 is the terminal `T_k`, then one row per inflow tree            |
+    | `species_coordinates`  | `n_trees` | coordinates `(x, y, z)` of the terminal, one row per tree            |
+    | `species_affiliations` | `n_trees` | tree id each coordinate row belongs to                               |
+    | `flow_ids`             | `1+n_in`  | row 1 is `"Outflow"`, then one row per inflow tree                   |
+    | `flow_values`          | `1+n_in`  | row 1 is the sum of all outflow flows, then one row per inflow tree  |
 
     Inflow rows and coordinate rows follow the order of `tree_info.vascular_trees`.
     Coordinates come from [`get_terminal_coordinates`](@ref). A terminal whose leaf node
     is not found keeps the coordinates `(0.0, 0.0, 0.0)` and the tree id `""`.
-    The blocks are stacked by [`assemble_tnodes_table`](@ref).
     """
     function prepare_tnodes_info(
         graphs::Dict{String,DataFrame},
@@ -270,33 +272,39 @@ module ProcessTerminalNodes
         assemble_tnodes_table(species_ids, species_coordinates, species_affiliations,
             flow_ids, flow_values, n_terminals) -> DataFrame
 
-    Stack the blocks filled by [`prepare_tnodes_info`](@ref) into one table and add the
-    last row with the terminal volume (`volume_geometry` split equally between the
-    `n_terminals` terminals). The row layout is described in `prepare_tnodes_info`.
-    Columns are named `x1`, `x2`, …, one per terminal.
+    Convert the blocks filled by [`prepare_tnodes_info`](@ref) into the output table:
+    one row per terminal, every column has one concrete type (no `Any`).
+
+    # Columns
+    | Columns                        | Type                | Content                                               |
+    |:-------------------------------|:--------------------|:------------------------------------------------------|
+    | `species_id_1`                 | `String`            | terminal id `T_k`                                     |
+    | `species_id_2`, …              | `String`            | species of the terminal in each inflow tree           |
+    | `coordinates_1`, …             | `NTuple{3,Float64}` | `(x, y, z)` of the terminal in each tree              |
+    | `affiliation_1`, …             | `String`            | tree id of each `coordinates_*` (`""` if not found)   |
+    | `flow_id_1`                    | `String`            | `"Outflow"`                                           |
+    | `flow_id_2`, …                 | `String`            | flow id of the terminal in each inflow tree           |
+    | `flow_value_1`                 | `Float64`           | sum of the flows of all outflow trees                 |
+    | `flow_value_2`, …              | `Float64`           | flow of the terminal in each inflow tree              |
+    | `volume`                       | `Float64`           | terminal volume, `volume_geometry / n_terminals`      |
+
+    The index in `species_id_*`, `flow_id_*` and `flow_value_*` runs over inflow trees (after the
+    first column), in `coordinates_*` and `affiliation_*` over all trees, in the order of
+    `tree_info.vascular_trees`.
+
+    To get a block back in its `rows * n_terminals` form:
+    `permutedims(Matrix(df[:, r"^coordinates_"]))`.
     """
-    function assemble_tnodes_table(
-        species_ids, 
-        species_coordinates, 
-        species_affiliations, 
-        flow_ids, 
-        flow_values, 
-        n_terminals
-    )
-        # the volume of the liver cube is split equally between all terminals
-        volume_terminal = volume_geometry / n_terminals
-        volume_row = fill(volume_terminal, 1, n_terminals)
-        # stack the blocks in the order described in the docstring
-        return DataFrame(
-            vcat(
-                species_ids, 
-                species_coordinates, 
-                species_affiliations, 
-                flow_ids, 
-                flow_values, 
-                volume_row
-            ), 
-            :auto
+    function assemble_tnodes_table(species_ids, species_coordinates, species_affiliations,
+                                flow_ids, flow_values, n_terminals)
+        return hcat(
+            block_to_df(species_ids, "species_id"),          # species_id_1 = T_k, then inflow species
+            block_to_df(species_coordinates, "coordinates"), # one column per tree
+            block_to_df(species_affiliations, "affiliation"),
+            block_to_df(flow_ids, "flow_id"),                # flow_id_1 = "Outflow"
+            block_to_df(flow_values, "flow_value"),          # flow_value_1 = summed outflow
+            DataFrame(volume = fill(volume_geometry / n_terminals, n_terminals)),
         )
     end
+
 end
