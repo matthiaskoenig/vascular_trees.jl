@@ -42,12 +42,12 @@ module TableUtils
         return DataFrame(permutedims(block), ["$(prefix)_$k" for k in 1:size(block, 1)])
     end
 
-    function load_arrow(ARROW_PATH::String, col_selection::Vector{String})::DataFrame
+    function load_arrow(ARROW_PATH::String, col_selection::Vector{Symbol})::DataFrame
         # this is a duplicate of a function from get_ode_parameters.jl
         graph_df = DataFrame(Arrow.Table(ARROW_PATH))[
             :,
             col_selection,
         ]
-        return graph
+        return graph_df
     end
 end

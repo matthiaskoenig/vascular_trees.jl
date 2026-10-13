@@ -49,7 +49,7 @@ module Simulation_Runner
     # === Graph options ===
     # options for graph, i.e., number of nodes and type of tree
     t_options = tree_options(
-        n_nodes = [10],  #100, 1000, 10000, 100000, 100000
+        n_nodes = [500],  #10, 100, 1000, 10000, 100000, 100000
         tree_configurations = [
             "Rectangle_quad",
             #"Rectangle_trio",

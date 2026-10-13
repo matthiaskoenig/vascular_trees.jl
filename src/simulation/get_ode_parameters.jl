@@ -10,11 +10,14 @@ Output: u0 (vector of initial values) and
 module ODEparameters
 
     export get_ODE_parameters, 
-    get_initial_values
+        get_initial_values
 
     using DataFrames, Arrow
     # include("../utils.jl")
-    using ..Definitions: tree_definitions, terminal_parameters, vascular_tree_parameters
+    using ..Definitions: 
+        tree_definitions, 
+        terminal_parameters, 
+        vascular_tree_parameters
 
     trees = tree_definitions()
 

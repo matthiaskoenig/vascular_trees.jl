@@ -212,7 +212,6 @@ module ProcessTerminalNodes
             flow_values, 
             n_terminals
         )
-        print(tnodes_info_df)
         return tnodes_info_df
     end
 
@@ -245,7 +244,7 @@ module ProcessTerminalNodes
         preterminal_edges,
         leaf_node_index,
     )
-        leaf_coordinates::Matrix{NTuple{3,Float64}} = fill((0.0, 0.0, 0.0), length(preterminal_edges))
+        leaf_coordinates::Vector{NTuple{3,Float64}} = fill((0.0, 0.0, 0.0), length(preterminal_edges))
         found = falses(length(preterminal_edges))
         # Node id => (x, y, z). Built once per tree so that each edge finds its node
         # directly instead of searching all nodes. Node columns are padded with
