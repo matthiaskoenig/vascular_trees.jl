@@ -43,6 +43,8 @@ module ProcessTerminalNodes
         Arrow,
         ProgressMeter
 
+    using CSV
+
     const groups = ODE_groups()
     # Volume of the liver cube in which the tree was grown (0.1 cm sides): [cm^3] -> [L].
     # It is split equally between all terminal nodes.
@@ -69,6 +71,7 @@ module ProcessTerminalNodes
 
         tnodes_info_df = prepare_tnodes_info(graphs, tree_info)
         save_as_arrow(tnodes_info_df, joinpath(tree_info.GRAPH_DIR, "graphs/T.arrow"))
+        # CSV.write(joinpath(tree_info.GRAPH_DIR, "graphs/T.csv"),tnodes_info_df)
     end
 
     """

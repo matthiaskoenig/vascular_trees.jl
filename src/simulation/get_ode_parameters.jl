@@ -19,6 +19,9 @@ module ODEparameters
         terminal_parameters, 
         vascular_tree_parameters
 
+    using ..TableUtils:
+        load_arrow
+
     trees = tree_definitions()
 
     # using InteractiveUtils
@@ -42,7 +45,7 @@ module ODEparameters
     end
 
     function get_graph_parameters(GRAPH_PATH::String, flow_scaling_factor::AbstractFloat)
-        graph = DataFrame(Arrow.Table(GRAPH_PATH))
+        graph = load_arrow(GRAPH_PATH)
         p = vascular_tree_parameters(
             graph.vascular_tree_id[1],
             graph.is_inflow[1],
@@ -58,7 +61,7 @@ module ODEparameters
     end
 
     function get_tnodes_parameters(GRAPH_PATH::String, flow_scaling_factor::AbstractFloat)
-        graph = DataFrame(Arrow.Table(GRAPH_PATH))
+        graph = load_arrow(GRAPH_PATH)
         p = terminal_parameters(
             ; id = "T",
             # (n_inflow+1) × n_terminals, same shape as before

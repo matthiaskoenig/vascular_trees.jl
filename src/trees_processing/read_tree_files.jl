@@ -61,19 +61,18 @@ module ReadTreeFiles
     """
         read_graph_skeleton(GRAPH_PATH) -> DataFrame
 
-    Read edge connectivity from a two-column CSV file and return it as a `DataFrame`
+    Read edge connectivity from a Graphs.jl LGFormat file and return it as a `DataFrame`
     with columns `[:source_id, :target_id]`.
 
-    Any columns that contain only missing values are dropped before renaming, so the
-    function is robust to trailing empty columns written by some exporters.
+    The first line of an LGFormat file is a metadata header not column names, so it is skipped.
 
     # Arguments
-    - `GRAPH_PATH`: path to the CSV file with source and target node ids.
+    - `GRAPH_PATH`: path to the `.lg` file with source and target node ids.
     """
     function read_graph_skeleton(GRAPH_PATH::String)::DataFrame
-        graph_skeleton::DataFrame = CSV.read(GRAPH_PATH, DataFrame)
-        select!(graph_skeleton, Not(names(graph_skeleton, Missing)))
-        rename!(graph_skeleton, [:source_id, :target_id])
+        graph_skeleton::DataFrame = CSV.read(GRAPH_PATH, DataFrame;
+                                             header=[:source_id, :target_id], skipto=2, delim=',',
+                                             types=Dict(:source_id => Int, :target_id => Int))
 
         return graph_skeleton
     end
@@ -99,7 +98,19 @@ module ReadTreeFiles
     - `EDGES_PATH`: path to the CSV file with edge attributes.
     """
     function read_edge_attributes(EDGES_PATH::String)::DataFrame
-        edges_attrib_df::DataFrame = CSV.read(EDGES_PATH, DataFrame)
+        edges_attrib_df::DataFrame = CSV.read(
+            EDGES_PATH, 
+            DataFrame,
+            types=Dict(
+                :edge_idx => Int,
+                :leaf_count => Int,
+                :radius_in_mm => Float64,
+                :flow_in_mm3_per_s => Float64,
+                :length_in_mm => Float64,
+                :pressure_drop_in_kg_per_mm_s2 => Float64
+            ); 
+            delim=","
+        )
         @chain edges_attrib_df begin
             @rename! begin
                 :target_id = :edge_idx
