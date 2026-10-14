@@ -14,7 +14,6 @@ module Options
     using Parameters
     using Sundials
     using OrdinaryDiffEq
-    using SciMLBase: AbstractODEAlgorithm
 
     """
     TreeOptions(; n_nodes, tree_configurations)
