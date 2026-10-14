@@ -12,7 +12,7 @@ using Term
 
 include("../utils.jl")
 import .Utils: JULIA_RESULTS_DIR
-import .Utils.Definitions: tree_definitions
+import .Utils.Definitions: TreeDefinitions
 import .Utils.Benchmarking: save_times_as_csv
 import .Utils.Options: model_types
 
@@ -23,7 +23,7 @@ import .get_ode_parametershelpers: get_ODE_components
 
 # Already specified in utils.jl
 m_types::model_types = model_types()
-trees::tree_definitions = tree_definitions()
+trees::TreeDefinitions = TreeDefinitions()
 
 function ODE_solver(;
     ode_system,

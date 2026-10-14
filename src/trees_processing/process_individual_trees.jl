@@ -28,7 +28,7 @@ module ProcessIndividualTrees
     export process_julia_graph
 
     using ..Definitions: 
-        flow_directions, 
+        FlowDirections, 
         ODE_groups
 
     using ..ReadTreeFiles: 
@@ -37,7 +37,7 @@ module ProcessIndividualTrees
 
     using ..TableUtils: 
         get_extended_vector, 
-        create_tuples_from_dfrows, 
+        rows_to_tuples, 
         selection_from_df, 
         save_as_arrow
 
@@ -50,7 +50,7 @@ module ProcessIndividualTrees
 
     # ODE group codes and inflow/outflow tree names, defined in definitions.jl
     const groups::ODE_groups = ODE_groups()
-    const flow_direction = flow_directions()
+    const flow_direction = FlowDirections()
 
     """
         process_julia_graph(tree_info)
@@ -58,7 +58,7 @@ module ProcessIndividualTrees
     Process every vessel tree listed in `tree_info.vascular_trees` and save one `.arrow` file per tree.
 
     # Arguments
-    - `tree_info`: a `Tree_structure` (provides `vascular_trees` and `GRAPH_DIR`).
+    - `tree_info`: a `TreeStructure` (provides `vascular_trees` and `GRAPH_DIR`).
     """
     function process_julia_graph(tree_info)
         @info "Processing individual trees..."
@@ -269,7 +269,7 @@ module ProcessIndividualTrees
 
         # tuples are what is stored in the .arrow file
         all_edges, terminal_edges, start_edge, preterminal_edges, nodes_coordinates =
-            map(create_tuples_from_dfrows, (edges, terminals, start, preterminals, nodes_coord))
+            map(rows_to_tuples, (edges, terminals, start, preterminals, nodes_coord))
 
         pre_elements, post_elements = get_pre_postelements(all_edges)
 

@@ -6,7 +6,7 @@ Run: `julia --project src/build_arrow_graphs.jl` (processing starts as soon as t
 What must be specified below:
 1. t_options (tree configurations and numbers of nodes)
 
-Supported configurations: those in `tree_definitions` (src/common/definitions.jl),
+Supported configurations: those in `TreeDefinitions` (src/common/definitions.jl),
 currently "Rectangle_quad" and "Rectangle_trio".
 
 Inputs (per vascular tree, e.g. A, P, V, B), expected in
@@ -30,15 +30,15 @@ module ProcessSyntheticVascularTrees
     using VascularTrees.ProcessTerminalNodes: process_terminal_nodes
 
     # Definitions of the available tree configurations (inflow / outflow trees)
-    const trees::tree_definitions = tree_definitions()
+    const trees::TreeDefinitions = TreeDefinitions()
 
 
     # ============================ Options ============================
 
     # === Graph options ===
     # options for graph, i.e., number of nodes and type of tree
-    t_options = tree_options(
-        n_nodes = [10],  #10, 100, 1000, 10000, 100000
+    t_options = TreeOptions(
+        n_nodes = [10, 100, 1000, 10000, 100000],  #10, 100, 1000, 10000, 100000
         tree_configurations = [
             "Rectangle_quad",
         ],
@@ -52,14 +52,13 @@ module ProcessSyntheticVascularTrees
             for n_node ∈ t_options.n_nodes
                 # fill the tree structure with the info for this tree
                 tree_info =
-                    Tree_structure(; tree_configuration = tree_configuration, n_node = n_node, tree_components = trees.vascular_trees[tree_configuration])
+                    TreeStructure(; tree_configuration = tree_configuration, n_node = n_node, tree_components = trees.vascular_trees[tree_configuration])
                 @info "Working on $(tree_info.graph_id)"
                 # load (.lg and .csv), process and save (as .arrow) each graph (vascular tree)
                 process_julia_graph(tree_info)
                 # load (.arrow) every graph that this tree includes, collect info that we
                 # need for the correct ODEs for the terminal part that connects all the parts of this tree
                 # together and save it in one file (as .arrow)
-                process_terminal_nodes(tree_info)
                 process_terminal_nodes(tree_info)
             end
         end

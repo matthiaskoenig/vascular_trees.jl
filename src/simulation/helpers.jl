@@ -20,7 +20,7 @@ module SimulationHelpers
 
     using ..Paths: JULIA_RESULTS_DIR, MODEL_PATH
 
-    using ..Definitions: flow_directions, ODE_groups, vascular_tree_parameters
+    using ..Definitions: FlowDirections, ODE_groups, vascular_tree_parameters
     using ..Benchmarking: save_times_as_csv
     using ..TableUtils: save_as_arrow
 
@@ -28,7 +28,7 @@ module SimulationHelpers
 
     # Which trees are inflow / outflow, and the numbers marking the ODE groups of the species
     # (both defined in utils.jl)
-    const flow_direction = flow_directions()
+    const flow_direction = FlowDirections()
     const groups = ODE_groups()
 
     using ..Pharmacokinetic_models: jf_dxdt!
@@ -48,7 +48,7 @@ module SimulationHelpers
     Otherwise it is run once and, if `sim_options.save_simulations`, the solutions are saved to CSV.
 
     # Arguments
-    - `tree_info`: `Tree_structure` of the graph (ids of the trees, graph directory, ...).
+    - `tree_info`: `TreeStructure` of the graph (ids of the trees, graph directory, ...).
     - `sim_options`: simulation options (`tspan`, `steps`, `dt`, `save_simulations`, `benchmark`).
     - `sol_options`: ODE solver options (solver, tolerances).
     - `additional_sol_options`: additional integrator arguments (not mandatory), a `NamedTuple`.
@@ -67,7 +67,7 @@ module SimulationHelpers
         # TODO: mostly all of this can be preallocated
         # 1. parameters of trees and of the terminal part
         p = dictionary(
-        vascular_tree => get_ODE_parameters(tree_info, vascular_tree, flow_scaling_factor) for
+            vascular_tree => get_ODE_parameters(tree_info, vascular_tree, flow_scaling_factor) for
             vascular_tree in tree_info.vascular_trees
         )
         # terminal nodes are stored separately from trees, because they are stored differently

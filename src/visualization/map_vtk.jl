@@ -14,15 +14,15 @@ Note for understanding the workflow with T.arrow file (terminal part of the tree
 
 include("../utils.jl")
 import .Utils: JULIA_RESULTS_DIR
-import .Utils.Options: tree_options
-import .Utils.Definitions: tree_definitions
+import .Utils.Options: TreeOptions
+import .Utils.Definitions: TreeDefinitions
 
 using DataFrames, Arrow, CSV
 
-const trees::tree_definitions = tree_definitions()
+const trees::TreeDefinitions = TreeDefinitions()
 # === Graph options ===
 # options for graph, i.e., number of nodes and type of tree
-const t_options = tree_options(
+const t_options = TreeOptions(
     n_nodes = [10, 100, 1000],  #10
     tree_configurations = [
         "Rectangle_quad",
@@ -32,7 +32,7 @@ const t_options = tree_options(
 
 # Basic information about the tree that differs between its types (Rectangle_quad, trio, etc.)
 # and which is used repeatedly in its processing
-Base.@kwdef struct Tree_structure
+Base.@kwdef struct TreeStructure
     tree_configuration::String
     n_node::Int
     graph_id::String = "$(tree_configuration)_PVL_ligated_$(n_node)"
@@ -47,13 +47,13 @@ end
 function __init__()
     for tree_configuration ∈ t_options.tree_configurations
         for n_node in t_options.n_nodes
-            tree_info = Tree_structure(; tree_configuration = tree_configuration, n_node = n_node)
+            tree_info = TreeStructure(; tree_configuration = tree_configuration, n_node = n_node)
             map_vtk_with_jgraphs(tree_info)
         end
     end
 end    
 
-function map_vtk_with_jgraphs(tree_info::Tree_structure)
+function map_vtk_with_jgraphs(tree_info::TreeStructure)
     """
     Full workflow of mapping one full tree with its vtk files.
     """
@@ -74,7 +74,7 @@ function map_vtk_with_jgraphs(tree_info::Tree_structure)
     CSV.write(joinpath(tree_info.GRAPH_DIR, "graphs", "T_map_vtk.csv"), df_map_terminal_file)
 end
 
-function map_vtk_with_terminal_file(tree_info::Tree_structure)::NamedTuple
+function map_vtk_with_terminal_file(tree_info::TreeStructure)::NamedTuple
     """
     Function that loads T.arrow file, gets parameters that we need for mapping with vtk from this file,
         make first mapping:

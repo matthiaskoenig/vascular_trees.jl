@@ -5,7 +5,7 @@ module VascularTrees
     include("common/paths.jl");        @reexport using .Paths
     include("common/definitions.jl");  @reexport using .Definitions
     include("common/options.jl");      @reexport using .Options
-    include("common/table_utils.jl");   @reexport using .Options
+    include("common/table_utils.jl");   @reexport using .TableUtils
     
     # part that processes initial trees (.vtk files) and saves them in .arrow format
     include("trees_processing/read_tree_files.jl")

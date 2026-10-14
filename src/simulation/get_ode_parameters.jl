@@ -1,73 +1,105 @@
 """
-Module which contains functions to load .arrow files (contain information of julia graph needed for ODE model)
-    and to prepare vector of initial values and parameters for the ODE function.
+    ODEparameters
 
-Input: GRAPH_DIR (e to Rectangle_quad_10),
-       vascular_tree (ex. "A") - id of a single tree
-Output: u0 (vector of initial values) and 
-        p (tuple that contains parameters for the differential equations)
+Load the `.arrow` tables written by the trees processing and turn them into the parameters
+(`p`) and initial values (`u0`) of the ODE functions in pharmacokinetic_models.jl.
+
+# Input
+- `tree_info`: a `TreeStructure`; `tree_info.GRAPH_DIR` points to the graph folder
+  (e.g. `.../Rectangle_quad/Rectangle_quad_10`).
+- `graph_subsystem`: id of one part of the system, either a single tree (`"A"`, `"P"`, `"V"`, `"B"`)
+  or `"T"` for the terminal nodes. The table read is `<GRAPH_DIR>/graphs/<graph_subsystem>.arrow`.
+
+# Output
+- `p`: a `vascular_tree_parameters` (single tree) or a `terminal_parameters` (`"T"`),
+  see definitions.jl.
+- `u0`: zero initial values with the shape of the state of that subsystem.
 """
 module ODEparameters
 
-    export get_ODE_parameters, 
+    export get_ODE_parameters,
         get_initial_values
 
     using DataFrames, Arrow
-    # include("../utils.jl")
-    using ..Definitions: 
-        tree_definitions, 
-        terminal_parameters, 
+    using ..Definitions:
+        terminal_parameters,
         vascular_tree_parameters
 
     using ..TableUtils:
         load_arrow
 
-    trees = tree_definitions()
+    """
+        get_ODE_parameters(tree_info, graph_subsystem, flow_scaling_factor) -> p
 
-    # using InteractiveUtils
-
-    function get_ODE_parameters(tree_info, graph_subsystem::String, flow_scaling_factor::AbstractFloat)
+    Read `<tree_info.GRAPH_DIR>/graphs/<graph_subsystem>.arrow` and build the ODE parameters:
+    a `terminal_parameters` for `"T"`, a `vascular_tree_parameters` for every other id.
+    All flows are multiplied by `flow_scaling_factor` (1.0 = original flow).
+    """
+    function get_ODE_parameters(tree_info, graph_subsystem::String, flow_scaling_factor::Float64)
         # get path to the graph
-        GRAPH_PATH::String = normpath(joinpath(tree_info.GRAPH_DIR, "graphs/$(graph_subsystem).arrow"))
+        ARROW_PATH::String = normpath(joinpath(tree_info.GRAPH_DIR, "graphs/$(graph_subsystem).arrow"))
 
         if graph_subsystem != "T"
-            p = get_graph_parameters(GRAPH_PATH, flow_scaling_factor)
+            p = get_tree_parameters(ARROW_PATH, flow_scaling_factor)
         else
-            p = get_tnodes_parameters(GRAPH_PATH, flow_scaling_factor)
+            p = get_terminal_parameters(ARROW_PATH, flow_scaling_factor)
         end
 
         return p
     end
 
-    function get_initial_values(species::Array{T}) where {T<:Number}
-        u0 = zeros(size(species))
+    """
+        get_initial_values(state_template) -> Array{Float64}
+
+    Zero initial values with the same shape as `state_template`: one value per edge for a tree
+    (called with `p.ODE_groups`), an `(n_inflow+1) * n_terminals` matrix for the terminal nodes
+    (called with `p.flow_values`).
+    """
+    function get_initial_values(state_template::Array{T}) where {T<:Number}
+        u0 = zeros(size(state_template))
         return u0
     end
 
-    function get_graph_parameters(GRAPH_PATH::String, flow_scaling_factor::AbstractFloat)
-        graph = load_arrow(GRAPH_PATH)
+    """
+        get_tree_parameters(ARROW_PATH, flow_scaling_factor) -> vascular_tree_parameters
+
+    Parameters of one vessel tree, one entry per edge (row of the table written by
+    `build_arrow_df`). `id` and `is_inflow` are taken from the first row; the other columns are
+    copied into plain `Vector`s (Arrow columns are read-only views), flows are scaled by
+    `flow_scaling_factor`.
+    """
+    function get_tree_parameters(ARROW_PATH::String, flow_scaling_factor::Float64)
+        tree_df = load_arrow(ARROW_PATH)
         p = vascular_tree_parameters(
-            graph.vascular_tree_id[1],
-            graph.is_inflow[1],
-            Vector(graph.species_ids),
-            Vector(graph.flows) .* flow_scaling_factor,
-            Vector(graph.volumes),
-            Vector(graph.ODE_groups),
-            Vector(Vector.(graph.pre_elements)),
-            Vector(Vector.(graph.post_elements)),
+            tree_df.vascular_tree_id[1],
+            tree_df.is_inflow[1],
+            Vector(tree_df.species_ids),
+            Vector(tree_df.flows) .* flow_scaling_factor,
+            Vector(tree_df.volumes),
+            Vector(tree_df.ODE_groups),
+            Vector(Vector.(tree_df.pre_elements)),
+            Vector(Vector.(tree_df.post_elements)),
         )
 
         return p
     end
 
-    function get_tnodes_parameters(GRAPH_PATH::String, flow_scaling_factor::AbstractFloat)
-        graph = load_arrow(GRAPH_PATH)
+    """
+        get_terminal_parameters(ARROW_PATH, flow_scaling_factor) -> terminal_parameters
+
+    Parameters of the terminal nodes from `T.arrow` (one row per terminal, see
+    `assemble_tnodes_table`). The `species_id_*` and `flow_value_*` columns are put back into
+    `(n_inflow+1) * n_terminals` blocks: row 1 = terminal / summed outflow, then one row per inflow
+    tree. `volumes` is the volume of one terminal (the same for all terminals).
+    """
+    function get_terminal_parameters(ARROW_PATH::String, flow_scaling_factor::Float64)
+        tnodes_df = load_arrow(ARROW_PATH)
         p = terminal_parameters(
             ; id = "T",
-            # (n_inflow+1) × n_terminals, same shape as before
-            species_ids = permutedims(Matrix{String}(graph[:, r"^species_id_"])),
-            flow_values = permutedims(Matrix{Float64}(graph[:, r"^flow_value_"])) .* flow_scaling_factor,
-            volumes = graph.volume[1],
+            # columns species_id_1..k → rows of a (n_inflow+1) * n_terminals block
+            species_ids = permutedims(Matrix{String}(tnodes_df[:, r"^species_id_"])),
+            flow_values = permutedims(Matrix{Float64}(tnodes_df[:, r"^flow_value_"])) .* flow_scaling_factor,
+            volumes = tnodes_df.volume[1],
         )
 
         return p

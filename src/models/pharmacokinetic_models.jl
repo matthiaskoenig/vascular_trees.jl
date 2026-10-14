@@ -14,7 +14,7 @@ Also, variables (initial values and differentials) and parts of parameters struc
 include("interventions.jl")
 using .Interventions: f_intervention
 
-using ..Definitions: tree_definitions, terminal_parameters, vascular_tree_parameters
+using ..Definitions: TreeDefinitions, terminal_parameters, vascular_tree_parameters
 
 using InteractiveUtils
 

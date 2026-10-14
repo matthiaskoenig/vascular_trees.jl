@@ -34,7 +34,7 @@ using CSV,
 # using GraphPlot
 include("../utils.jl")
 import .Utils: JULIA_RESULTS_DIR
-import .Utils.Options: tree_options
+import .Utils.Options: TreeOptions
 # include("./Pharmacokinetic_models.jl")
 # import .Pharmacokinetic_models: f_dxdt!
 

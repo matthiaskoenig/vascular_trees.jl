@@ -41,14 +41,14 @@ module SimulationRunner
     using VascularTrees.SimulationHelpers: run_simulations
 
     # Definitions of the available tree configurations (inflow / outflow trees)
-    const trees::tree_definitions = tree_definitions()
+    const trees::TreeDefinitions = TreeDefinitions()
 
 
     # ============================ Options ============================
 
     # === Graph options ===
     # options for graph, i.e., number of nodes and type of tree
-    t_options = tree_options(
+    t_options = TreeOptions(
         n_nodes = [10],  #10, 100, 1000, 10000, 100000, 100000
         tree_configurations = [
             "Rectangle_quad",
@@ -60,7 +60,7 @@ module SimulationRunner
     flow_scaling_factors = [1.0] # 1.0/16, 1.0/8, 1.0/4, 1.0/2, 1.0, 1.0*2, 1.0*4, 1.0*8, 1.0*16
 
     # === Simulation options ===
-    sim_options = simulations_options(
+    sim_options = SimulationOptions(
         tspan = (0.0, 16.0),  # [min]
         steps = 800,          # number of time steps, dt = tspan[2] / steps
         save_simulations = true,
@@ -69,7 +69,7 @@ module SimulationRunner
 
     # === ODE Solver options ===
     # integrator, tolerances
-    sol_options = solver_options()
+    sol_options = SolverOptions()
     # additional integrator arguments
     # these arguments are not mandatory
     additional_sol_options::NamedTuple =
@@ -77,7 +77,7 @@ module SimulationRunner
 
     # === Benchmark options ===
     # do not write anything here in brackets if you are okay with default variant
-    bench_options = benchmark_options(save_running_times = true)
+    bench_options = BenchmarkOptions(save_running_times = true)
 
 
     # ============================== Run ==============================
@@ -97,7 +97,7 @@ module SimulationRunner
             t_options.tree_configurations,
         )
             tree_info =
-                Tree_structure(; tree_configuration = tree_configuration, n_node = n_node, tree_components = trees.vascular_trees[tree_configuration])
+                TreeStructure(; tree_configuration = tree_configuration, n_node = n_node, tree_components = trees.vascular_trees[tree_configuration])
             @info "Working on $(tree_info.graph_id)"
             run_simulations(
                 tree_info,
@@ -111,6 +111,6 @@ module SimulationRunner
     end
 
     simulate_all_trees() 
-    #Main.@profview_allocs simulate_all_trees() #  
+    Main.@profview_allocs simulate_all_trees() #  
 
 end

@@ -5,6 +5,7 @@ authors = ["Mariia Myshkina", "Matthias König"]
 
 [deps]
 Arrow = "69666777-d1a9-59fb-9406-91d4454c9d45"
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DataFramesMeta = "1313f7d8-7da2-5740-9ea0-a2ca25f37964"
@@ -24,6 +25,7 @@ TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 
 [compat]
 Arrow = "2.8.1"
+BenchmarkTools = "1.8.0"
 CSV = "1.1.0"
 DataFrames = "1.8.2"
 DataFramesMeta = "0.15.6"
