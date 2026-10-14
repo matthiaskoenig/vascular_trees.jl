@@ -11,7 +11,7 @@ Load the `.arrow` tables written by the trees processing and turn them into the 
   or `"T"` for the terminal nodes. The table read is `<GRAPH_DIR>/graphs/<graph_subsystem>.arrow`.
 
 # Output
-- `p`: a `vascular_tree_parameters` (single tree) or a `terminal_parameters` (`"T"`),
+- `p`: a `VascularTreeParameters` (single tree) or a `TerminalParameters` (`"T"`),
   see definitions.jl.
 - `u0`: zero initial values with the shape of the state of that subsystem.
 """
@@ -22,8 +22,8 @@ module ODEparameters
 
     using DataFrames, Arrow
     using ..Definitions:
-        terminal_parameters,
-        vascular_tree_parameters
+        TerminalParameters,
+        VascularTreeParameters
 
     using ..TableUtils:
         load_arrow
@@ -32,7 +32,7 @@ module ODEparameters
         get_ODE_parameters(tree_info, graph_subsystem, flow_scaling_factor) -> p
 
     Read `<tree_info.GRAPH_DIR>/graphs/<graph_subsystem>.arrow` and build the ODE parameters:
-    a `terminal_parameters` for `"T"`, a `vascular_tree_parameters` for every other id.
+    a `TerminalParameters` for `"T"`, a `VascularTreeParameters` for every other id.
     All flows are multiplied by `flow_scaling_factor` (1.0 = original flow).
     """
     function get_ODE_parameters(tree_info, graph_subsystem::String, flow_scaling_factor::Float64)
@@ -61,7 +61,7 @@ module ODEparameters
     end
 
     """
-        get_tree_parameters(ARROW_PATH, flow_scaling_factor) -> vascular_tree_parameters
+        get_tree_parameters(ARROW_PATH, flow_scaling_factor) -> VascularTreeParameters
 
     Parameters of one vessel tree, one entry per edge (row of the table written by
     `build_arrow_df`). `id` and `is_inflow` are taken from the first row; the other columns are
@@ -70,7 +70,7 @@ module ODEparameters
     """
     function get_tree_parameters(ARROW_PATH::String, flow_scaling_factor::Float64)
         tree_df = load_arrow(ARROW_PATH)
-        p = vascular_tree_parameters(
+        p = VascularTreeParameters(
             tree_df.vascular_tree_id[1],
             tree_df.is_inflow[1],
             Vector(tree_df.species_ids),
@@ -85,7 +85,7 @@ module ODEparameters
     end
 
     """
-        get_terminal_parameters(ARROW_PATH, flow_scaling_factor) -> terminal_parameters
+        get_terminal_parameters(ARROW_PATH, flow_scaling_factor) -> TerminalParameters
 
     Parameters of the terminal nodes from `T.arrow` (one row per terminal, see
     `assemble_tnodes_table`). The `species_id_*` and `flow_value_*` columns are put back into
@@ -94,7 +94,7 @@ module ODEparameters
     """
     function get_terminal_parameters(ARROW_PATH::String, flow_scaling_factor::Float64)
         tnodes_df = load_arrow(ARROW_PATH)
-        p = terminal_parameters(
+        p = TerminalParameters(
             ; id = "T",
             # columns species_id_1..k → rows of a (n_inflow+1) * n_terminals block
             species_ids = permutedims(Matrix{String}(tnodes_df[:, r"^species_id_"])),

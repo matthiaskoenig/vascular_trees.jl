@@ -20,7 +20,7 @@ module SimulationHelpers
 
     using ..Paths: JULIA_RESULTS_DIR, MODEL_PATH
 
-    using ..Definitions: FlowDirections, ODE_groups, vascular_tree_parameters
+    using ..Definitions: FlowDirections, ODE_groups, VascularTreeParameters
     using ..Benchmarking: save_times_as_csv
     using ..TableUtils: save_as_arrow
 

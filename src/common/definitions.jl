@@ -11,8 +11,8 @@ module Definitions
         FlowDirections, 
         TreeStructure,  
         ODE_groups, 
-        vascular_tree_parameters,
-        terminal_parameters
+        VascularTreeParameters,
+        TerminalParameters
 
     using Parameters
 
@@ -100,7 +100,7 @@ module Definitions
     end
 
     """
-    vascular_tree_parameters(id, is_inflow, species_ids, flow_values, volume_values,
+    VascularTreeParameters(id, is_inflow, species_ids, flow_values, volume_values,
                              ODE_groups, pre_elements, post_elements)
 
     Parameters of one vessel tree (`p` for `jf_inflow!` / `jf_outflow!`), built by
@@ -116,7 +116,7 @@ module Definitions
     - `ODE_groups`: group code of the edge, see [`ODE_groups`](@ref).
     - `pre_elements`, `post_elements`: indices of the predecessor / successor edges.
     """
-    struct vascular_tree_parameters{T<:AbstractFloat, I<:Int}
+    struct VascularTreeParameters{T<:AbstractFloat, I<:Int}
         id::String
         is_inflow::Bool
         species_ids::Vector{String}
@@ -128,7 +128,7 @@ module Definitions
     end
 
     """
-    terminal_parameters(; id, species_ids, flow_values, volumes)
+    TerminalParameters(; id, species_ids, flow_values, volumes)
 
     Parameters of the terminal nodes (`p` for `jf_terminal!`), built by `get_terminal_parameters`
     from `T.arrow`. Matrices have shape `(n_inflow+1) × n_terminals`: column k = terminal k,
@@ -147,7 +147,7 @@ module Definitions
     - `terminal_outflow`: `1 × n_terminals`, outflow flow × concentration.
     - `terminal_difference`: `1 × n_terminals`, inflow - outflow of every terminal.
     """
-    Base.@kwdef struct terminal_parameters{T<:AbstractFloat, I<:Int}
+    Base.@kwdef struct TerminalParameters{T<:AbstractFloat, I<:Int}
         id::String
         species_ids::Array{String, 2}
         flow_values::Array{T, 2}
