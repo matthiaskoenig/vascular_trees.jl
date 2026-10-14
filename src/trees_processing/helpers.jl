@@ -21,7 +21,6 @@ module TreesProcessingHelpers
         DataFramesMeta,
         InteractiveUtils,
         Parameters,
-        Revise,
         Arrow
 
     export label_special_edges!,
@@ -165,9 +164,12 @@ module TreesProcessingHelpers
     """
     function collect_terminal_edge_attributes(terminal_node_ids::SubArray)::DataFrame
         n_terminals = length(terminal_node_ids)
-        species_ids = ["T_$n_terminal" for n_terminal = 1:n_terminals]
-        flow_ids = ["QT_$n_terminal" for n_terminal = 1:n_terminals]
-        volume_ids = ["VT_$n_terminal" for n_terminal = 1:n_terminals]
+        tlist = ["$n" for n ∈ 1:n_terminals]
+
+        species_ids = ["T_" * tid for tid ∈ tlist]
+        flow_ids = ["QT_" * tid for tid ∈ tlist]
+        volume_ids = ["VT_" * tid for tid ∈ tlist]
+        
         volume_terminal = volume_geometry / n_terminals
         return DataFrame(
             :source_id => terminal_node_ids,

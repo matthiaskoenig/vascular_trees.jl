@@ -60,11 +60,12 @@ module ProcessSyntheticVascularTrees
                 # need for the correct ODEs for the terminal part that connects all the parts of this tree
                 # together and save it in one file (as .arrow)
                 process_terminal_nodes(tree_info)
+                process_terminal_nodes(tree_info)
             end
         end
     end
 
     process_all_trees()
-    Main.@profview_allocs process_all_trees()
+    # Main.@profview_allocs process_all_trees()
 
 end

@@ -28,21 +28,22 @@ module ReadTreeFiles
     export read_edges, 
         read_graph_skeleton, 
         read_edge_attributes, 
-        read_nodes_attributes
+        read_nodes
 
-    MM3_PER_L = 1e6
-    S_PER_MIN = 60
+    const MM3_PER_L = 1e6
+    const S_PER_MIN = 60
+
     """
         read_edges(GRAPH_PATH, EDGES_PATH) -> DataFrame
 
     Load a complete edge table by joining the graph skeleton (connectivity) with edge
     attributes (physical quantities).
 
-    The two CSVs are joined on `:target_id`. Missing values are not allowed in the
+    The two LG are joined on `:target_id`. Missing values are not allowed in the
     result and will raise an error if any join keys are unmatched.
 
     # Arguments
-    - `GRAPH_PATH`: path to the CSV containing edge connectivity (source/target node ids).
+    - `GRAPH_PATH`: path to the LG containing edge connectivity (source/target node ids).
     - `EDGES_PATH`: path to the CSV containing per-edge physical attributes.
 
     # Returns
@@ -111,20 +112,19 @@ module ReadTreeFiles
             ); 
             delim=","
         )
-        @chain edges_attrib_df begin
-            @rename! begin
-                :target_id = :edge_idx
-                :leaf = :leaf_count
-                :radius = :radius_in_mm
-                :flows = :flow_in_mm3_per_s
-                :length = :length_in_mm
-                :pressure_drop = :pressure_drop_in_kg_per_mm_s2
-            end
-            @transform! begin
-                :flows = (:flows ./ MM3_PER_L * S_PER_MIN)           # mm³/s → L/min
-                :volumes = π .* :radius .^ 2 .* :length ./ MM3_PER_L  # mm³ → L
-            end
-        end
+        rename!(
+            edges_attrib_df,
+            Dict(
+                :edge_idx => :target_id,
+                :leaf_count => :leaf,
+                :radius_in_mm => :radius,
+                :flow_in_mm3_per_s => :flows,
+                :length_in_mm => :length,
+                :pressure_drop_in_kg_per_mm_s2 => :pressure_drop
+            )
+        )
+        edges_attrib_df.flows  .= edges_attrib_df.flows .* (S_PER_MIN / MM3_PER_L) # mm³/s → L/min
+        edges_attrib_df.volumes .= π .* edges_attrib_df.radius .^ 2 .* edges_attrib_df.length ./ MM3_PER_L  # mm³ → L
 
         return edges_attrib_df
     end
@@ -139,15 +139,25 @@ module ReadTreeFiles
     - `NODES_PATH`: path to the CSV file with node coordinates.
     """
     function read_nodes(NODES_PATH::String)::DataFrame
-        nodes_df::DataFrame = CSV.read(NODES_PATH, DataFrame)
-        @chain nodes_df begin
-            @rename! begin
-                :ids = :node_idx
-                :x = :x_coord_in_mm
-                :y = :y_coord_in_mm
-                :z = :z_coord_in_mm
-            end
-        end
+        nodes_df::DataFrame = CSV.read(
+            NODES_PATH, DataFrame,
+            types=Dict(
+                :node_idx => Int,
+                :x_coord_in_mm => Float64,
+                :y_coord_in_mm => Float64,
+                :z_coord_in_mm => Float64,
+            ); 
+            delim=","
+        )
+        rename!(
+            nodes_df,
+            Dict(
+                :node_idx => :ids,
+                :x_coord_in_mm => :x,
+                :y_coord_in_mm => :y,
+                :z_coord_in_mm => :z,
+            )
+        )
 
         return nodes_df
     end

@@ -26,8 +26,10 @@ module TableUtils
         Arrow.write(PATH, df, ntasks=1)
     end
 
-    function get_extended_vector(vector_to_extend, to_which_length_extend::Int)
-        return [vector_to_extend; fill(missing, to_which_length_extend - length(vector_to_extend))]
+    function get_extended_vector(v::AbstractVector{T}, n::Int) where {T}
+        out = Vector{Union{Missing,T}}(missing, n)
+        copyto!(out, v)
+        return out
     end
 
     """
@@ -47,10 +49,9 @@ module TableUtils
     end
 
     function load_arrow(ARROW_PATH::String, col_selection::Vector{Symbol})::DataFrame
-        graph_df = DataFrame(Arrow.Table(ARROW_PATH))[
+        return DataFrame(Arrow.Table(ARROW_PATH))[
             :,
             col_selection,
         ]
-        return graph_df
     end
 end

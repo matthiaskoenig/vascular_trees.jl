@@ -30,9 +30,11 @@ module ProcessIndividualTrees
     using ..Definitions: 
         flow_directions, 
         ODE_groups
+
     using ..ReadTreeFiles: 
         read_edges, 
         read_nodes
+
     using ..TableUtils: 
         get_extended_vector, 
         create_tuples_from_dfrows, 
@@ -135,17 +137,11 @@ module ProcessIndividualTrees
     and ODE groups / indices must be assigned after all rows exist.
     """
     function add_graph_characteristics!(edges_df::DataFrame, vascular_tree::String)
-        transform!(
-            edges_df,
-            [:source_id, :target_id] =>
-                ByRow(
-                    (source_id, target_id) -> (
-                        "$(vascular_tree)_$(source_id)_$(target_id)",
-                        "Q_$(source_id)_$(target_id)",
-                        "V_$(source_id)_$(target_id)",
-                    ),
-                ) => [:species_ids, :flow_ids, :volume_ids],
-        )
+        ids = string.(edges_df.source_id, "_", edges_df.target_id)
+        edges_df.species_ids = string.(vascular_tree, "_", ids)
+        edges_df.flow_ids    = string.("Q_", ids)
+        edges_df.volume_ids  = string.("V_", ids)
+
         # terminal edges don't exist yet, so `terminal` is false for every edge here
         label_special_edges!(edges_df)
         # one self-edge per terminal node + the marginal edge, where the dose is applied
@@ -185,8 +181,9 @@ module ProcessIndividualTrees
         df_length = length(graph_info.all_edges)
 
         return DataFrame(
-            vascular_tree_id = get_extended_vector(vascular_tree, df_length),
-            is_inflow = get_extended_vector(graph_info.is_inflow, df_length),
+            ;
+            vascular_tree_id = get_extended_vector([vascular_tree], df_length),
+            is_inflow = get_extended_vector([graph_info.is_inflow], df_length),
             nodes_ids = get_extended_vector(nodes_df.ids, df_length),
             nodes_coordinates = get_extended_vector(graph_info.nodes_coordinates, df_length),
             all_edges = graph_info.all_edges,
@@ -201,6 +198,7 @@ module ProcessIndividualTrees
             ODE_groups = graph_info.ODE_groups,
             pre_elements = graph_info.pre_elements,
             post_elements = graph_info.post_elements,
+            copycols = false
         )
     end
 
@@ -266,7 +264,7 @@ module ProcessIndividualTrees
             edges_df,
             (edges_df.preterminal .== true, [:source_id, :target_id]),
         )
-        ODE_groups = selection_from_df(edges_df, (:, :ODE_group))
+        ODE_groups = edges_df[!, :ODE_group]
         nodes_coord = selection_from_df(nodes_df, (:, [:x, :y, :z]))
 
         # tuples are what is stored in the .arrow file
@@ -300,15 +298,18 @@ module ProcessIndividualTrees
     where it sends its outflow.
     """
     function get_pre_postelements(edges::Vector{Tuple{Int,Int}})
+        # preallocations
+        no_edges = Int[]
         incoming = Dict{Int,Vector{Int}}()   # node id => indices of edges ending at it
         outgoing = Dict{Int,Vector{Int}}()   # node id => indices of edges starting at it
+        
         for (i, (s, t)) in enumerate(edges)
             push!(get!(outgoing, s, Int[]), i)
             push!(get!(incoming, t, Int[]), i)
         end
         # filter(!=(i)) excludes the edge itself (terminal edges have source == target)
-        pre  = [filter(!=(i), get(incoming, s, Int[])) for (i, (s, _)) in enumerate(edges)]
-        post = [filter(!=(i), get(outgoing, t, Int[])) for (i, (_, t)) in enumerate(edges)]
+        pre  = [filter(!=(i), get(incoming, s, no_edges)) for (i, (s, _)) in enumerate(edges)]
+        post = [filter(!=(i), get(outgoing, t, no_edges)) for (i, (_, t)) in enumerate(edges)]
         return pre, post
     end
 
