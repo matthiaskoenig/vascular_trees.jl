@@ -1,12 +1,12 @@
 include("../utils.jl")
 import .Utils: JULIA_RESULTS_DIR
-import .Utils.Options: tree_options, simulations_options
+import .Utils.Options: TreeOptions, SimulationOptions
 
-include("simulation_helpers.jl")
-import .Simulation_helpers: ODE_solver
+include("helpers.jl")
+import .helpers: ODE_solver
 
 # ============ Specify options
-t_options::tree_options = tree_options(
+t_options::TreeOptions = TreeOptions(
     n_nodes = [10],
     tree_ids = [
         #"Rectangle_quad",
@@ -16,7 +16,7 @@ t_options::tree_options = tree_options(
 )
 
 tspan = (0.0, 10.0 / 60)
-sim_options::simulations_options = simulations_options(
+sim_options::SimulationOptions = SimulationOptions(
     tspan = tspan,
     tpoints = range(tspan[1], stop = tspan[2], length = 1001),
     save_simulations = false,

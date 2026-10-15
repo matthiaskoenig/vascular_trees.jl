@@ -11,10 +11,11 @@ Also, variables (initial values and differentials) and parts of parameters struc
     (arrays).
 """
 
-include("../interventions.jl")
+include("interventions.jl")
 using .Interventions: f_intervention
 
-using ...Utils.Definitions: tree_definitions, terminal_parameters, vascular_tree_parameters
+using ..Definitions: TreeDefinitions, TerminalParameters, VascularTreeParameters
+
 using InteractiveUtils
 
 # vectors preallocation
@@ -31,7 +32,7 @@ const terminal_in = zeros(2)
 
 export jf_dxdt!
 
-function jf_dxdt!(du::Vector, u::Vector, p::vascular_tree_parameters, t::Float64)
+function jf_dxdt!(du::Vector, u::Vector, p::VascularTreeParameters, t::Float64)
     if p.is_inflow
         jf_inflow!(du, u, p, t)
     else
@@ -39,7 +40,7 @@ function jf_dxdt!(du::Vector, u::Vector, p::vascular_tree_parameters, t::Float64
     end
 end
 
-function jf_inflow!(du::Vector, u::Vector, p::vascular_tree_parameters, t::Float64)
+function jf_inflow!(du::Vector, u::Vector, p::VascularTreeParameters, t::Float64)
     """
     Function with pharmacokinetic ODE based model for the drug(s) transport along
         liver's vascular inflow (ex. arterial or portal).
@@ -98,7 +99,7 @@ function jf_inflow!(du::Vector, u::Vector, p::vascular_tree_parameters, t::Float
     du .= du ./ volumes
 end
 
-function jf_outflow!(du::Vector, u::Vector, p::vascular_tree_parameters, t::Float64)
+function jf_outflow!(du::Vector, u::Vector, p::VascularTreeParameters, t::Float64)
     """
     Function with pharmacokinetic ODE based model for the drug(s) transport along
         liver's vascular outflow tree (ex. venous or biliary).
@@ -156,11 +157,11 @@ function jf_outflow!(du::Vector, u::Vector, p::vascular_tree_parameters, t::Floa
     du .= du ./ volumes
 end
 
-function jf_dxdt!(du::Array, u::Array, p::terminal_parameters, t::Float64)
+function jf_dxdt!(du::Array, u::Array, p::TerminalParameters, t::Float64)
     jf_terminal!(du, u, p, t)
 end
 
-function jf_terminal!(du::Array, u::Array, p::terminal_parameters, t::Float64)
+function jf_terminal!(du::Array, u::Array, p::TerminalParameters, t::Float64)
     """
     Function with pharmacokinetic ODE based model for the drug(s) transport to 
         sinusoid from liver's inflows and from sinusoid.
@@ -203,8 +204,9 @@ function jf_terminal!(du::Array, u::Array, p::terminal_parameters, t::Float64)
     # output
     p.terminal_outflow .= view(p.flow_values, 1:1, :) .* view(u, 1:1, :)
     # full equation
-    p.terminal_difference .= sum(p.terminal_inflow, dims=1) .- p.terminal_outflow
+    sum!(p.terminal_difference, p.terminal_inflow)
+    p.terminal_difference .-= p.terminal_outflow
     
-    du[1, :] = p.terminal_difference ./ p.volumes
+    du[1, :] .= view(p.terminal_difference, 1, :) ./ p.volumes
 end
 end

@@ -5,3 +5,4 @@ SyntheticVascularTrees.jl
 results
 Manifest.toml
 *.svg
+.claude/CLAUDE.md

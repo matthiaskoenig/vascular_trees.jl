@@ -14,15 +14,15 @@ Note for understanding the workflow with T.arrow file (terminal part of the tree
 
 include("../utils.jl")
 import .Utils: JULIA_RESULTS_DIR
-import .Utils.Options: tree_options
-import .Utils.Definitions: tree_definitions
+import .Utils.Options: TreeOptions
+import .Utils.Definitions: TreeDefinitions
 
 using DataFrames, Arrow, CSV
 
-const trees::tree_definitions = tree_definitions()
+const trees::TreeDefinitions = TreeDefinitions()
 # === Graph options ===
 # options for graph, i.e., number of nodes and type of tree
-const t_options = tree_options(
+const t_options = TreeOptions(
     n_nodes = [10, 100, 1000],  #10
     tree_configurations = [
         "Rectangle_quad",
@@ -32,14 +32,14 @@ const t_options = tree_options(
 
 # Basic information about the tree that differs between its types (Rectangle_quad, trio, etc.)
 # and which is used repeatedly in its processing
-Base.@kwdef struct Tree_structure
+Base.@kwdef struct TreeStructure
     tree_configuration::String
-    n_node::Integer
+    n_node::Int
     graph_id::String = "$(tree_configuration)_PVL_ligated_$(n_node)"
     tree_components::Dict{Symbol,Vector{String}} = trees.vascular_trees[tree_configuration]
     vascular_trees::Vector{String} = reduce(vcat, values(tree_components))
     GRAPH_DIR::String = normpath(
-        joinpath(@__FILE__, "../../..", JULIA_RESULTS_DIR, tree_configuration, graph_id),
+        joinpath(@__FILE__, "../..", JULIA_RESULTS_DIR, tree_configuration, graph_id),
     )
 end
 
@@ -47,13 +47,13 @@ end
 function __init__()
     for tree_configuration ∈ t_options.tree_configurations
         for n_node in t_options.n_nodes
-            tree_info = Tree_structure(; tree_configuration = tree_configuration, n_node = n_node)
+            tree_info = TreeStructure(; tree_configuration = tree_configuration, n_node = n_node)
             map_vtk_with_jgraphs(tree_info)
         end
     end
 end    
 
-function map_vtk_with_jgraphs(tree_info::Tree_structure)
+function map_vtk_with_jgraphs(tree_info::TreeStructure)
     """
     Full workflow of mapping one full tree with its vtk files.
     """
@@ -74,7 +74,7 @@ function map_vtk_with_jgraphs(tree_info::Tree_structure)
     CSV.write(joinpath(tree_info.GRAPH_DIR, "graphs", "T_map_vtk.csv"), df_map_terminal_file)
 end
 
-function map_vtk_with_terminal_file(tree_info::Tree_structure)::NamedTuple
+function map_vtk_with_terminal_file(tree_info::TreeStructure)::NamedTuple
     """
     Function that loads T.arrow file, gets parameters that we need for mapping with vtk from this file,
         make first mapping:
@@ -89,8 +89,8 @@ function map_vtk_with_terminal_file(tree_info::Tree_structure)::NamedTuple
 
     # get number of inflows and number of tree components (number of vascular systems)
     # they are needed to separate T.arrow file on its components correctly
-    n_inflows::Integer = length(tree_info.tree_components[:inflow_trees])
-    n_tree_components::Integer = length(tree_info.tree_components[:inflow_trees]) + length(tree_info.tree_components[:outflow_trees])
+    n_inflows::Int = length(tree_info.tree_components[:inflow_trees])
+    n_tree_components::Int = length(tree_info.tree_components[:inflow_trees]) + length(tree_info.tree_components[:outflow_trees])
 
     # get info needed for mapping
     terminal_info = get_graph_parameters(TERMINAL_NODES_PATH, n_inflows, n_tree_components)
@@ -110,7 +110,7 @@ function map_vtk_with_terminal_file(tree_info::Tree_structure)::NamedTuple
     # allocate vectors needed below
     species_ids = Vector{String}(undef, n_terminals * (n_tree_components + n_inflows))
     file_names = Vector{String}(undef, n_terminals * (n_tree_components + n_inflows))
-    node_line = Vector{Integer}(undef, n_terminals * (n_tree_components + n_inflows))
+    node_line = Vector{Int}(undef, n_terminals * (n_tree_components + n_inflows))
     nodes_coordinates = []
 
     # terminal node's index, we start from the first one
@@ -171,7 +171,7 @@ function map_vtk_with_individual_jgraphs!(terminal_nodes_mapping, tree_info, vas
     # we MUST be sure that components of these vectors with the same ids BELONG TO THE SAME NODE
     species_to_nodes_ids = Vector{String}(undef, count(!ismissing, nodes_coordinates))
     flows_to_node_ids = Vector{AbstractFloat}(undef, count(!ismissing, nodes_coordinates))
-    nodes_lines = Vector{Integer}(undef, count(!ismissing, nodes_coordinates))
+    nodes_lines = Vector{Int}(undef, count(!ismissing, nodes_coordinates))
     
     # species ids in the model belong to edges, for the visualization we need to map species 
     # to nodes from vtk file 
@@ -301,7 +301,7 @@ function paths_initialization(GRAPH_DIR::String, vascular_tree::String)::Tuple{S
 end
 
 
-#duplicate function from julia_from_jgraph.jl
+#duplicate function from get_ode_parametershelpers.jl
 function get_graph_parameters(GRAPH_PATH::String)
     graph = DataFrame(Arrow.Table(GRAPH_PATH))
     p = (
@@ -317,8 +317,8 @@ function get_graph_parameters(GRAPH_PATH::String)
 end
 
 
-#duplicate function from julia_from_jgraph.jl
-function get_graph_parameters(GRAPH_PATH::String, n_inflow::Integer, n_tree_components::Integer)
+#duplicate function from get_ode_parametershelpers.jl
+function get_graph_parameters(GRAPH_PATH::String, n_inflow::Int, n_tree_components::Int)
     """"
     Note for understanding (Duplicate): each tree component has terminal nodes. So, when we have terminal node 1 (T_1),
         this means that we have for it instance (affiliation) from arterial tree, venous tree, etc.
