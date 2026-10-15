@@ -61,9 +61,9 @@ module Benchmarking
         )
 
         if isfile(BENCHMARKING_RESULTS_PATH)
-            kwargs = (writeheader = false, append = true, sep = ',')
+            kwargs = (writeheader = false, append = true, delim = ',')
         else
-            kwargs = (writeheader = true, sep = ',')
+            kwargs = (writeheader = true, delim = ',')
         end
         CSV.write(BENCHMARKING_RESULTS_PATH, table; kwargs...)
     end

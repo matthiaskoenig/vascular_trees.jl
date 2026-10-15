@@ -27,7 +27,7 @@ Showed in the terminal:
 2. benchmark results if sim_options.benchmark=true
 
 Outputs:
-1. `<subsystem>_simulations_<dt>_dt.csv` in the `simulations` folder of the graph directory,
+1. `<subsystem>_simulations_<dt>_dt.arrow` in the `simulations` folder of the graph directory,
    one file per vascular tree and one for the terminal part - if you do not do benchmarking
    and sim_options.save_simulations = true
 2. jrunning_times.csv - if sim_options.benchmark and bench_options.save_running_times = true

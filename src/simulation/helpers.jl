@@ -122,7 +122,7 @@ module SimulationHelpers
 
             show(to, sortby = :firstexec)
             if bench_options.save_running_times
-                @info "Pay attention to the number of species, they can be calculated wrong"
+                @info "Pay attention to the number of species, they could be calculated in a wrong way"
                 n_terminal::Int = size(u0_terminal)[1]
                 save_times_as_csv(
                     to,
@@ -229,7 +229,6 @@ module SimulationHelpers
 
         progress = Progress(
             Int(sim_options.steps);
-            dt = dt,
             barglyphs = BarGlyphs('|', '█', ['▁', '▂', '▃', '▄', '▅', '▆', '▇'], ' ', '|'),
             color = :magenta,
         )
@@ -239,6 +238,11 @@ module SimulationHelpers
 
     function integrate!(solutions, integrators, integrator_terminal, inflow_rows, synch_idxs,
                         tmin, tmax, dt, progress)
+        # TODO: `t` accumulates float error (t += dt), so `t <= tmax` can fail one step early
+        #       (e.g. tspan=(0,16), steps=1000 -> 1000 instead of 1001 rows, last row stays zeros).
+        #       Loop over an integer index instead: `for kl in 1:n_rows; t = tmin + (kl-1)*dt`.
+        # TODO: the last iteration stores tmax and then still integrates to tmax + dt (result unused).
+        #       Break after storing the last row; then tspan margin (+2dt) in solve_tree! can be reduced.
         kl = 1
         t = tmin
         while t <= tmax
@@ -349,8 +353,6 @@ module SimulationHelpers
     function save_solutions(solutions, species_ids, tree_info, dt, flow_scaling_factor)
         @info "Saving results"
         for (graph_subsystem, solution) in pairs(solutions)
-            # skip time points that were not filled
-            filter!(!isempty, solution)
             table = DataFrame(solution, species_ids[graph_subsystem], copycols = false)
             save_as_arrow(
                 table,
