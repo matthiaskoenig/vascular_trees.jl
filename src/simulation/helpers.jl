@@ -87,7 +87,7 @@ module SimulationHelpers
 
         # 3. preallocated solutions
         # solutions[graph_subsystem][j][k] - value of the j-th column (t, then species) at the k-th time point
-        n_rows = sim_options.steps + 1
+        n_rows::Int = sim_options.steps + 1
         solutions = dictionary(
             tree => [zeros(n_rows) for _ = 1:length(u0[tree])+1] for tree in tree_info.vascular_trees
         )

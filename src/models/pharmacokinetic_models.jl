@@ -56,16 +56,18 @@ function jf_inflow!(du::Vector, u::Vector, p::VascularTreeParameters, t::Float64
     flows = p.flow_values
     volumes = p.volume_values
     ODE_groups = p.ODE_groups
-    pre_elements = p.pre_elements
-    post_elements = p.post_elements
+
+    pre_idx, pre_off = p.predecessors_idx, p.predecessors_offset
+    post_idx, post_off = p.successors_idx, p.successors_offset
+
     u[end] = f_intervention(t)
     # if p.id == "A"
     #     u[end] = f_intervention(t)
     # end
     @inbounds for (ke, group) in enumerate(ODE_groups)
         # retrieve information for element
-        pre_element = pre_elements[ke]
-        post_element = post_elements[ke]
+        pre_element = view(pre_idx, pre_off[ke]:pre_off[ke+1]-1)
+        post_element = view(post_idx, post_off[ke]:post_off[ke+1]-1)
         # in -> inflow & inflow element not connected to terminal
         if group == 1 #(!is_preterminal .&& !is_terminal .&& source_id != 0) 
             # dA/dt = QA * A_pre / VA - Q_post * A / VA;
@@ -118,12 +120,14 @@ function jf_outflow!(du::Vector, u::Vector, p::VascularTreeParameters, t::Float6
     flows = p.flow_values
     volumes = p.volume_values
     ODE_groups = p.ODE_groups
-    pre_elements = p.pre_elements
-    post_elements = p.post_elements
+
+    pre_idx, pre_off = p.predecessors_idx, p.predecessors_offset
+    post_idx, post_off = p.successors_idx, p.successors_offset
+
     @inbounds for (ke, group) in enumerate(ODE_groups)
         # retrieve information for element
-        pre_element = pre_elements[ke]
-        post_element = post_elements[ke]
+        pre_element = view(pre_idx, pre_off[ke]:pre_off[ke+1]-1)
+        post_element = view(post_idx, post_off[ke]:post_off[ke+1]-1)
         # write equations
         # marginal (outflow) element
         if group == 0 #target_id == 0

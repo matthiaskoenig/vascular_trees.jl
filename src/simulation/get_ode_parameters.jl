@@ -26,7 +26,8 @@ module ODEparameters
         VascularTreeParameters
 
     using ..TableUtils:
-        load_arrow
+        load_arrow,
+        decompose_lists
 
     """
         get_ODE_parameters(tree_info, graph_subsystem, flow_scaling_factor) -> p
@@ -70,15 +71,20 @@ module ODEparameters
     """
     function get_tree_parameters(ARROW_PATH::String, flow_scaling_factor::Float64)
         tree_df = load_arrow(ARROW_PATH)
+        # list columns → (flat indices, offsets), read directly from the Arrow columns
+        predecessors_idx, predecessors_offset = decompose_lists(tree_df.predecessors)
+        successors_idx, successors_offset = decompose_lists(tree_df.successors)
         p = VascularTreeParameters(
             tree_df.vascular_tree_id[1],
             tree_df.is_inflow[1],
             Vector(tree_df.species_ids),
-            Vector(tree_df.flows) .* flow_scaling_factor,
+            tree_df.flows .* flow_scaling_factor,
             Vector(tree_df.volumes),
             Vector(tree_df.ODE_groups),
-            Vector(Vector.(tree_df.pre_elements)),
-            Vector(Vector.(tree_df.post_elements)),
+            predecessors_idx,
+            predecessors_offset,
+            successors_idx,
+            successors_offset,
         )
 
         return p

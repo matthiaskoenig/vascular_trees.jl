@@ -163,7 +163,7 @@ module ProcessIndividualTrees
     - `flows`, `volumes`: flow [L/min] and volume [L] of the edge.
     - `species_ids`, `flow_ids`, `volume_ids`: names of the edge's variables.
     - `ODE_groups`: see `ODE_groups` in definitions.jl.
-    - `pre_elements`, `post_elements`: row indices of predecessor / successor edges.
+    - `predecessors`, `susuccessors`: row indices of predecessor / successor edges.
 
     # Columns - padded with `missing`
     - `vascular_tree_id`, `is_inflow`: one value (first row).
@@ -196,8 +196,8 @@ module ProcessIndividualTrees
             flow_ids = edges_df.flow_ids,
             volume_ids = edges_df.volume_ids,
             ODE_groups = graph_info.ODE_groups,
-            pre_elements = graph_info.pre_elements,
-            post_elements = graph_info.post_elements,
+            predecessors = graph_info.predecessors,
+            successors = graph_info.successors,
             copycols = false
         )
     end
@@ -238,7 +238,7 @@ module ProcessIndividualTrees
 
     # Returns
     NamedTuple with `is_inflow`, `nodes_coordinates`, `all_edges`, `terminal_edges`, `start_edge`,
-    `preterminal_edges`, `ODE_groups`, `pre_elements`, `post_elements`.
+    `preterminal_edges`, `ODE_groups`, `predecessors`, `successors`.
     Edges and coordinates are tuples: `(source_id, target_id)` / `(x, y, z)`.
     """
     function prepare_graph_info(
@@ -271,7 +271,7 @@ module ProcessIndividualTrees
         all_edges, terminal_edges, start_edge, preterminal_edges, nodes_coordinates =
             map(rows_to_tuples, (edges, terminals, start, preterminals, nodes_coord))
 
-        pre_elements, post_elements = get_pre_postelements(all_edges)
+        predecessors, successors = get_pre_postelements(all_edges)
 
         return (
             is_inflow = is_inflow,
@@ -281,13 +281,13 @@ module ProcessIndividualTrees
             start_edge = start_edge,
             preterminal_edges = preterminal_edges,
             ODE_groups = ODE_groups,
-            pre_elements = pre_elements,
-            post_elements = post_elements,
+            predecessors = predecessors,
+            successors = successors,
         )
     end
 
     """
-        get_pre_postelements(edges) -> (pre_elements, post_elements)
+        get_pre_postelements(edges) -> (predecessors, successors)
 
     For every edge `(s, t)` find:
     - predecessors: edges that end in `s`;
