@@ -79,7 +79,7 @@ module Options
     """
     # https://docs.sciml.ai/DiffEqDocs/stable/solvers/split_ode_solve/
     @with_kw struct SolverOptions{A<:SciMLBase.AbstractODEAlgorithm}
-        solver::A = Tsit5() # "Tsit5", "CVODE_BDF", …
+        solver::A = CVODE_BDF() # "Tsit5", "CVODE_BDF", …
         absolute_tolerance::Float64 = 1e-8
         relative_tolerance::Float64 = 1e-8
         solver_name::String = string(nameof(typeof(solver)))   

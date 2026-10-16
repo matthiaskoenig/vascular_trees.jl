@@ -180,37 +180,29 @@ function jf_terminal!(du::Array, u::Array, p::TerminalParameters, t::Float64)
         preterminal inflow elements from u array. So, their rate of change must be a 
         constant.
     """
-    n_ODE_elements = size(u)[1]
-    du .= 0
-    # # terminal_difference = p.terminal_difference
-    # flow_values = p.flow_values
-    # sign = 1
-    # ke = 1
-    # kt = 1
-    # @inbounds for flow_value in flow_values
-    #     if ke == 1
-    #         sign = -1
-    #     else
-    #         sign = 1
-    #     end
-    #     du[1, kt] = du[1, kt] + sign * flow_value * u[ke, kt]
-    #     ke += 1
-    #     if ke == 4
-    #         ke = 1
-    #         kt += 1
-    #     end
-    # end
-    # du[1, :] ./= p.volumes
-
-    # dT/dt = Q_inflow * Inflow / VT - Q_outflow * T / VT
-    # species before
-    p.terminal_inflow .= view(p.flow_values, 2:n_ODE_elements, :) .* view(u, 2:n_ODE_elements, :)
-    # output
-    p.terminal_outflow .= view(p.flow_values, 1:1, :) .* view(u, 1:1, :)
-    # full equation
-    sum!(p.terminal_difference, p.terminal_inflow)
-    p.terminal_difference .-= p.terminal_outflow
+    # n_ODE_elements = size(u)[1]
+    # du .= 0
+    flows = p.flow_values
+    volume = p.volumes
+    n_rows, n_terminals = size(u)    
+    @inbounds for kt in 1:n_terminals
+        inflow = 0.0
+        for ke in 2:n_rows
+            inflow += flows[ke, kt] * u[ke, kt]
+            du[ke, kt] = 0.0                     # inflow species are set by synchronization
+        end
+        # dT/dt = Q_inflow * Inflow / VT - Q_outflow * T / VT
+        du[1, kt] = (inflow - flows[1, kt] * u[1, kt]) / volume
+    end    
+    # # dT/dt = Q_inflow * Inflow / VT - Q_outflow * T / VT
+    # # species before
+    # p.terminal_inflow .= view(p.flow_values, 2:n_ODE_elements, :) .* view(u, 2:n_ODE_elements, :)
+    # # output
+    # p.terminal_outflow .= view(p.flow_values, 1:1, :) .* view(u, 1:1, :)
+    # # full equation
+    # sum!(p.terminal_difference, p.terminal_inflow)
+    # p.terminal_difference .-= p.terminal_outflow
     
-    du[1, :] .= view(p.terminal_difference, 1, :) ./ p.volumes
+    # du[1, :] .= view(p.terminal_difference, 1, :) ./ p.volumes
 end
 end

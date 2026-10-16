@@ -49,7 +49,7 @@ module SimulationRunner
     # === Graph options ===
     # options for graph, i.e., number of nodes and type of tree
     t_options = TreeOptions(
-        n_nodes = [10, 100, 1000, 10000, 100000],  #10, 100, 1000, 10000, 100000, 100000
+        n_nodes = [100],  #10, 100, 1000, 10000, 100000, 100000
         tree_configurations = [
             "Rectangle_quad",
             #"Rectangle_trio",
@@ -64,7 +64,7 @@ module SimulationRunner
         tspan = (0.0, 16.0),  # [min]
         steps = 800,          # number of time steps, dt = tspan[2] / steps
         save_simulations = true,
-        benchmark = true,
+        benchmark = false,
     )
 
     # === ODE Solver options ===
@@ -111,6 +111,5 @@ module SimulationRunner
     end
 
     simulate_all_trees() 
-    Main.@profview_allocs simulate_all_trees() #  
 
 end
