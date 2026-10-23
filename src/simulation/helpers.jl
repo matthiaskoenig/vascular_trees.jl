@@ -42,7 +42,7 @@ module SimulationHelpers
     const flow_direction = FlowDirections()
     const groups = ODE_groups()
 
-    using ..Pharmacokinetic_models: jf_dxdt!, jac!
+    using ..PharmacokineticModels: jf_dxdt!, jac!
 
 
     """
