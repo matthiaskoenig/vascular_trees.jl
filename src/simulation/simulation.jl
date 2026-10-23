@@ -29,8 +29,6 @@ module Simulation
         Profile,
         PProf
 
-    using ..Paths: JULIA_RESULTS_DIR
-
     using ..Definitions: FlowDirections, ODE_groups, VascularTreeParameters
     using ..Benchmarking: save_times_as_csv
     using ..TableUtils: save_as_arrow
@@ -42,9 +40,10 @@ module Simulation
     const flow_direction = FlowDirections()
     const groups = ODE_groups()
 
-    include("output.jl")
-    include("coupling.jl")
-    include("integration.jl")
-    include("run.jl")
+   include("results/output.jl")
+   include("setup/problems.jl")
+   include("solver/coupling.jl")
+   include("solver/time_loop.jl")
+   include("run.jl")
 
 end

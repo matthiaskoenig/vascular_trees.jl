@@ -2,7 +2,7 @@
 Load graph files in arrow format and run the coupled-tree simulations.
 
 The simulations start as soon as this file is included
-(e.g. `julia --project src/simulation_runner.jl`), using the options
+(e.g. `julia --project src/run_simulations.jl`), using the options
 defined in the options sections below.
 
 Make sure that the structure of the vascular_trees.jl directory is as needed

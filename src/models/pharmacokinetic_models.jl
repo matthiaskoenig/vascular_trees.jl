@@ -1,4 +1,3 @@
-module PharmacokineticModels
 """
 Module with pharmacokinetic ODE based models for the drug(s): transport of the
     substance(s) along the liver's vessel tree (arterial/portal vascular trees ->
@@ -10,6 +9,7 @@ Also, variables (initial values and differentials) and parts of parameters struc
     differ between ODE functions for vascular trees (vectors) and for terminal part 
     (arrays).
 """
+module PharmacokineticModels
 
 using ..Definitions: 
     TreeDefinitions, 
@@ -19,12 +19,12 @@ using ..Definitions:
 using InteractiveUtils, 
     SparseArrays
 
-include("ode_trees.jl")
-include("ode_terminal.jl")
-export jf_dxdt!
-
 include("interventions.jl")
 using .Interventions: f_intervention
+
+include("equations/ode_trees.jl")
+include("equations/ode_terminal.jl")
+export jf_dxdt!
 
 include("jacobians.jl")
 export jac!
