@@ -6,7 +6,7 @@ Create and run the coupled tree simulation for one graph and one flow scaling fa
 
 If `sim_options.benchmark` is `true`, the simulation is run `bench_options.n_iterations` times
 and timed (the results are printed and, if `bench_options.save_running_times`, saved to a CSV).
-Otherwise it is run once and, if `sim_options.save_simulations`, the solutions are saved to CSV.
+Otherwise it is run once and, if `sim_options.save_simulations`, the solutions are saved to ARROW.
 
 # Arguments
 - `tree_info`: `TreeStructure` of the graph (ids of the trees, graph directory, ...).

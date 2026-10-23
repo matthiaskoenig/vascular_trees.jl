@@ -22,10 +22,10 @@ https://github.com/matthiaskoenig/vascular_trees.
   pharmacokinetic ODE simulations of drug transport along the liver's vessel trees —
   from the inflow trees (arterial, portal) through the liver sinusoids (terminal part)
   to the outflow trees (venous, biliary) — with optional benchmarking of running times.
-- **Visualization** ([src/visualization/](src/visualization/)): plots of benchmarking
+- **Visualization** ([old/visualization/](old/visualization/)): plots of benchmarking
   results (Makie / AlgebraOfGraphics) and mapping of simulation results back onto the
-  VTK geometry of the trees. *Note: this part is currently being refactored to the new
-  module structure.*
+  VTK geometry of the trees. *Note: this part is not yet part of the package; it is kept
+  in `old/` until it is refactored to the new module structure.*
 
 ### Supported tree configurations
 
@@ -46,10 +46,14 @@ src/
 ├── run_simulations.jl        # run script: coupled-tree simulations
 ├── common/                   # paths, tree definitions, option structs, table utilities
 ├── trees_processing/         # reading and processing of the generated tree files
-├── models/                   # pharmacokinetic ODE models and interventions
-├── simulation/               # ODE parameters, simulation loop, benchmarking
-├── visualization/            # benchmark plots and VTK mapping
-└── sbml/                     # test script for importing SBML models
+├── models/                   # pharmacokinetic ODE models, Jacobians and interventions
+│   └── equations/            # ODE right-hand sides of the trees and the terminal part
+└── simulation/               # simulation module
+    ├── setup/                # ODE parameters and problems
+    ├── solver/               # time loop and coupling of the trees
+    └── results/              # saving of solutions and benchmarking
+sbml/                         # test scripts for importing SBML models
+old/                          # legacy code (incl. visualization, not yet refactored)
 ```
 
 ## Results folder structure
@@ -74,7 +78,7 @@ results/
             │   ├── <tree>.arrow             #   one table per vascular tree
             │   └── T.arrow                  #   terminal nodes connecting the trees
             ├── simulations/                 # OUTPUT of run_simulations.jl
-            │   └── <tree>[_<f>Q]_simulations_<dt>_dt.csv
+            │   └── <tree>[_<f>Q]_simulations_<dt>_dt.arrow
             └── models/                      # currently not used by the Julia code
 ```
 
@@ -120,15 +124,20 @@ script:
   solutions (`save_simulations`) and whether to benchmark (`benchmark`).
 - `SolverOptions` — ODE solver (any
   [SciML algorithm](https://docs.sciml.ai/DiffEqDocs/stable/solvers/ode_solve/), e.g.
-  `Tsit5()` or `CVODE_BDF()`) and its tolerances.
+  `Tsit5()` or `CVODE_BDF()`), its tolerances and whether to use the analytic Jacobian
+  (`compute_jacobian`, default `true`). The Jacobian is sparse, so with CVODE use a sparse
+  linear solver: `CVODE_BDF(linear_solver = :KLU)` (the default solver). KLU requires
+  `compute_jacobian = true`; this is checked when `SolverOptions` is constructed.
 - `BenchmarkOptions` — number of timed iterations and whether to save the running times
   (used only if `benchmark = true`).
 - `flow_scaling_factors` — factors by which the flow is scaled (`1.0` = original flow).
 
 Outputs (in the graph directory):
 
-- `simulations/<subsystem>_simulations_<dt>_dt.csv` — one file per vascular tree and one
-  for the terminal part (if `save_simulations = true` and benchmarking is off).
+- `simulations/<subsystem>_simulations_<dt>_dt.arrow` — one file per vascular tree and one
+  for the terminal part (if `save_simulations = true` and benchmarking is off). Each table
+  has one row per species: a `species_ids` column followed by one column per time point
+  (`t_<time>`).
 - `results/julia_vessel_trees/jrunning_times.csv` — benchmark running times (if
   `benchmark = true` and `save_running_times = true`).
 
