@@ -2,7 +2,7 @@
 Load graph files in arrow format and run the coupled-tree simulations.
 
 The simulations start as soon as this file is included
-(e.g. `julia --project src/run_simulations.jl`), using the options
+(e.g. `julia --project scripts/run_simulations.jl`), using the options
 defined in the options sections below.
 
 Make sure that the structure of the vascular_trees.jl directory is as needed
@@ -49,7 +49,7 @@ module SimulationRunner
     # === Graph options ===
     # options for graph, i.e., number of nodes and type of tree
     t_options = TreeOptions(
-        n_nodes = [10],  #, 100, 1000, 10000, 100000, 1000000
+        n_nodes = [10, 100],  #, 100, 1000, 10000, 100000, 1000000
         tree_configurations = [
             "Rectangle_quad",
             #"Rectangle_trio",
