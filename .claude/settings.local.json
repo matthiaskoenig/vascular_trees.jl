@@ -7,7 +7,10 @@
       "Bash(julia +1.11 --version)",
       "Bash(rm -f Manifest.toml)",
       "Bash(julia --project=. -e 'using Pkg; Pkg.add\\([\"Arrow\",\"CSV\",\"DataFrames\",\"DataFramesMeta\",\"DifferentialEquations\",\"Dictionaries\",\"InteractiveUtils\",\"OrdinaryDiffEq\",\"Parameters\",\"PProf\",\"Profile\",\"ProgressMeter\",\"Reexport\",\"Revise\",\"Sundials\",\"Tables\",\"TimerOutputs\"]\\); Pkg.compat\\(\"julia\",\"1.10\"\\)')",
-      "Bash(julia --project=. -e 'using VascularTrees; println\\(\"OK\"\\)')"
+      "Bash(julia --project=. -e 'using VascularTrees; println\\(\"OK\"\\)')",
+      "Read(//home/mariia/.julia/packages/Sundials/9ZddA/**)",
+      "Bash(grep -rn \"function SUNNonlinSol_Newton\\\\|function SUNLinSol_KLU\\\\b\\\\|function SUNSparseMatrix\\\\b\\\\|sunindextype = \\\\|const sunindextype\" src lib)",
+      "WebSearch"
     ],
     "deny": [
       "Read(~/examples/**)",

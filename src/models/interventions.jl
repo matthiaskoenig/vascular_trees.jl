@@ -2,7 +2,7 @@ module Interventions
 
 export f_intervention
 
-const dose = 10.0
+const dose = 10.0 # [mmol/min]
 const hill = 1.0
 const stop_time = 7.0
 

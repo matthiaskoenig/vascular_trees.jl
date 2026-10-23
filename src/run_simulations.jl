@@ -49,7 +49,7 @@ module SimulationRunner
     # === Graph options ===
     # options for graph, i.e., number of nodes and type of tree
     t_options = TreeOptions(
-        n_nodes = [100],  #10, 100, 1000, 10000, 100000, 100000
+        n_nodes = [10],  #, 100, 1000, 10000, 100000, 1000000
         tree_configurations = [
             "Rectangle_quad",
             #"Rectangle_trio",
@@ -72,12 +72,16 @@ module SimulationRunner
     sol_options = SolverOptions()
     # additional integrator arguments
     # these arguments are not mandatory
-    additional_sol_options::NamedTuple =
-        (dense = false, save_everystep = false, progress = false)
+   additional_sol_options::NamedTuple = (
+        dense = false,
+        save_everystep = false,
+        progress = false
+    )
 
+    
     # === Benchmark options ===
     # do not write anything here in brackets if you are okay with default variant
-    bench_options = BenchmarkOptions(save_running_times = false, n_iterations = 5)
+    bench_options = BenchmarkOptions(save_running_times = true, n_iterations = 5)
 
 
     # ============================== Run ==============================

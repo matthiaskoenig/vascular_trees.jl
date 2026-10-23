@@ -67,7 +67,8 @@ module Options
 
     """
     SolverOptions(; solver = Tsit5(), absolute_tolerance = 1e-8,
-                   relative_tolerance = 1e-8, solver_name = string(nameof(typeof(solver)))
+                   relative_tolerance = 1e-8, solver_name = string(nameof(typeof(solver))),
+                   compute_jacobian = true)
 
     ODE solver passed to `init` for every tree and the terminal part, see
     https://docs.sciml.ai/DiffEqDocs/stable/solvers/ode_solve/.
@@ -76,13 +77,23 @@ module Options
     - `solver`: any SciML ODE algorithm, e.g. `Tsit5()` or `CVODE_BDF()` (Sundials).
     - `absolute_tolerance`, `relative_tolerance`: `abstol` / `reltol` of the integrator.
     - `solver_name`: name of the solver written to the benchmark results.
+    - `compute_jacobian`: build the analytic Jacobian of every tree (see `jac!`). It is sparse,
+      so CVODE needs a sparse linear solver: `CVODE_BDF(linear_solver = :KLU)`.
+      KLU needs the sparsity pattern of the Jacobian, so a KLU solver requires
+      `compute_jacobian = true` (checked on construction).
     """
     # https://docs.sciml.ai/DiffEqDocs/stable/solvers/split_ode_solve/
     @with_kw struct SolverOptions{A<:SciMLBase.AbstractODEAlgorithm}
-        solver::A = CVODE_BDF() # "Tsit5", "CVODE_BDF", …
+        solver::A = CVODE_BDF(linear_solver = :KLU) # "Tsit5", "CVODE_BDF", …
         absolute_tolerance::Float64 = 1e-8
         relative_tolerance::Float64 = 1e-8
-        solver_name::String = string(nameof(typeof(solver)))   
+        solver_name::String = string(nameof(typeof(solver)))
+        compute_jacobian::Bool = true
+        @assert !uses_klu(solver) || compute_jacobian "linear_solver = :KLU needs compute_jacobian = true"
     end
+
+    # whether the solver is a Sundials algorithm with the sparse KLU linear solver
+    uses_klu(::Sundials.SundialsODEAlgorithm{M, L}) where {M, L} = L == :KLU
+    uses_klu(::SciMLBase.AbstractODEAlgorithm) = false
 
 end
