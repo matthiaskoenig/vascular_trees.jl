@@ -16,8 +16,7 @@ module Definitions
 
     using Parameters
 
-    using ..Paths: 
-        PROJECT_ROOT, 
+    using ..Paths:
         JULIA_RESULTS_DIR
 
     """
@@ -74,7 +73,7 @@ module Definitions
         graph_id::S = "$(tree_configuration)_$(n_node)"
         tree_components::Dict{Symbol,Vector{S}}
         vascular_trees::Vector{S} = reduce(vcat, values(tree_components))
-        GRAPH_DIR::S = joinpath(PROJECT_ROOT, JULIA_RESULTS_DIR, tree_configuration, graph_id)
+        GRAPH_DIR::S = joinpath(JULIA_RESULTS_DIR, tree_configuration, graph_id)
     end
 
     """

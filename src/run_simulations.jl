@@ -38,7 +38,7 @@ module SimulationRunner
     # === Imports ===
     using Revise
     using VascularTrees
-    using VascularTrees.SimulationHelpers: run_simulations
+    using VascularTrees.Simulation: run_simulations
 
     # Definitions of the available tree configurations (inflow / outflow trees)
     const trees::TreeDefinitions = TreeDefinitions()
