@@ -22,8 +22,7 @@ module ReadTreeFiles
     using CSV, 
         DataFrames, 
         DataFramesMeta, 
-        Parameters, 
-        Revise
+        Parameters
 
     export read_edges, 
         read_graph_skeleton, 

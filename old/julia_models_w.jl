@@ -1,4 +1,4 @@
-module Pharmacokinetic_models
+module PharmacokineticModels
 
 include("../interventions.jl")
 using .Interventions: f_intervention

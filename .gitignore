@@ -6,3 +6,4 @@ results
 Manifest.toml
 *.svg
 .claude/CLAUDE.md
+JuliaSysimage.so

@@ -16,8 +16,7 @@ module Definitions
 
     using Parameters
 
-    using ..Paths: 
-        PROJECT_ROOT, 
+    using ..Paths:
         JULIA_RESULTS_DIR
 
     """
@@ -74,7 +73,7 @@ module Definitions
         graph_id::S = "$(tree_configuration)_$(n_node)"
         tree_components::Dict{Symbol,Vector{S}}
         vascular_trees::Vector{S} = reduce(vcat, values(tree_components))
-        GRAPH_DIR::S = joinpath(PROJECT_ROOT, JULIA_RESULTS_DIR, tree_configuration, graph_id)
+        GRAPH_DIR::S = joinpath(JULIA_RESULTS_DIR, tree_configuration, graph_id)
     end
 
     """
@@ -101,7 +100,7 @@ module Definitions
 
     """
     VascularTreeParameters(id, is_inflow, species_ids, flow_values, volume_values,
-                             ODE_groups, pre_elements, post_elements)
+                             ODE_groups, predecessors_idx, predecessors_offset, successors_idx, successors_offset)
 
     Parameters of one vessel tree (`p` for `jf_inflow!` / `jf_outflow!`), built by
     `get_tree_parameters` from `<tree>.arrow`. All vectors have one entry per edge, in the
@@ -114,7 +113,9 @@ module Definitions
     - `flow_values`: flow of the edge [L/min], already multiplied by `flow_scaling_factor`.
     - `volume_values`: volume of the edge [L].
     - `ODE_groups`: group code of the edge, see [`ODE_groups`](@ref).
-    - `pre_elements`, `post_elements`: indices of the predecessor / successor edges.
+    - `predecessors_idx`, `predecessors_offset`, `successors_idx`, `successors_offset`: indices of
+      the predecessor / successor edges as flat vectors (see `decompose_lists`); the neighbours of
+      edge `ke` are `predecessors_idx[predecessors_offset[ke] : predecessors_offset[ke+1]-1]`.
     """
     struct VascularTreeParameters{T<:AbstractFloat, I<:Int}
         id::String
@@ -123,8 +124,10 @@ module Definitions
         flow_values::Vector{T}
         volume_values::Vector{T}
         ODE_groups::Vector{Int16}
-        pre_elements::Vector{Vector{I}}
-        post_elements::Vector{Vector{I}}
+        predecessors_idx::Vector{I}
+        predecessors_offset::Vector{I}
+        successors_idx::Vector{I}
+        successors_offset::Vector{I}
     end
 
     """
@@ -143,9 +146,9 @@ module Definitions
 
     # Preallocated work arrays (derived, DO NOT PASS)
     - `terminal_matrix_size`: `size(species_ids)`.
-    - `terminal_inflow`: `(n_inflow) × n_terminals`, inflow flow × concentration.
-    - `terminal_outflow`: `1 × n_terminals`, outflow flow × concentration.
-    - `terminal_difference`: `1 × n_terminals`, inflow - outflow of every terminal.
+    - `terminal_inflow`: `(n_inflow) * n_terminals`, inflow flow * concentration.
+    - `terminal_outflow`: `1 * n_terminals`, outflow flow * concentration.
+    - `terminal_difference`: `1 * n_terminals`, inflow - outflow of every terminal.
     """
     Base.@kwdef struct TerminalParameters{T<:AbstractFloat, I<:Int}
         id::String

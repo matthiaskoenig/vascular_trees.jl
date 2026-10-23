@@ -2,7 +2,9 @@
     TableUtils
 
 Small helpers for DataFrames and `.arrow` files that are shared by the trees processing
-and the simulation code.
+and the simulation code: selecting and reshaping tables, loading and saving `.arrow` files, and
+`decompose_lists`, which turns a list column (e.g. `pre_elements`) into flat
+`(flat_values, offsets)` vectors.
 """
 module TableUtils
 
@@ -11,7 +13,8 @@ module TableUtils
         save_as_arrow, 
         get_extended_vector,
         block_to_df,
-        load_arrow
+        load_arrow,
+        decompose_lists
 
     using DataFrames, 
         Arrow,
@@ -85,4 +88,58 @@ module TableUtils
             col_selection,
         ]
     end
+
+    """
+    decompose_lists(lists) -> (flat_values, offsets)
+
+    Store a vector of variable-length lists (e.g. `pre_elements` / `post_elements`, one list of
+    neighbour indices per edge) as two flat vectors instead of one small vector per list:
+
+    - `flat_values`: all lists concatenated, in order.
+    - `offsets`: `length(lists) + 1` start positions; list `k` is
+      `flat_values[offsets[k] : offsets[k+1]-1]`. Empty lists give equal neighbouring offsets.
+
+    Example: `[[5], [], [7, 8]]` → `flat_values = [5, 7, 8]`, `offsets = [1, 2, 2, 4]`.
+
+    `lists` can be any vector of vectors, including an Arrow list column, so the per-list vectors
+    are never materialized.
+    """
+    function decompose_lists(lists::AbstractVector{<:AbstractVector{<:Integer}})
+        offsets = get_offsets(lists)
+        flat_values = flatten_lists(lists, offsets[end] - 1)
+        return flat_values, offsets
+    end
+
+    """
+    get_offsets(lists) -> Vector{Int}
+
+    Start position of each list in the concatenated vector, plus one entry past the end:
+    `offsets[1] = 1`, `offsets[k+1] = offsets[k] + length(lists[k])`. See [`decompose_lists`](@ref).
+    """
+    function get_offsets(lists::AbstractVector{<:AbstractVector{<:Integer}})::Vector{Int}
+        n_lists = length(lists)
+        offsets = Vector{Int}(undef, n_lists + 1)
+        offsets[1] = 1
+        @inbounds for k in 1:n_lists
+            offsets[k+1] = offsets[k] + length(lists[k])
+        end
+        return offsets
+    end
+
+    """
+    flatten_lists(lists, n_values) -> Vector{Int}
+
+    All values of `lists` concatenated in order. `n_values` must be the total number of values
+    (`offsets[end] - 1` from [`get_offsets`](@ref)).
+    """
+    function flatten_lists(lists::AbstractVector{<:AbstractVector{<:Integer}}, n_values::Int)::Vector{Int}
+        flat_values = Vector{Int}(undef, n_values)
+        position = 1
+        @inbounds for list in lists, value in list
+            flat_values[position] = value
+            position += 1
+        end
+        return flat_values
+    end
+
 end

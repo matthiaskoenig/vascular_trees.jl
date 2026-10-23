@@ -30,7 +30,6 @@ module ProcessTerminalNodes
 
     export process_terminal_nodes
 
-    using ..Paths: JULIA_RESULTS_DIR
     using ..Definitions: ODE_groups
     using ..TableUtils: 
         selection_from_df, 

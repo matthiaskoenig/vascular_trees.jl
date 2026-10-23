@@ -16,8 +16,8 @@ module VascularTrees
     # part that runs simulations
     include("models/pharmacokinetic_models.jl")
 
-    include("simulation/get_ode_parameters.jl")
-    include("simulation/benchmarking.jl")
-    include("simulation/helpers.jl")
+    include("simulation/setup/parameters.jl")
+    include("simulation/results/benchmarking.jl")
+    include("simulation/simulation.jl")
 
 end

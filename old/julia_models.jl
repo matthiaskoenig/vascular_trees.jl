@@ -1,4 +1,4 @@
-module Pharmacokinetic_models
+module PharmacokineticModels
 
 export pyf_dxdt!, jf_dxdt!, str_jf_dxdt!
 

@@ -114,13 +114,13 @@ function create_simulations(; t_options, sim_options, sol_options)
             end
 
         elseif model_type ∈ m_types.julia_model
-            MODEL_PATH = normpath(joinpath(@__FILE__, "../../models/Pharmacokinetic_models.jl"))
+            MODEL_PATH = normpath(joinpath(@__FILE__, "../../models/PharmacokineticModels.jl"))
             include(MODEL_PATH)
             if endswith(model_type, "_python")
-                f_dxdt = Pharmacokinetic_models.pyf_dxdt!
+                f_dxdt = PharmacokineticModels.pyf_dxdt!
                 get_ODE_components = Julia_from_pygraph.get_ODE_components
             elseif endswith(model_type, "_julia")
-                f_dxdt = Pharmacokinetic_models.jf_dxdt!
+                f_dxdt = PharmacokineticModels.jf_dxdt!
                 get_ODE_components = get_ode_parametershelpers.get_ODE_components
             end
             for n_node ∈ t_options.n_nodes, tree_id ∈ t_options.tree_ids
@@ -246,13 +246,13 @@ function create_benchmarked_simulations(;
             end
 
         elseif model_type ∈ m_types.julia_model
-            MODEL_PATH = normpath(joinpath(@__FILE__, "../../models/Pharmacokinetic_models.jl"))
+            MODEL_PATH = normpath(joinpath(@__FILE__, "../../models/PharmacokineticModels.jl"))
             include(MODEL_PATH)
             # if endswith(model_type, "_python")
-            #     f_dxdt = Pharmacokinetic_models.pyf_dxdt!
+            #     f_dxdt = PharmacokineticModels.pyf_dxdt!
             #     get_ODE_components = Julia_from_pygraph.get_ODE_components
             if endswith(model_type, "_julia")
-                f_dxdt = Pharmacokinetic_models.jf_dxdt!
+                f_dxdt = PharmacokineticModels.jf_dxdt!
                 get_ODE_components = get_ode_parametershelpers.get_ODE_components
             end
             for tree_id ∈ t_options.tree_ids, n_node ∈ t_options.n_nodes
