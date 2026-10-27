@@ -2,7 +2,7 @@
 .vscode
 vascular_trees.jl.code-workspace
 SyntheticVascularTrees.jl
-results
+/results
 Manifest.toml
 *.svg
 .claude/CLAUDE.md
