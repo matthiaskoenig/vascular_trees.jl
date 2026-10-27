@@ -7,3 +7,5 @@ Manifest.toml
 *.svg
 .claude/CLAUDE.md
 JuliaSysimage.so
+.claude/settings.local.json
+*.pb.gz

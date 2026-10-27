@@ -27,13 +27,14 @@ module Simulation
         SparseArrays,
         Sundials,
         Profile,
-        PProf
+        PProf,
+        Mmap
 
     using ..Definitions: FlowDirections, ODE_groups, VascularTreeParameters
     using ..Benchmarking: save_times_as_csv
     using ..TableUtils: save_as_arrow
     using ..ODEparameters: get_ODE_parameters, get_initial_values
-    using ..PharmacokineticModels: jf_dxdt!, jac!
+    using ..PharmacokineticModels: jf_dxdt!, jac!, jac_prototype
 
     # Which trees are inflow / outflow, and the numbers marking the ODE groups of the species
     # (both defined in utils.jl)
