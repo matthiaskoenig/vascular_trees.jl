@@ -28,14 +28,14 @@ end
 # create_sysimage(
 #     [
 #         "VascularTrees",
-#         # ODE solving
+#         ODE solving
 #         "DifferentialEquations", "OrdinaryDiffEq", "Sundials", "SciMLBase", "SparseArrays",
-#         # tables / IO
+#         tables / IO
 #         "Arrow", "CSV", "DataFrames", "DataFramesMeta", "Tables", "Dictionaries",
-#         # utilities used inside the package
+#         utilities used inside the package
 #         "Parameters", "Reexport", "ProgressMeter", "TimerOutputs",
 #     ];
-#     sysimage_path = "VascularTrees_sysimage.so",
+#     sysimage_path = "JuliaSysimage.so",
 #     project = ".",
 #     precompile_execution_file = "scripts/precompile_project.jl",
 # )

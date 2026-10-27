@@ -1,4 +1,39 @@
 """
+    jac_prototype(p) -> SparseMatrixCSC
+
+Sparsity pattern of `jac!` (values zero), built from (row, col) pairs in one `sparse` call.
+Assigning entries one by one into a `SparseMatrixCSC` shifts all later entries, O(n · nnz).
+The diagonal is always stored (CVODE builds I - γJ in place of J, see `subsystem_problem`).
+"""
+function jac_prototype(p::VascularTreeParameters)
+    n = length(p.ODE_groups)
+    rows, cols = collect(1:n), collect(1:n)
+    post_idx, post_off = p.successors_idx, p.successors_offset
+    for (ke, group) in enumerate(p.ODE_groups)
+        # columns with (post, ke) entries: inflow group 1; outflow groups 1, 2, 3
+        has_post = p.is_inflow ? group == 1 : group != 0
+        has_post || continue
+        for k in post_off[ke]:post_off[ke+1]-1
+            push!(rows, post_idx[k]); push!(cols, ke)
+        end
+    end
+    return sparse(rows, cols, zeros(length(rows)), n, n)
+end
+
+function jac_prototype(p::TerminalParameters)
+    n_rows, n_terminals = size(p.flow_values)
+    n = n_rows * n_terminals
+    rows, cols = collect(1:n), collect(1:n)
+    for kt in 1:n_terminals
+        kterm = (kt - 1) * n_rows + 1
+        for ke in 2:n_rows
+            push!(rows, kterm); push!(cols, kterm + ke - 1)
+        end
+    end
+    return sparse(rows, cols, zeros(length(rows)), n, n)
+end
+
+"""
     jac!(J, p::VascularTreeParameters)
 
 Fill `J` with the Jacobian of `jf_dxdt!` of a vascular tree (`jac_inflow!` or `jac_outflow!`).

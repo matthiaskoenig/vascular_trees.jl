@@ -31,17 +31,24 @@ module Options
     end
 
     """
-    SimulationOptions(; tspan, steps, save_simulations, benchmark)
+    SimulationOptions(; tspan, steps, save_simulations, benchmark,
+                       save_abstol = 0.0, save_reltol = 0.0, save_max_gap = typemax(Int))
 
     Time settings of the simulation and what to do with the results.
 
     # Fields
     - `tspan`: `(t_start, t_end)` [min].
-    - `steps`: number of time steps; the solution is stored at `steps + 1` time points.
+    - `steps`: number of time steps (coupling steps of length `dt`); the solution can be stored
+    at up to `steps + 1` time points.
     - `dt`: time step [min], derived from `tspan` and `steps` (DO NOT PASS).
     - `save_simulations`: save the solutions as `.arrow` (only when `benchmark = false`).
     - `benchmark`: run the simulation `n_iterations` times and measure the running time
     instead of saving the solutions, see [`BenchmarkOptions`](@ref).
+    - `save_abstol`, `save_reltol`: adaptive saving. A time point is stored only if a species of
+    any subsystem differs from the last stored time point by more than
+    `save_abstol + save_reltol * |u_saved|`. If both are `0.0`, every time point is stored.
+    - `save_max_gap`: with adaptive saving, a time point is stored at least every
+    `save_max_gap` steps. The first and the last time points are always stored.
     """
     @with_kw struct SimulationOptions
         tspan::Tuple{Float64,Float64}
@@ -49,6 +56,11 @@ module Options
         dt::Float64 = (tspan[2] - tspan[1]) / steps
         save_simulations::Bool
         benchmark::Bool
+        save_abstol::Float64 = 0.0
+        save_reltol::Float64 = 0.0
+        save_max_gap::Int = typemax(Int)
+        @assert save_abstol >= 0 && save_reltol >= 0 "save_abstol and save_reltol must be >= 0"
+        @assert save_max_gap >= 1 "save_max_gap must be >= 1"
     end
 
     """

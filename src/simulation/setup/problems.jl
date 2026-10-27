@@ -27,8 +27,11 @@ function subsystem_problem(u0_sub, p_sub, tspan, compute_jacobian::Bool)
         n = length(u0_sub)
         # the diagonal is stored even where it is zero: CVODE builds I - γJ in place of J,
         # and with KLU the sparsity pattern of J must already contain it
-        J = sparse(1:n, 1:n, zeros(n), n, n)
-        jac!(J, p_sub)      # builds the pattern
+        J = jac_prototype(p_sub)
+        n_pattern = nnz(J)
+        jac!(J, p_sub)
+        # jac! must not insert entries outside the pattern (that would be the slow path again)
+        @assert nnz(J) == n_pattern "jac_prototype misses entries written by jac!"
         f = ODEFunction(jf_dxdt!; jac = (J, u, p, t) -> jac!(J, p), jac_prototype = J)
     else
         f = jf_dxdt!
