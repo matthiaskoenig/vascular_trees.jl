@@ -51,7 +51,6 @@ function solve_tree!(
         additional_sol_options...
     )
     
-    @info "Running integration"
     tmin = sim_options.tspan[1]
     tmax = sim_options.tspan[2]
     dt = sim_options.dt
@@ -59,16 +58,18 @@ function solve_tree!(
     # (tmax + 2dt as margin so that float drift in t never steps past tf)
     tspan = (tmin, tmax + 2dt)
 
-    # setup integrators for tree problems
-    integrators = dictionary(
-        id => init(subsystem_problem(u0[id], p[id], tspan, sol_options.compute_jacobian),
-                sol_options.solver; integrator_options...)
-        for id in keys(u0)
-    )
-    # setup integrator for terminal node problem
-    problem_terminal =
-        subsystem_problem(u0_terminal, p_terminal, tspan, sol_options.compute_jacobian)
-    integrator_terminal = init(problem_terminal, sol_options.solver; integrator_options...)
+    # no assignments to the outer names inside the closure (they would be boxed)
+    integrators, integrator_terminal = stage("setting up integrators") do
+        (
+            # setup integrators for tree problems
+            dictionary(
+                id => init_subsystem(id, u0[id], p[id], tspan, sol_options, integrator_options)
+                for id in keys(u0)
+            ),
+            # setup integrator for terminal node problem
+            init_subsystem("T", u0_terminal, p_terminal, tspan, sol_options, integrator_options),
+        )
+    end
 
     ids = collect(keys(integrators))
     tree_bindings = [(integ = integrators[id], sol = solutions[id], sidx = synch_idxs[id],
@@ -84,13 +85,33 @@ function solve_tree!(
         dt = 1.0,
         barglyphs = BarGlyphs('|', '█', ['▁', '▂', '▃', '▄', '▅', '▆', '▇'], ' ', '|'),
         color = :magenta,
-        enabled = false
+        enabled = sim_options.show_progress && !sim_options.benchmark
     )
     save_criteria = (abstol = sim_options.save_abstol, reltol = sim_options.save_reltol,
                     max_gap = sim_options.save_max_gap)
-    return integrate!(solutions["T"], integrator_terminal, size(p_terminal.flow_values, 1),
+    return stage("integration ($(sim_options.steps) steps)") do
+        integrate!(solutions["T"], integrator_terminal, size(p_terminal.flow_values, 1),
                 inflow_rows, tree_bindings, tmin, dt, save_criteria, progress)
+    end
 
+end
+
+"""
+    init_subsystem(id, u0_sub, p_sub, tspan, sol_options, integrator_options)
+
+Build the problem of the subsystem `id` (see [`subsystem_problem`](@ref)) and initialize its
+integrator. Both steps are logged as `Debug` stages (see [`stage`](@ref)), with the number of
+species and, with the analytic Jacobian, the number of stored Jacobian entries.
+"""
+function init_subsystem(id, u0_sub, p_sub, tspan, sol_options, integrator_options)
+    problem = stage("problem $id ($(length(u0_sub)) species)"; debug = true) do
+        subsystem_problem(u0_sub, p_sub, tspan, sol_options.compute_jacobian)
+    end
+    J = problem.f.jac_prototype
+    J === nothing || @debug "Jacobian $id: $(nnz(J)) stored entries"
+    return stage("init $id"; debug = true) do
+        init(problem, sol_options.solver; integrator_options...)
+    end
 end
 
 """
@@ -161,7 +182,8 @@ function integrate!(solution_terminal, integrator_terminal, n_rows, inflow_rows,
         # reset its cached derivative
         reinit_state!(integrator_terminal)
 
-        next!(progress)
+        # showvalues as a function: evaluated only when the bar is redrawn
+        next!(progress; showvalues = () -> [(:t, tmin + kl * dt), (:stored, n_saved)])
     end
     return times
 end

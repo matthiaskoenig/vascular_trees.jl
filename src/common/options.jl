@@ -32,7 +32,8 @@ module Options
 
     """
     SimulationOptions(; tspan, steps, save_simulations, benchmark,
-                       save_abstol = 0.0, save_reltol = 0.0, save_max_gap = typemax(Int))
+                       save_abstol = 0.0, save_reltol = 0.0, save_max_gap = typemax(Int),
+                       show_progress = true)
 
     Time settings of the simulation and what to do with the results.
 
@@ -49,6 +50,8 @@ module Options
     `save_abstol + save_reltol * |u_saved|`. If both are `0.0`, every time point is stored.
     - `save_max_gap`: with adaptive saving, a time point is stored at least every
     `save_max_gap` steps. The first and the last time points are always stored.
+    - `show_progress`: show a progress bar of the time loop (simulated time, number of stored
+    time points); never shown when `benchmark = true`.
     """
     @with_kw struct SimulationOptions
         tspan::Tuple{Float64,Float64}
@@ -59,6 +62,7 @@ module Options
         save_abstol::Float64 = 0.0
         save_reltol::Float64 = 0.0
         save_max_gap::Int = typemax(Int)
+        show_progress::Bool = true
         @assert save_abstol >= 0 && save_reltol >= 0 "save_abstol and save_reltol must be >= 0"
         @assert save_max_gap >= 1 "save_max_gap must be >= 1"
     end

@@ -32,20 +32,27 @@ function run_simulations(
     synch_idxs = Dictionary{String, Vector{Int}}()
     solutions  = Dictionary{String, Matrix{Float64}}()
 
-    for tree in trees
-        # 1. parameters of the tree
-        p_tree = get_ODE_parameters(tree_info, tree, flow_scaling_factor)
-        insert!(p, tree, p_tree)
-        # 2. initial values and indices of the species that connect trees and terminal nodes
-        insert!(u0, tree, get_initial_values(p_tree.ODE_groups))
-        insert!(synch_idxs, tree, get_synchronization_indices(tree, p_tree.ODE_groups))
-    end
+    p_terminal, u0_terminal = stage("parameters and initial values") do
+        for tree in trees
+            stage("parameters $tree"; debug = true) do
+                # 1. parameters of the tree
+                p_tree = get_ODE_parameters(tree_info, tree, flow_scaling_factor)
+                insert!(p, tree, p_tree)
+                # 2. initial values and indices of the species that connect trees and terminal nodes
+                insert!(u0, tree, get_initial_values(p_tree.ODE_groups))
+                insert!(synch_idxs, tree, get_synchronization_indices(tree, p_tree.ODE_groups))
+            end
+        end
 
-    # terminal nodes are stored separately from trees, because they are stored differently
-    p_terminal = get_ODE_parameters(tree_info, "T", flow_scaling_factor)
-    # the state is the (n_rows, n_terminals) block as a vector (column-major order, see
-    # jf_terminal!): the analytic-Jacobian callback of Sundials.jl only supports vectors
-    u0_terminal = vec(get_initial_values(p_terminal.flow_values))
+        stage("parameters T"; debug = true) do
+            # terminal nodes are stored separately from trees, because they are stored differently
+            # (own name: assigning p_terminal inside the closure would box the outer variable)
+            p_T = get_ODE_parameters(tree_info, "T", flow_scaling_factor)
+            # the state is the (n_rows, n_terminals) block as a vector (column-major order, see
+            # jf_terminal!): the analytic-Jacobian callback of Sundials.jl only supports vectors
+            p_T, vec(get_initial_values(p_T.flow_values))
+        end
+    end
 
     # 3. preallocated solutions, one column per (possibly) stored time point; the disk space
     #    is checked first, because a full disk is noticed only while writing (crash)
@@ -53,10 +60,12 @@ function run_simulations(
     # "T" (without a value) to u0 as well
     n_species = dictionary(id => length(u0[id]) for id in keys(u0))
     insert!(n_species, "T", length(u0_terminal))
-    check_disk_space(tree_info, sum(n_species), n_time_points,
-                     sim_options.save_simulations && !sim_options.benchmark)
-    for (graph_subsystem, n) in pairs(n_species)
-        insert!(solutions, graph_subsystem, mmap_solution(tree_info, graph_subsystem, n, n_time_points))
+    stage("preallocating solutions ($(sum(n_species)) species * $n_time_points time points)") do
+        check_disk_space(tree_info, sum(n_species), n_time_points,
+                         sim_options.save_simulations && !sim_options.benchmark)
+        for (graph_subsystem, n) in pairs(n_species)
+            insert!(solutions, graph_subsystem, mmap_solution(tree_info, graph_subsystem, n, n_time_points))
+        end
     end
 
     try
@@ -117,7 +126,9 @@ function run_simulations(
                 species_ids["T"] = vec(p_terminal.species_ids)
                 # only the stored columns, the rest of the preallocated matrix is unused
                 stored_solutions = map(solution -> view(solution, :, 1:length(times)), solutions)
-                save_solutions(stored_solutions, species_ids, times, tree_info, sim_options.dt, flow_scaling_factor)
+                stage("saving results") do
+                    save_solutions(stored_solutions, species_ids, times, tree_info, sim_options.dt, flow_scaling_factor)
+                end
             end
         end
     finally

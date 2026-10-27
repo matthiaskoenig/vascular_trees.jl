@@ -12,6 +12,9 @@ Data flow of `run_simulations`:
    and no benchmarking).
 
 Subsystem = vascular tree (e.g. "A") or the terminal part ("T").
+
+The stages are logged with their running times (see `stage`); per-subsystem stages are logged
+at `Debug` level, shown with `ENV["JULIA_DEBUG"] = "VascularTrees"`.
 """
 module Simulation
 
@@ -33,6 +36,7 @@ module Simulation
     using ..Definitions: FlowDirections, ODE_groups, VascularTreeParameters
     using ..Benchmarking: save_times_as_csv
     using ..TableUtils: save_as_arrow
+    using ..LogUtils: stage
     using ..ODEparameters: get_ODE_parameters, get_initial_values
     using ..PharmacokineticModels: jf_dxdt!, jac!, jac_prototype
 

@@ -40,6 +40,10 @@ module SimulationRunner
     using VascularTrees
     using VascularTrees.Simulation: run_simulations
 
+    # === Logging ===
+    # colored log prefixes; debug = true also shows the per-subsystem stages of VascularTrees
+    setup_logging(debug = false)
+
     # Definitions of the available tree configurations (inflow / outflow trees)
     const trees::TreeDefinitions = TreeDefinitions()
 
