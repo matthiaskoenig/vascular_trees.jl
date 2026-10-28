@@ -5,8 +5,7 @@ The simulations start as soon as this file is included
 (e.g. `julia --project scripts/run_simulations.jl`), using the options
 defined in the options sections below.
 
-Make sure that the structure of the vascular_trees.jl directory is as needed
-(see "Inputs" for the expected graph location).
+The graph tables must exist (see "Inputs"); the `simulations` output folder is created if needed.
 
 What must/may be specified in the code below:
 1. must
@@ -18,8 +17,8 @@ What must/may be specified in the code below:
     2.3. additional solver options (these arguments are not mandatory)
 
 Inputs:
-1. Graph file (prepared information in arrow format (process_julia_graph.jl) from a graph
-   generated in SyntheticVascularTrees.jl), expected in
+1. Graph tables (`graphs/<tree>.arrow` and `graphs/T.arrow`, written by build_arrow_graphs.jl from
+   a graph generated in SyntheticVascularTrees.jl), expected in
    `results/julia_vessel_trees/<tree_configuration>/<tree_configuration>_<n_nodes>/`
 
 Showed in the terminal:
@@ -27,7 +26,7 @@ Showed in the terminal:
 2. benchmark results if sim_options.benchmark=true
 
 Outputs:
-1. `<subsystem>_simulations_<dt>_dt.arrow` in the `simulations` folder of the graph directory,
+1. `<subsystem>[_<f>Q]_simulations_<dt>_dt.arrow` in the `simulations` folder of the graph directory,
    one file per vascular tree and one for the terminal part - if you do not do benchmarking
    and sim_options.save_simulations = true
 2. jrunning_times.csv - if sim_options.benchmark and bench_options.save_running_times = true

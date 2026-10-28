@@ -19,10 +19,11 @@ See also: [Usage](usage.md) · [back to README](../README.md)
   pharmacokinetic ODE simulations of drug transport along the liver's vessel trees —
   from the inflow trees (arterial, portal) through the liver sinusoids (terminal part)
   to the outflow trees (venous, biliary) — with optional benchmarking of running times.
-- **Visualization** ([old/visualization/](../old/visualization/)): plots of benchmarking
-  results (Makie / AlgebraOfGraphics) and mapping of simulation results back onto the
-  VTK geometry of the trees. *Note: this part is not yet part of the package; it is kept
-  in `old/` until it is refactored to the new module structure.*
+- **Visualization** ([scripts/create_vtk.jl](../scripts/create_vtk.jl),
+  [src/visualization/](../src/visualization/)): writes the simulation results of every
+  vascular tree as a time-dependent VTKHDF file (tree geometry with `Flow`, `Volume` and
+  `Concentration` per edge) for ParaView. Plots of benchmarking results (Makie /
+  AlgebraOfGraphics) are still legacy code in [old/visualization/](../old/visualization/).
 
 ## Supported tree configurations
 
@@ -40,28 +41,31 @@ See also: [Usage](usage.md) · [back to README](../README.md)
 scripts/
 ├── build_arrow_graphs.jl     # run script: convert generated trees to .arrow tables
 ├── run_simulations.jl        # run script: coupled-tree simulations
+├── create_vtk.jl             # run script: VTKHDF files of the simulation results (ParaView)
 └── precompile_project.jl     # precompile workload for building the sysimage
 src/
 ├── VascularTrees.jl          # main module
 ├── common/                   # paths, tree definitions, option structs, table utilities
 ├── trees_processing/         # reading and processing of the generated tree files
+│   ├── individual_trees.jl   #   one .arrow table per vascular tree
+│   └── terminal_nodes.jl     #   T.arrow, terminal nodes connecting the trees
 ├── models/                   # pharmacokinetic ODE models, Jacobians and interventions
 │   └── equations/            # ODE right-hand sides of the trees and the terminal part
-└── simulation/               # simulation module
-    ├── setup/                # ODE parameters and problems
-    ├── solver/               # time loop and coupling of the trees
-    └── results/              # saving of solutions and benchmarking
+├── simulation/               # simulation module
+│   ├── setup/                # ODE parameters and problems
+│   ├── solver/               # time loop and coupling of the trees
+│   └── results/              # saving of solutions and benchmarking
+└── visualization/            # writing of the VTKHDF files
 docs/                         # documentation
 sbml/                         # test scripts for importing SBML models
-old/                          # legacy code (incl. visualization, not yet refactored)
+old/                          # legacy code (incl. benchmarking plots, not yet refactored)
 ```
 
 ## Results folder structure
 
-**Important:** the run scripts do *not* create any folders themselves — they read from
-and write into an existing directory layout under `results/`. Before running, make sure
-the following structure exists for every tree configuration and number of nodes you want
-to process:
+Only the input folder `julia/` of every graph directory must exist before running (it is
+written by SyntheticVascularTrees.jl). The output folders (`graphs/`, `simulations/`,
+`vtkhdf/`) are created by the run scripts when needed.
 
 ```
 results/
@@ -73,12 +77,14 @@ results/
             │   ├── <tree>.lg                #   edge list (graph skeleton)
             │   ├── <tree>_edges.csv         #   edge attributes
             │   ├── <tree>_nodes.csv         #   node attributes
-            │   └── <tree>.vtk               #   geometry (used for visualization)
+            │   └── <tree>.vtk               #   geometry (legacy visualization, not used)
             ├── graphs/                      # OUTPUT of build_arrow_graphs.jl
             │   ├── <tree>.arrow             #   one table per vascular tree
             │   └── T.arrow                  #   terminal nodes connecting the trees
             ├── simulations/                 # OUTPUT of run_simulations.jl
             │   └── <tree>[_<f>Q]_simulations_<dt>_dt.arrow
+            ├── vtkhdf/                      # OUTPUT of create_vtk.jl (not for T)
+            │   └── <tree>[_<f>Q]_<dt>_dt.vtkhdf
             └── models/                      # currently not used by the Julia code
 ```
 

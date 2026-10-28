@@ -2,7 +2,7 @@
     Options
 
 Option structs set by the user in the run scripts (run_simulations.jl,
-build_arrow_graphs.jl, map_vtk.jl): which trees to use, how to simulate,
+build_arrow_graphs.jl, create_vtk.jl): which trees to use, how to simulate,
 which ODE solver to use and whether to benchmark.
 """
 module Options

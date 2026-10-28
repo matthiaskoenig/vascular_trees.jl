@@ -14,8 +14,8 @@ https://github.com/matthiaskoenig/vascular_trees.
 - **Simulation:** coupled pharmacokinetic ODE simulations from the inflow trees (arterial,
   portal) through the liver sinusoids to the outflow trees (venous, biliary), with optional
   benchmarking.
-- **Visualization:** benchmarking plots and mapping of results onto the VTK geometry
-  (legacy code in `old/`).
+- **Visualization:** time-dependent VTKHDF files of the simulation results for ParaView
+  (benchmarking plots are still legacy code in `old/`).
 
 More details: [Project structure](docs/project_structure.md).
 
@@ -52,11 +52,14 @@ Details (SyntheticVascularTrees.jl, environment activation, VS Code, multithread
 julia --project scripts/build_arrow_graphs.jl
 # 2. run the coupled-tree simulations
 julia --project scripts/run_simulations.jl
+# 3. write the results as VTKHDF files for ParaView
+julia --project scripts/create_vtk.jl
 ```
 
 The options (tree configurations, numbers of nodes, solver, benchmarking, ...) are set
-inside the scripts. The scripts read from and write into an existing
-[`results/` folder layout](docs/project_structure.md#results-folder-structure).
+inside the scripts. Only the generated trees must be placed in the
+[`results/` folder](docs/project_structure.md#results-folder-structure) by hand; the output
+folders are created by the scripts.
 All options and outputs: [docs/usage.md](docs/usage.md).
 
 ## Examples / Demos
@@ -70,6 +73,7 @@ using VascularTrees
 using VascularTrees.ProcessIndividualTrees: process_julia_graph
 using VascularTrees.ProcessTerminalNodes: process_terminal_nodes
 using VascularTrees.Simulation: run_simulations
+using VascularTrees.Visualization: write_vtkhdf_files
 
 trees = TreeDefinitions()
 cfg = "Rectangle_quad"
@@ -90,13 +94,16 @@ run_simulations(
     1.0,                 # flow scaling factor
     BenchmarkOptions(),
 )
+
+# VTKHDF files for ParaView (flow scaling factor 1.0, dt = 16.0 / 800)
+write_vtkhdf_files(tree_info, 1.0, 0.02)
 ```
 
 ## Documentation
 
 - [Installation](docs/installation.md): requirements, SyntheticVascularTrees.jl,
   dependencies, environment activation, multithreading
-- [Usage](docs/usage.md): workflow, all options of the run scripts, outputs
+- [Usage](docs/usage.md): workflow, all options of the run scripts, outputs, ParaView
 - [Project structure](docs/project_structure.md): features, supported tree configurations,
   repository and results folder structure
 - [Sysimage](docs/sysimage.md): building and using a sysimage (terminal and VS Code)

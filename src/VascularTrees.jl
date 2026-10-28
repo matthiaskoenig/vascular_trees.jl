@@ -12,8 +12,8 @@ module VascularTrees
     # part that processes initial trees (.vtk files) and saves them in .arrow format
     include("trees_processing/read_tree_files.jl")
     include("trees_processing/helpers.jl")
-    include("trees_processing/process_individual_trees.jl")
-    include("trees_processing/process_terminal_nodes.jl")
+    include("trees_processing/individual_trees.jl")
+    include("trees_processing/terminal_nodes.jl")
     
     # part that runs simulations
     include("models/pharmacokinetic_models.jl")
@@ -21,6 +21,8 @@ module VascularTrees
     include("simulation/setup/parameters.jl")
     include("simulation/results/benchmarking.jl")
     include("simulation/simulation.jl")
+
+    # part that writes the simulation results as VTKHDF files (ParaView)
     include("visualization/create_vtkhdf.jl")
 
 end

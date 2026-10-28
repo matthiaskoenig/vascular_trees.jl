@@ -2,6 +2,7 @@ using VascularTrees
 using VascularTrees.ProcessIndividualTrees: process_julia_graph
 using VascularTrees.ProcessTerminalNodes: process_terminal_nodes
 using VascularTrees.Simulation: run_simulations
+using VascularTrees.Visualization: write_vtkhdf_files
 
 trees = TreeDefinitions()
 for cfg in ["Rectangle_quad"]           
@@ -21,6 +22,7 @@ for cfg in ["Rectangle_quad"]
         1.0,
         BenchmarkOptions()
     )
+    write_vtkhdf_files(tree_info, 1.0, 0.02)   # dt = 16.0 / 800
 end
 
 # in the julia terminal with activated environment run
@@ -31,7 +33,7 @@ end
 #         ODE solving
 #         "DifferentialEquations", "OrdinaryDiffEq", "Sundials", "SciMLBase", "SparseArrays",
 #         tables / IO
-#         "Arrow", "CSV", "DataFrames", "DataFramesMeta", "Tables", "Dictionaries",
+#         "Arrow", "CSV", "DataFrames", "DataFramesMeta", "Tables", "Dictionaries", "HDF5",
 #         utilities used inside the package
 #         "Parameters", "Reexport", "ProgressMeter", "TimerOutputs",
 #     ];
