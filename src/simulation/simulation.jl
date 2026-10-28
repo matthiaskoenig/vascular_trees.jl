@@ -39,6 +39,7 @@ module Simulation
     using ..LogUtils: stage
     using ..ODEparameters: get_ODE_parameters, get_initial_values
     using ..PharmacokineticModels: jf_dxdt!, jac!, jac_prototype
+    using ..PharmacokineticModels.Interventions: f_intervention
 
     # Which trees are inflow / outflow, and the numbers marking the ODE groups of the species
     # (both defined in utils.jl)

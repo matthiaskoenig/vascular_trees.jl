@@ -12,7 +12,7 @@ function f_intervention(t)
 end
 
 f_saturation(t) = dose * (t^hill / (0.1^hill + t^hill)) # amount per time = mmole / min
-f_decline(t) = dose * (-(t - stop_time)^hill / (0.1^hill + (t - stop_time)^hill) + 1.0)
+f_decline(t) = f_saturation(stop_time) * 0.1 / (0.1 + (t - stop_time))
 
 function f_soft_step(t)
 

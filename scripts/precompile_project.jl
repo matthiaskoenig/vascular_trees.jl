@@ -30,11 +30,11 @@ end
 # create_sysimage(
 #     [
 #         "VascularTrees",
-#         ODE solving
+#         # ODE solving
 #         "DifferentialEquations", "OrdinaryDiffEq", "Sundials", "SciMLBase", "SparseArrays",
-#         tables / IO
+#         # tables / IO
 #         "Arrow", "CSV", "DataFrames", "DataFramesMeta", "Tables", "Dictionaries", "HDF5",
-#         utilities used inside the package
+#         # utilities used inside the package
 #         "Parameters", "Reexport", "ProgressMeter", "TimerOutputs",
 #     ];
 #     sysimage_path = "JuliaSysimage.so",

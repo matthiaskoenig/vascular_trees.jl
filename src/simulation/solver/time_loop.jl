@@ -73,7 +73,8 @@ function solve_tree!(
 
     ids = collect(keys(integrators))
     tree_bindings = [(integ = integrators[id], sol = solutions[id], sidx = synch_idxs[id],
-                    is_outflow = id in flow_direction.outflow_trees) for id in ids]
+                    is_outflow = id in flow_direction.outflow_trees,
+                    is_inflow = id in flow_direction.inflow_trees) for id in ids]
     # terminal rows that receive inflow from an inflow tree: (row index, tree id)
     # computed once, because the assignment of terminal rows to trees does not change
     inflow_rows = [(ki, findfirst(==(tid), ids)) for (ki, tid) in
@@ -131,6 +132,10 @@ time points. With `abstol = reltol = 0` every time point is stored.
 
 Returns the stored time points; the stored states are the first `length(times)` columns.
 
+The marginal element of an inflow tree (`u[end]`, the dose) is not integrated (`du = 0`), and
+`jf_inflow!` sets it only in the solver's work vector, so the state would keep its initial
+value. It is therefore set to `f_intervention(t)` before every time point is checked and stored.
+
 The terminal state is a vector holding the `(n_rows, n_terminals)` block in column-major
 order (see `jf_terminal!`), so row `ki` of the block is the strided range `ki:n_rows:end`.
 """
@@ -143,6 +148,11 @@ function integrate!(solution_terminal, integrator_terminal, n_rows, inflow_rows,
     n_saved = 0
     kl_last_saved = 0
     for kl in 1:n_time_points
+        # dose of the inflow trees at the kl-th time point, so that it is stored and seen by
+        # the adaptive saving (the solver does not read it back: du = 0, jf_inflow! overwrites it)
+        for b in tree_bindings
+            b.is_inflow && (b.integ.u[end] = f_intervention(tmin + (kl - 1) * dt))
+        end
         # store numerical solutions (state at the kl-th time point) in the next free column
         if save_all || kl == 1 || kl == n_time_points ||
                 kl - kl_last_saved >= save_criteria.max_gap ||
