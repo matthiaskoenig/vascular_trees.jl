@@ -78,6 +78,8 @@ module ProcessIndividualTrees
         edges_df, nodes_df = read_graph(GRAPH_PATH, EDGES_PATH, NODES_PATH)
         add_graph_characteristics!(edges_df, vascular_tree)
         graph_df = build_arrow_df(edges_df, nodes_df, vascular_tree)
+        
+        mkpath(joinpath(GRAPH_DIR, "graphs"))
         save_as_arrow(graph_df, joinpath(GRAPH_DIR, "graphs/$(vascular_tree).arrow"))
     end
 

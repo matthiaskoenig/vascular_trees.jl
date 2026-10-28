@@ -42,10 +42,10 @@ function jf_inflow!(du::Vector, u::Vector, p::VascularTreeParameters, t::Float64
     # marginal element (u[end]) gets the concentration of the incoming blood, rate / Q_root
     # (Q_root: flow of the root edge, the successor of the marginal element)
     root_element = view(post_idx, post_off[end-1]:post_off[end]-1)
-    u[end] = f_intervention(t) / sum(view(flows, root_element))
-    # if p.id == "A"
-    #     u[end] = f_intervention(t)
-    # end
+    # u[end] = f_intervention(t)
+    if p.id == "A"
+        u[end] = f_intervention(t)
+    end
     @inbounds for (ke, group) in enumerate(ODE_groups)
         # retrieve information for element
         pre_element = view(pre_idx, pre_off[ke]:pre_off[ke+1]-1)

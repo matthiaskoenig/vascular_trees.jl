@@ -6,9 +6,13 @@ is part of the file name only if it differs from 1.0.
 """
 function simulation_path(tree_info, graph_subsystem, flow_scaling_factor, dt, format::String)
     flow_part = flow_scaling_factor == 1.0 ? "" : "_$(flow_scaling_factor)Q"
-    return joinpath(
+    SIM_DIR = joinpath(
         tree_info.GRAPH_DIR,
-        "simulations",
+        "simulations"
+    )
+    mkpath(SIM_DIR)
+    return joinpath(
+        SIM_DIR,
         "$(graph_subsystem)$(flow_part)_simulations_$(dt)_dt.$(format)",
     )
 end
@@ -84,10 +88,6 @@ function save_solutions(solutions, species_ids, times, tree_info, dt, flow_scali
             table,
             simulation_path(tree_info, graph_subsystem, flow_scaling_factor, dt, "arrow"),
         )
-        # save_simulations_to_csv(
-        #     table,
-        #     simulation_csv_path(tree_info, graph_subsystem, flow_scaling_factor, dt, "csv"),
-        # )
     end
 end
 

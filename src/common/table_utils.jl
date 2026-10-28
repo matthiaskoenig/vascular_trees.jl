@@ -104,9 +104,15 @@ module TableUtils
     `lists` can be any vector of vectors, including an Arrow list column, so the per-list vectors
     are never materialized.
     """
-    function decompose_lists(lists::AbstractVector{<:AbstractVector{<:Integer}})
-        offsets = get_offsets(lists)
+    function decompose_lists(lists::AbstractVector{<:AbstractVector{<:Integer}}, first_offset::Int)
+        offsets = get_offsets(lists, first_offset)
         flat_values = flatten_lists(lists, offsets[end] - 1)
+        return flat_values, offsets
+    end
+    function decompose_lists(lists::AbstractVector{<:Tuple{<:Integer, <:Integer}}, first_offset::Int)
+        vectors_vec = [collect(edge) for edge in lists]
+        offsets = get_offsets(vectors_vec, first_offset)
+        flat_values = flatten_lists(vectors_vec, offsets[end] - first_offset)
         return flat_values, offsets
     end
 
@@ -116,10 +122,10 @@ module TableUtils
     Start position of each list in the concatenated vector, plus one entry past the end:
     `offsets[1] = 1`, `offsets[k+1] = offsets[k] + length(lists[k])`. See [`decompose_lists`](@ref).
     """
-    function get_offsets(lists::AbstractVector{<:AbstractVector{<:Integer}})::Vector{Int}
+    function get_offsets(lists::AbstractVector{<:AbstractVector{<:Integer}}, first_offset::Int)::Vector{Int}
         n_lists = length(lists)
         offsets = Vector{Int}(undef, n_lists + 1)
-        offsets[1] = 1
+        offsets[1] = first_offset
         @inbounds for k in 1:n_lists
             offsets[k+1] = offsets[k] + length(lists[k])
         end

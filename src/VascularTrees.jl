@@ -1,6 +1,7 @@
 module VascularTrees
 
     using Reexport # only for common modules, to avoid reexporting everything from the submodules
+    using DataFrames
 
     include("common/paths.jl");        @reexport using .Paths
     include("common/definitions.jl");  @reexport using .Definitions
@@ -20,5 +21,6 @@ module VascularTrees
     include("simulation/setup/parameters.jl")
     include("simulation/results/benchmarking.jl")
     include("simulation/simulation.jl")
+    include("visualization/create_vtkhdf.jl")
 
 end
