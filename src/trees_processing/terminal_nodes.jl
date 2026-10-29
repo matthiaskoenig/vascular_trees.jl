@@ -113,7 +113,7 @@ module ProcessTerminalNodes
     graph, and the preterminal edges of every tree are assumed to be in the same order, so that
     the k-th preterminal edge of each tree belongs to terminal k (row k).
 
-    Inside this function the data are collected in blocks of size `rows × n_terminals`
+    Inside this function the data are collected in blocks of size `rows * n_terminals`
     (`n_in` = number of inflow trees, `n_trees` = number of all trees), column k of a block
     belongs to terminal k. [`assemble_tnodes_table`](@ref) turns each block into columns of the
     output, see there for the column names.
@@ -158,8 +158,6 @@ module ProcessTerminalNodes
 
         # Row that the next inflow tree writes to (row 1 is reserved for the outflow trees).
         k_inflow::Int = 2
-
-        p = Progress(length(values(graphs)); dt=0.5, color=:magenta)
         # The order of tree_info.vascular_trees fixes the order of the rows.
         for (tree_row, tree_id) in enumerate(tree_info.vascular_trees)
             graph = graphs[tree_id]
@@ -200,8 +198,6 @@ module ProcessTerminalNodes
                 leaf_node_index
             )
             species_affiliations[tree_row, found] .= tree_name
-
-            next!(p)
         end
 
         tnodes_info_df = assemble_tnodes_table(

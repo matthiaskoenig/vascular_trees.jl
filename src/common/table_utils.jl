@@ -159,13 +159,16 @@ module TableUtils
     swap_parts("Q_12_34", (2, 3))   # "Q_34_12"
     ```
 
-    Throws `BoundsError` if `str` has fewer parts than the largest index in `swap_idx`.
+    If `str` has fewer parts than the largest index in `swap_idx` returns unchanged 'str'.
     """
     function swap_parts(str::AbstractString, swap_idx::Tuple{Int,Int})
-        idx1, idx2 = swap_idx
         parts = split(str, "_")
-        parts[idx1], parts[idx2] = parts[idx2], parts[idx1]
-        return join(parts, "_")
+        if length(parts) >= maximum(swap_idx)
+            idx1, idx2 = swap_idx
+            parts[idx1], parts[idx2] = parts[idx2], parts[idx1]
+            return join(parts, "_")
+        end
+        return str
     end
 
 end
