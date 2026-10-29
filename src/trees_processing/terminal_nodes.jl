@@ -208,6 +208,7 @@ module ProcessTerminalNodes
             flow_values, 
             n_terminals
         )
+        print(species_coordinates[:, 1])
         return tnodes_info_df
     end
 
