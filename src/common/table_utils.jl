@@ -14,7 +14,8 @@ module TableUtils
         get_extended_vector,
         block_to_df,
         load_arrow,
-        decompose_lists
+        decompose_lists,
+        swap_parts
 
     using DataFrames, 
         Arrow,
@@ -146,6 +147,25 @@ module TableUtils
             position += 1
         end
         return flat_values
+    end
+
+    """
+        swap_parts(str, swap_idx) -> String
+
+    Split `str` by `"_"`, swap the two parts at positions `swap_idx` (1-based) and join them back.
+
+    # Example
+    ```julia
+    swap_parts("Q_12_34", (2, 3))   # "Q_34_12"
+    ```
+
+    Throws `BoundsError` if `str` has fewer parts than the largest index in `swap_idx`.
+    """
+    function swap_parts(str::AbstractString, swap_idx::Tuple{Int,Int})
+        idx1, idx2 = swap_idx
+        parts = split(str, "_")
+        parts[idx1], parts[idx2] = parts[idx2], parts[idx1]
+        return join(parts, "_")
     end
 
 end

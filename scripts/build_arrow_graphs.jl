@@ -20,9 +20,6 @@ Outputs, in the `graphs/` folder of the graph directory:
 2. `T.arrow`      - terminal nodes, i.e. the connection points between the trees
 """
 module ProcessSyntheticVascularTrees
-    """
-    TODO: Optimize code
-    """
     # === Imports ===
     using Revise
     using VascularTrees
@@ -38,7 +35,7 @@ module ProcessSyntheticVascularTrees
     # === Graph options ===
     # options for graph, i.e., number of nodes and type of tree
     t_options = TreeOptions(
-        n_nodes = [1000000],  #10, 100, 1000, 10000, 100000
+        n_nodes = [10],  #10, 100, 1000, 10000, 100000
         tree_configurations = [
             "Rectangle_quad",
         ],

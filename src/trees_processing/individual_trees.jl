@@ -39,7 +39,8 @@ module ProcessIndividualTrees
         get_extended_vector, 
         rows_to_tuples, 
         selection_from_df, 
-        save_as_arrow
+        save_as_arrow,
+        swap_parts
 
     using ..TreesProcessingHelpers: 
         label_special_edges!, 
@@ -250,9 +251,12 @@ module ProcessIndividualTrees
     )::NamedTuple
         is_inflow = in(vascular_tree, flow_direction.inflow_trees)
         # outflow trees: swap source and target so that edges follow the blood flow
-        (!is_inflow) &&
-            (rename!(edges_df, [:source_id => :target_id, :target_id => :source_id]))
-
+        if !is_inflow
+            rename!(edges_df, [:source_id => :target_id, :target_id => :source_id])
+            for col in (:species_ids, :flow_ids, :volume_ids)
+                edges_df[!, col] = swap_parts.(edges_df[!, col], Ref((2, 3)))
+            end
+        end
         edges = selection_from_df(edges_df, (:, [:source_id, :target_id]))
         terminals = selection_from_df(
             edges_df,

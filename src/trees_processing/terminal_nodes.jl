@@ -19,8 +19,6 @@ Workflow:
 
 TODO: Flow affiliations are wrong.
 
-TODO: the output table mixes strings, tuples and numbers, so all its columns have type `Any`.
-
 TODO: prepare_tnodes_info assumes that every tree lists its preterminal edges in the same order,
     so that the k-th preterminal edge of each tree belongs to terminal k (column k of the output).
     This is not checked. If it does not hold, values of different terminals get mixed up
