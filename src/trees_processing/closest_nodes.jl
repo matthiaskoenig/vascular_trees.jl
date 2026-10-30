@@ -1,125 +1,165 @@
 using NearestNeighbors,
-    StaticArrays
+    StaticArrays,
+    Statistics,
+    Hungarian
 
-function calculate_squared_distance(coordinates)
-    x_coord = [c[1] for c in coordinates]
-    y_coord = [c[2] for c in coordinates]
-    z_coord = [c[3] for c in coordinates]
+sq_dist(p, q) = sum((p .- q) .^ 2)
 
-    x_centroid = sum(x_coord) / length(x_coord)
-    y_centroid = sum(y_coord) / length(y_coord)
-    z_centroid = sum(z_coord) / length(z_coord)
+function calculate_group_cost(trees, groups, group_idx)
+    μ = mean(trees[t, groups[t, group_idx]] for t in axes(groups, 1))
 
-    squared_dist = []
-    for c in coordinates
-        x, y, z = c
-        distance = (x - x_centroid)^2 + (y - y_centroid)^2 + (z - z_centroid)^2
-        push!(squared_dist, distance)
-    end
-    return sum(squared_dist)
+    group_cost = sum(sq_dist(trees[t, groups[t, group_idx]], μ) for t in axes(groups, 1))
+    return group_cost
 end
 
-function find_closest_nodes(nodes::Matrix, k::Int)
-    fixed_nodes = @view nodes[1, :]
-    fixed = reduce(hcat, collect.(nodes[1, :]))
+function calculate_total_cost(trees, groups)
+    return sum(group_idx -> calculate_group_cost(trees, groups, group_idx), axes(groups, 2))
+end
 
-    n_trees = size(nodes, 1) - 1
-    kdtrees = Vector{KDTree}(undef, n_trees)
-    knn_idx = Vector{Vector{Vector{Int}}}(undef, n_trees)
-    knn_dist = Vector{Vector{Vector{Float64}}}(undef, n_trees)
-    for (kr, row) in enumerate(eachrow(@view nodes[2:end, :]))
-        data = reduce(hcat, collect.(row))
-        kdtrees[kr] = KDTree(data)
-        knn_idx[kr], knn_dist[kr] = knn(kdtrees[kr], fixed, min(k, size(data, 2)))
+# neighbours[t] holds the nodes of tree t + 1 closest to each node of the reference tree
+function find_neighbours!(neighbours, trees, reference_tree, k)
+    for (t, tree) in enumerate(eachrow(trees[2:end, :]))
+        neighbours[t], _ = knn(KDTree(tree), reference_tree, min(k, length(tree)))
     end
+end
 
-    sq_distances = []
-    candidates = []
-    for (kn, c) in enumerate(fixed_nodes)
-        # for this node collect all neighbour nodes from all trees 
-        neighbour_lists = [knn_idx[kr][kn] for kr in 1:n_trees]
-        
+function select_greedy!(groups, order, candidates, taken, n_groups)
+    for c in order
+        candidate = view(candidates, :, c)
+        any(taken[t, candidate[t]] for t in eachindex(candidate)) && continue
+        n_groups += 1
+        groups[:, n_groups] .= candidate
+        for t in eachindex(candidate)
+            taken[t, candidate[t]] = true # mark nodes as taken
+        end
+    end
+    return n_groups
+end
+
+function assign_free_nodes!(groups, taken, trees)
+    for t in 3:size(trees, 1)
+        free_nodes = taken[t, :]
+        # groups that still have no node from tree t
+        open_groups = findall(==(0), groups[t, :])
+        # centroid of each open group from its already assigned trees
+        centroids = [mean(trees[t_other, groups[t_other, group_idx]] for t_other in axes(groups, 1) if groups[t_other, group_idx] != 0) for group_idx in open_groups]
+
+        # all (open group index, node index) combinations, scored by distance from the node to the group's centroid
+        options = collect(Iterators.product(eachindex(open_groups), free_nodes))
+        costs = [sq_dist(centroids[group_idx], trees[t, node_idx]) for (group_idx, node_idx) in options]
+        # smallest distance first
+        order = sortperm(vec(costs))
+
+        group_filled = falses(length(open_groups))
+        node_taken = falses(size(trees, 2))
+        for o in order
+            group_idx, node_idx = options[o]
+            (group_filled[group_idx] || node_taken[node_idx]) && continue
+            groups[t, open_groups[group_idx]] = node_idx
+            group_filled[group_idx] = true                # mark the group and the node as taken
+            node_taken[node_idx] = true
+        end
+    end
+end
+
+function pair_free_nodes!(groups, taken, trees, n_groups, idx)
+    free_1 = taken[idx[1], :]
+    free_2 = taken[idx[2], :]
+
+    pairs = Matrix{Int}(undef, 2, length(free_1) * length(free_2))
+    combinations = Iterators.product(free_1, free_2)
+    for (c, (a, b)) in enumerate(combinations)
+        pairs[:, c] .= (a, b)
+    end
+    costs = [calculate_group_cost(trees, pairs, c) for c in axes(pairs, 2)]
+    order = sortperm(costs)
+
+    return select_greedy!(view(groups, 1:2, :), order, pairs, taken, n_groups)
+end
+
+function get_greedy_solution!(groups, reference_tree, trees, k)
+    n_trees = size(trees, 1)
+    n_other = n_trees - 1
+    n_neighbours = min(k, size(trees, 2))
+    n_reference = length(reference_tree)
+    n_candidates = n_reference * n_neighbours^n_other
+
+    neighbours = Vector{Vector{Vector{Int}}}(undef, n_other)
+    candidates = Matrix{Int}(undef, n_trees, n_candidates)
+    taken = falses(n_trees, size(trees, 2)) # one flag vector per tree
+    costs = Vector{Float64}(undef, n_candidates)
+
+    find_neighbours!(neighbours, trees, reference_tree, k)
+
+    c = 0
+    for node_idx in eachindex(reference_tree)
+        # for this node collect all neighbour nodes from all trees
+        neighbour_lists = [neighbours[t][node_idx] for t in 1:n_other]
         # get all possible combinations of this node and neighbours to check them
-        combinations = Iterators.product(neighbour_lists...)
-        for combo in combinations
-            coords = [c]
-            for (kr, idx) in enumerate(combo)
-                push!(coords, nodes[kr + 1, idx])
-            end
-            push!(candidates, (kn, combo...))
-            push!(sq_distances, calculate_squared_distance(coords))
+        for neighbour_combo in Iterators.product(neighbour_lists...)
+            c += 1
+            candidates[:, c] .= (node_idx, neighbour_combo...)
+            costs[c] = calculate_group_cost(trees, candidates, c)
         end
     end
 
-    p = sortperm(sq_distances, rev=false)
-    used = [falses(size(nodes, 2)) for _ in 1:n_trees + 1] # one flag vector per row
-    triplets = []
-    for idx in p
-        cand = candidates[idx]
-        any(used[r][cand[r]] for r in eachindex(cand)) && continue
+    order = sortperm(costs)
 
-        push!(triplets, cand)
-        for r in eachindex(cand)
-            used[r][cand[r]] = true # consume the points
-        end
-    end
-    
-    leftovers_fixed = findall(.!used[1])
-    leftovers_b = findall(.!used[2])
-    leftover = [leftovers_fixed, leftovers_b]
-    sq_distances_l = []
-    combinations = Iterators.product(leftover...)
-    for (kc, combo) in enumerate(combinations)
-        a = combo[1]
-        b = combo[2]
-        coords = [nodes[1, a], nodes[2, b]]
-        push!(sq_distances_l, calculate_squared_distance(coords))
-    end
-    combinations = collect(Iterators.product(leftover...)) 
-    p = sortperm(sq_distances_l, rev=false)
-    used_l = [falses(size(nodes, 2)) for _ in 1:2 + 1]
-    triplets_l = []
-    for idx in p
-        cand = combinations[idx]
-        any(used_l[r][cand[r]] for r in eachindex(cand)) && continue
+    n_groups = 0 # number of filled groups (columns)
+    n_groups = select_greedy!(groups, order, candidates, taken, n_groups)
+    n_groups = pair_free_nodes!(groups, taken, trees, n_groups, [1, 2])
 
-        push!(triplets_l, cand)
-        for r in eachindex(cand)
-            used_l[r][cand[r]] = true # consume the points
-        end
-    end
+    # --- attach free nodes of trees 3.. to the pairs of trees 1–2 ---
+    assign_free_nodes!(groups, taken, trees)
 
-    # --- attach leftover C points to the leftover A–B pairs ---
-    midpoint(p, q) = (p .+ q) ./ 2
-    sq_dist(p, q) = sum((p .- q) .^ 2)
+    greedy_cost = calculate_total_cost(trees, groups)
 
-    leftovers_c = findall(.!used[3])
-    midpoints = [midpoint(nodes[1, a], nodes[2, b]) for (a, b) in triplets_l]
-
-    # all (pair index, c index) combinations, scored by distance from c to the pair's midpoint
-    pair_c = collect(Iterators.product(eachindex(triplets_l), leftovers_c))
-    sq_distances_c = [sq_dist(midpoints[ip], nodes[3, c]) for (ip, c) in pair_c]
-
-    p = sortperm(vec(sq_distances_c))        # smallest distance first
-    used_pairs = falses(length(triplets_l))
-    used_c = falses(size(nodes, 2))
-    triplets_abc = []
-    for idx in p
-        ip, c = pair_c[idx]
-        (used_pairs[ip] || used_c[c]) && continue
-
-        a, b = triplets_l[ip]
-        push!(triplets_abc, (a, b, c))
-        used_pairs[ip] = true                # consume the pair and the point
-        used_c[c] = true
-    end
-
+    return greedy_cost
 end
 
-"""
-End of Step 1 (leftovers only). After the greedy pass, a few points remain unused. Only those are matched: the remaining A points with the remaining B points, then the remaining C points attached to the midpoints of those pairs. The greedy triplets stay as they are. The purpose is simply to make the solution complete.
+function alternating_assignment(groups, trees, greedy_cost, max_iter, tol)
+    rel_change = 1
+    cost = greedy_cost
+    for _ in 1:max_iter
+        for t in axes(trees, 1)
 
-Step 2 (everything). Starting from that complete solution, each step takes all n pairs and reassigns all n points of the third set at once. For example, it fixes all n A–B pairs and finds the best assignment of all n C points to their midpoints. Every triplet can change, including the ones greedy picked as excellent.
+            # centroid of each group without tree t
+            other_trees = [t_other for t_other in axes(groups, 1) if t_other != t]
+            centroids = [mean(trees[t_other, groups[t_other, group_idx]] for t_other in other_trees) for group_idx in axes(groups, 2)]
 
-Why it has to be global: the leftover triplets are usually poor because their points are far apart. They can’t be fixed using only each other, since no good partners exist among the leftovers. The fix is for nearby good triplets to give up a point and take a slightly worse one in return. A good triplet gets a little looser, while a bad one gets much tighter, and the total drops. That’s only possible if Step 2 is allowed to change the good triplets too.
-"""
+            cost_matrix = [sq_dist(centroids[group_idx], trees[t, node_idx])
+                           for group_idx in axes(groups, 2), node_idx in axes(trees, 2)]
+            assignment, _ = hungarian(cost_matrix)
+            groups[t, :] .= assignment
+        end
+
+        new_cost = calculate_total_cost(trees, groups)
+        rel_change = (cost - new_cost) / cost
+        cost = new_cost
+        rel_change <= tol && break
+    end
+    return groups
+end
+
+function find_closest_nodes(coords::Matrix, k::Int)
+    trees = SVector{3,Float64}.(coords)
+    n_trees = size(coords, 1)
+    n_nodes = size(coords, 2)
+    groups = zeros(Int, n_trees, n_nodes)
+
+    reference_tree = @view trees[1, :]
+
+    max_iter = 10
+    tol = 10e-09
+
+    greedy_cost = get_greedy_solution!(groups, reference_tree, trees, k)
+    alternating_assignment(groups, trees, greedy_cost, max_iter, tol)
+end
+
+coords = permutedims(hcat(
+    [[0.0, 0.0, 0.0],  [10.0, 0.0, 0.0], [0.0, 10.0, 0.0], [0.0, 0.0, 10.0]],  # tree 1: reference tree
+    [[0.0, 10.1, 0.0], [0.1, 0.0, 0.0],  [0.0, 0.0, 10.1], [10.1, 0.0, 0.0]],  # tree 2
+    [[0.0, 0.0, 9.9],  [9.9, 0.0, 0.0],  [0.0, 0.1, 0.0],  [0.0, 9.9, 0.0]],   # tree 3
+    [[10.0, 0.2, 0.0], [0.0, 0.0, 10.2], [0.0, 9.8, 0.0],  [0.0, 0.0, 0.2]],   # tree 4
+))
+result = find_closest_nodes(coords, 1)
