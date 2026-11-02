@@ -96,7 +96,8 @@ module ODEparameters
     Parameters of the terminal nodes from `T.arrow` (one row per terminal, see
     `assemble_tnodes_table`). The `species_id_*` and `flow_value_*` columns are put back into
     `(n_inflow+1) * n_terminals` blocks: row 1 = terminal / summed outflow, then one row per inflow
-    tree. `volumes` is the volume of one terminal (the same for all terminals).
+    tree. `volumes` is the volume of one terminal (the same for all terminals). The `synch_idx_*`
+    columns (one per tree) are put back into the `n_trees * n_terminals` block `synch_indices`.
     """
     function get_terminal_parameters(ARROW_PATH::String, flow_scaling_factor::Float64)
         tnodes_df = load_arrow(ARROW_PATH)
@@ -106,6 +107,7 @@ module ODEparameters
             species_ids = permutedims(Matrix{String}(tnodes_df[:, r"^species_id_"])),
             flow_values = permutedims(Matrix{Float64}(tnodes_df[:, r"^flow_value_"])) .* flow_scaling_factor,
             volumes = tnodes_df.volume[1],
+            synch_indices = permutedims(Matrix{Int}(tnodes_df[:, r"^synch_idx_"]))
         )
 
         return p

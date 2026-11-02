@@ -24,7 +24,7 @@ using .Interventions: f_intervention
 
 include("equations/ode_trees.jl")
 include("equations/ode_terminal.jl")
-export jf_dxdt!
+export dose_concentration, jf_dxdt!
 
 include("jacobians.jl")
 export jac!

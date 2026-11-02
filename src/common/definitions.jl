@@ -131,7 +131,7 @@ module Definitions
     end
 
     """
-    TerminalParameters(; id, species_ids, flow_values, volumes)
+    TerminalParameters(; id, species_ids, flow_values, volumes, synch_indices)
 
     Parameters of the terminal nodes (`p` for `jf_terminal!`), built by `get_terminal_parameters`
     from `T.arrow`. Matrices have shape `(n_inflow+1) × n_terminals`: column k = terminal k,
@@ -143,6 +143,11 @@ module Definitions
     connected to terminal k.
     - `flow_values`: row 1 = summed outflow of the terminal, rows 2… = inflow from each inflow tree.
     - `volumes`: volume of one terminal (the same for all terminals).
+    - `synch_indices`: `n_trees × n_terminals`, one row per tree in the order of
+    `tree_info.vascular_trees` (the result of `find_closest_nodes!`). `synch_indices[t, k]` is the
+    position, among the preterminal edges of tree `t` (table order), of the edge connected to
+    terminal k. Used by `get_synchronization_indices` to order the coupled species of each tree
+    like the terminal columns. Must be passed: the default (one row of zeros) is not valid.
 
     # Preallocated work arrays (derived, DO NOT PASS)
     - `terminal_matrix_size`: `size(species_ids)`.
@@ -159,5 +164,6 @@ module Definitions
         terminal_inflow::Array{T, 2} = zeros(terminal_matrix_size[1]-1, terminal_matrix_size[2])
         terminal_outflow::Array{T, 2} = zeros(1, terminal_matrix_size[2])
         terminal_difference::Array{T, 2} = zeros(1, terminal_matrix_size[2])
+        synch_indices::Array{Int, 2} = zeros(Int, 1, terminal_matrix_size[2])
     end
 end

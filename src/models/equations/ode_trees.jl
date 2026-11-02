@@ -8,6 +8,19 @@ const outflow_out = zeros(1)
 const outflow_in_margin = zeros(1)
 const outflow_out_margin = zeros(1)
 
+"""
+    dose_concentration(p::VascularTreeParameters, t) -> Float64
+
+Value of the marginal element (`u[end]`) of an inflow tree at time `t`: `f_intervention` is an
+infusion rate (amount/min), `u` holds concentrations, so the incoming blood has the concentration
+rate / Q_root (Q_root: flow of the root edge, the successor of the marginal element).
+"""
+function dose_concentration(p::VascularTreeParameters, t)
+    post_idx, post_off = p.successors_idx, p.successors_offset
+    root_element = view(post_idx, post_off[end-1]:post_off[end]-1)
+    return f_intervention(t) / sum(view(p.flow_values, root_element))
+end
+
 function jf_dxdt!(du::Vector, u::Vector, p::VascularTreeParameters, t::Float64)
     if p.is_inflow
         jf_inflow!(du, u, p, t)
@@ -36,12 +49,7 @@ function jf_inflow!(du::Vector, u::Vector, p::VascularTreeParameters, t::Float64
     pre_idx, pre_off = p.predecessors_idx, p.predecessors_offset
     post_idx, post_off = p.successors_idx, p.successors_offset
 
-    #   dose input means changing how the root's equation reads its predecessor.
-    # dose: f_intervention is an infusion rate (amount/min), u holds concentrations, so the
-    # marginal element (u[end]) gets the concentration of the incoming blood, rate / Q_root
-    # (Q_root: flow of the root edge, the successor of the marginal element)
-    root_element = view(post_idx, post_off[end-1]:post_off[end]-1)
-    u[end] = f_intervention(t) / sum(view(flows, root_element))
+    u[end] = dose_concentration(p, t)
     # if p.id == "A"
     #     u[end] = f_intervention(t)
     # end

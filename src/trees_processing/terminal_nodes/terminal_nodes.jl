@@ -18,11 +18,6 @@ Workflow:
     - [`assemble_tnodes_table`](@ref) - stack the blocks into one `DataFrame`.
 
 TODO: Flow affiliations are wrong.
-
-TODO: prepare_tnodes_info assumes that every tree lists its preterminal edges in the same order,
-    so that the k-th preterminal edge of each tree belongs to terminal k (column k of the output).
-    This is not checked. If it does not hold, values of different terminals get mixed up
-    (possible cause of the wrong flow affiliations).
 =#
 
 """
@@ -88,8 +83,9 @@ end
 Build the terminal node table from the loaded trees in `graphs`.
 
 The output has one row per terminal node. The number of terminals is taken from the `"V"`
-graph, and the preterminal edges of every tree are assumed to be in the same order, so that
-the k-th preterminal edge of each tree belongs to terminal k (row k).
+graph. The preterminal edges of the trees are not in the same order, so they are grouped by
+[`find_closest_nodes!`](@ref): terminal k (row k) is the group of the closest leaf nodes, one
+from every tree. All blocks are reordered by these groups after they are filled.
 
 Inside this function the data are collected in blocks of size `rows * n_terminals`
 (`n_in` = number of inflow trees, `n_trees` = number of all trees), column k of a block
@@ -103,8 +99,9 @@ output, see there for the column names.
 | `species_affiliations` | `n_trees` | tree id each coordinate row belongs to                               |
 | `flow_ids`             | `1+n_in`  | row 1 is `"Outflow"`, then one row per inflow tree                   |
 | `flow_values`          | `1+n_in`  | row 1 is the sum of all outflow flows, then one row per inflow tree  |
+| `matching`             | `n_trees` | position of the terminal among the preterminal edges of each tree    |
 
-Inflow rows and coordinate rows follow the order of `tree_info.vascular_trees`.
+Inflow rows, coordinate rows and `matching` rows follow the order of `tree_info.vascular_trees`.
 Coordinates come from [`get_terminal_coordinates`](@ref). A terminal whose leaf node
 is not found keeps the coordinates `(0.0, 0.0, 0.0)` and the tree id `""`.
 """
@@ -211,7 +208,8 @@ function prepare_tnodes_info(
         species_affiliations, 
         flow_ids, 
         flow_values, 
-        n_terminals
+        n_terminals,
+        matching
     )
     return tnodes_info_df
 end
@@ -270,7 +268,7 @@ end
 
 """
     assemble_tnodes_table(species_ids, species_coordinates, species_affiliations,
-        flow_ids, flow_values, n_terminals) -> DataFrame
+        flow_ids, flow_values, n_terminals, matching) -> DataFrame
 
 Convert the blocks filled by [`prepare_tnodes_info`](@ref) into the output table:
 one row per terminal, every column has one concrete type (no `Any`).
@@ -287,16 +285,17 @@ one row per terminal, every column has one concrete type (no `Any`).
 | `flow_value_1`                 | `Float64`           | sum of the flows of all outflow trees                 |
 | `flow_value_2`, …              | `Float64`           | flow of the terminal in each inflow tree              |
 | `volume`                       | `Float64`           | terminal volume, `volume_geometry / n_terminals`      |
+| `synch_idx_1`, …               | `Int`               | position of the terminal among the preterminal edges of each tree (`matching`) |
 
 The index in `species_id_*`, `flow_id_*` and `flow_value_*` runs over inflow trees (after the
-first column), in `coordinates_*` and `affiliation_*` over all trees, in the order of
+first column), in `coordinates_*`, `affiliation_*` and `synch_idx_*` over all trees, in the order of
 `tree_info.vascular_trees`.
 
 To get a block back in its `rows * n_terminals` form:
 `permutedims(Matrix(df[:, r"^coordinates_"]))`.
 """
 function assemble_tnodes_table(species_ids, species_coordinates, species_affiliations,
-                            flow_ids, flow_values, n_terminals)
+                            flow_ids, flow_values, n_terminals, matching)
     return hcat(
         block_to_df(species_ids, "species_id"),          # species_id_1 = T_k, then inflow species
         block_to_df(species_coordinates, "coordinates"), # one column per tree
@@ -304,5 +303,6 @@ function assemble_tnodes_table(species_ids, species_coordinates, species_affilia
         block_to_df(flow_ids, "flow_id"),                # flow_id_1 = "Outflow"
         block_to_df(flow_values, "flow_value"),          # flow_value_1 = summed outflow
         DataFrame(volume = fill(volume_geometry / n_terminals, n_terminals)),
+        block_to_df(matching, "synch_idx")
     )
 end

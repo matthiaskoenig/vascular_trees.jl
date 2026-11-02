@@ -32,26 +32,21 @@ function run_simulations(
     synch_idxs = Dictionary{String, Vector{Int}}()
     solutions  = Dictionary{String, Matrix{Float64}}()
 
-    p_terminal, u0_terminal = stage("parameters and initial values") do
-        for tree in trees
-            stage("parameters $tree"; debug = true) do
-                # 1. parameters of the tree
-                p_tree = get_ODE_parameters(tree_info, tree, flow_scaling_factor)
-                insert!(p, tree, p_tree)
-                # 2. initial values and indices of the species that connect trees and terminal nodes
-                insert!(u0, tree, get_initial_values(p_tree.ODE_groups))
-                insert!(synch_idxs, tree, get_synchronization_indices(tree, p_tree.ODE_groups))
-            end
-        end
+    # terminal nodes are stored separately from trees, because they are stored differently
+    p_terminal = get_ODE_parameters(tree_info, "T", flow_scaling_factor)
+    # the state is the (n_rows, n_terminals) block as a vector (column-major order, see
+    # jf_terminal!): the analytic-Jacobian callback of Sundials.jl only supports vectors
+    u0_terminal = vec(get_initial_values(p_terminal.flow_values))
 
-        stage("parameters T"; debug = true) do
-            # terminal nodes are stored separately from trees, because they are stored differently
-            # (own name: assigning p_terminal inside the closure would box the outer variable)
-            p_T = get_ODE_parameters(tree_info, "T", flow_scaling_factor)
-            # the state is the (n_rows, n_terminals) block as a vector (column-major order, see
-            # jf_terminal!): the analytic-Jacobian callback of Sundials.jl only supports vectors
-            p_T, vec(get_initial_values(p_T.flow_values))
-        end
+    for (tree_row, tree) in enumerate(trees)
+        # 1. parameters of the tree
+        p_tree = get_ODE_parameters(tree_info, tree, flow_scaling_factor)
+        insert!(p, tree, p_tree)
+        # 2. initial values and indices of the species that connect trees and terminal nodes;
+        #    row tree_row of synch_indices belongs to this tree (order of tree_info.vascular_trees)
+        insert!(u0, tree, get_initial_values(p_tree.ODE_groups))
+        insert!(synch_idxs, tree,
+            get_synchronization_indices(tree, p_tree.ODE_groups, view(p_terminal.synch_indices, tree_row, :)))
     end
 
     # 3. preallocated solutions, one column per (possibly) stored time point; the disk space

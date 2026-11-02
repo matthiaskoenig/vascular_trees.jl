@@ -155,7 +155,7 @@ function integrate!(solution_terminal, integrator_terminal, n_rows, inflow_rows,
         # the adaptive saving (the solver does not read it back: du = 0, jf_inflow! overwrites it)
         if store
             for b in tree_bindings
-                b.is_inflow && (b.integ.u[end] = f_intervention(tmin + (kl - 1) * dt))
+                b.is_inflow && (b.integ.u[end] = dose_concentration(b.integ.p, tmin + (kl - 1) * dt))
             end
         end
         # store numerical solutions (state at the kl-th time point) in the next free column
