@@ -23,8 +23,9 @@ module ProcessSyntheticVascularTrees
     # === Imports ===
     using Revise
     using VascularTrees
-    using VascularTrees.ProcessIndividualTrees: process_julia_graph
-    using VascularTrees.ProcessTerminalNodes: process_terminal_nodes
+    using VascularTrees.TreesProcessing: 
+        process_julia_graph, 
+        process_terminal_nodes
 
     # Definitions of the available tree configurations (inflow / outflow trees)
     const trees::TreeDefinitions = TreeDefinitions()

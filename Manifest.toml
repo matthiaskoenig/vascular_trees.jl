@@ -2,7 +2,7 @@
 
 julia_version = "1.13.1"
 manifest_format = "2.1"
-project_hash = "be4e3ff80a1a5a48863465c07ed07de42e348131"
+project_hash = "a762beffb6f9e2a5dfe0f26d326e7b08bb938895"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -2257,7 +2257,7 @@ version = "1.29.0"
     Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [[deps.VascularTrees]]
-deps = ["Arrow", "BenchmarkTools", "CSV", "Combinatorics", "DataFrames", "DataFramesMeta", "Dictionaries", "DifferentialEquations", "HDF5", "Hungarian", "InteractiveUtils", "Mmap", "NearestNeighbors", "OrdinaryDiffEq", "PProf", "Parameters", "Profile", "ProgressMeter", "Reexport", "Revise", "SciMLBase", "SparseArrays", "StaticArrays", "StyledStrings", "Sundials", "Tables", "TimerOutputs"]
+deps = ["Arrow", "BenchmarkTools", "CSV", "Combinatorics", "DataFrames", "DataFramesMeta", "Dictionaries", "DifferentialEquations", "HDF5", "Hungarian", "InteractiveUtils", "Mmap", "NearestNeighbors", "OrdinaryDiffEq", "PProf", "Parameters", "Profile", "ProgressMeter", "Reexport", "Revise", "SciMLBase", "SparseArrays", "StaticArrays", "Statistics", "StyledStrings", "Sundials", "Tables", "TimerOutputs"]
 path = "."
 uuid = "87ddc3cc-728b-4545-b71e-e2b9cf7abe66"
 version = "0.1.0"

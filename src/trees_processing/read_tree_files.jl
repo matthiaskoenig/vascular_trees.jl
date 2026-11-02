@@ -1,6 +1,4 @@
-"""
-    ReadTreeFiles
-
+#=
 Read vascular tree data from CSV files produced by the SyntheticVascularTree generator
 and assemble them into DataFrames ready for graph construction.
 
@@ -17,148 +15,136 @@ Attributes of a node describe the edge *arriving at* that node (the "target" edg
 
 Inflow/outflow direction is irrelevant at this stage; every tree is read as flowing from
 the highest-index node to the lowest. Direction reversal is handled downstream.
+=#
+
+const MM3_PER_L = 1e6
+const S_PER_MIN = 60
+
 """
-module ReadTreeFiles
-    using CSV, 
-        DataFrames, 
-        DataFramesMeta, 
-        Parameters
+    read_edges(GRAPH_PATH, EDGES_PATH) -> DataFrame
 
-    export read_edges, 
-        read_graph_skeleton, 
-        read_edge_attributes, 
-        read_nodes
+Load a complete edge table by joining the graph skeleton (connectivity) with edge
+attributes (physical quantities).
 
-    const MM3_PER_L = 1e6
-    const S_PER_MIN = 60
+The two LG are joined on `:target_id`. Missing values are not allowed in the
+result and will raise an error if any join keys are unmatched.
 
-    """
-        read_edges(GRAPH_PATH, EDGES_PATH) -> DataFrame
+# Arguments
+- `GRAPH_PATH`: path to the LG containing edge connectivity (source/target node ids).
+- `EDGES_PATH`: path to the CSV containing per-edge physical attributes.
 
-    Load a complete edge table by joining the graph skeleton (connectivity) with edge
-    attributes (physical quantities).
+# Returns
+A `DataFrame` with columns from both sources, with units converted as described in
+[`read_edge_attributes`](@ref).
+"""
+function read_edges(GRAPH_PATH::String, EDGES_PATH::String)::DataFrame
+    edges_df::DataFrame = read_graph_skeleton(GRAPH_PATH)
+    edges_attrib_df::DataFrame = read_edge_attributes(EDGES_PATH)
+    leftjoin!(edges_df, edges_attrib_df, on = :target_id)
+    disallowmissing!(edges_df)
 
-    The two LG are joined on `:target_id`. Missing values are not allowed in the
-    result and will raise an error if any join keys are unmatched.
+    return edges_df
+end
 
-    # Arguments
-    - `GRAPH_PATH`: path to the LG containing edge connectivity (source/target node ids).
-    - `EDGES_PATH`: path to the CSV containing per-edge physical attributes.
+"""
+    read_graph_skeleton(GRAPH_PATH) -> DataFrame
 
-    # Returns
-    A `DataFrame` with columns from both sources, with units converted as described in
-    [`read_edge_attributes`](@ref).
-    """
-    function read_edges(GRAPH_PATH::String, EDGES_PATH::String)::DataFrame
-        edges_df::DataFrame = read_graph_skeleton(GRAPH_PATH)
-        edges_attrib_df::DataFrame = read_edge_attributes(EDGES_PATH)
-        leftjoin!(edges_df, edges_attrib_df, on = :target_id)
-        disallowmissing!(edges_df)
+Read edge connectivity from a Graphs.jl LGFormat file and return it as a `DataFrame`
+with columns `[:source_id, :target_id]`.
 
-        return edges_df
-    end
+The first line of an LGFormat file is a metadata header not column names, so it is skipped.
 
-    """
-        read_graph_skeleton(GRAPH_PATH) -> DataFrame
+# Arguments
+- `GRAPH_PATH`: path to the `.lg` file with source and target node ids.
+"""
+function read_graph_skeleton(GRAPH_PATH::String)::DataFrame
+    graph_skeleton::DataFrame = CSV.read(GRAPH_PATH, DataFrame;
+                                         header=[:source_id, :target_id], skipto=2, delim=',',
+                                         types=Dict(:source_id => Int, :target_id => Int))
 
-    Read edge connectivity from a Graphs.jl LGFormat file and return it as a `DataFrame`
-    with columns `[:source_id, :target_id]`.
+    return graph_skeleton
+end
 
-    The first line of an LGFormat file is a metadata header not column names, so it is skipped.
+"""
+    read_edge_attributes(EDGES_PATH) -> DataFrame
 
-    # Arguments
-    - `GRAPH_PATH`: path to the `.lg` file with source and target node ids.
-    """
-    function read_graph_skeleton(GRAPH_PATH::String)::DataFrame
-        graph_skeleton::DataFrame = CSV.read(GRAPH_PATH, DataFrame;
-                                             header=[:source_id, :target_id], skipto=2, delim=',',
-                                             types=Dict(:source_id => Int, :target_id => Int))
+Read per-edge physical attributes from CSV, rename columns to short canonical names,
+and convert units to SI-adjacent values used throughout the pipeline:
 
-        return graph_skeleton
-    end
+| Original column            | Renamed to      | Unit conversion              |
+|:---------------------------|:----------------|:-----------------------------|
+| `edge_idx`                 | `target_id`     | —                            |
+| `leaf_count`               | `leaf`          | —                            |
+| `radius_in_mm`             | `radius`        | mm (unchanged)               |
+| `flow_in_mm3_per_s`        | `flows`         | mm³/s → L/min                |
+| `length_in_mm`             | `length`        | mm (unchanged)               |
+| `pressure_drop_in_kg_per_mm_s2` | `pressure_drop` | kg/(mm·s²) (unchanged)  |
 
-    """
-        read_edge_attributes(EDGES_PATH) -> DataFrame
+A new column `volumes` (in L) is computed as `π · radius² · length / 10⁶`.
 
-    Read per-edge physical attributes from CSV, rename columns to short canonical names,
-    and convert units to SI-adjacent values used throughout the pipeline:
-
-    | Original column            | Renamed to      | Unit conversion              |
-    |:---------------------------|:----------------|:-----------------------------|
-    | `edge_idx`                 | `target_id`     | —                            |
-    | `leaf_count`               | `leaf`          | —                            |
-    | `radius_in_mm`             | `radius`        | mm (unchanged)               |
-    | `flow_in_mm3_per_s`        | `flows`         | mm³/s → L/min                |
-    | `length_in_mm`             | `length`        | mm (unchanged)               |
-    | `pressure_drop_in_kg_per_mm_s2` | `pressure_drop` | kg/(mm·s²) (unchanged)  |
-
-    A new column `volumes` (in L) is computed as `π · radius² · length / 10⁶`.
-
-    # Arguments
-    - `EDGES_PATH`: path to the CSV file with edge attributes.
-    """
-    function read_edge_attributes(EDGES_PATH::String)::DataFrame
-        edges_attrib_df::DataFrame = CSV.read(
-            EDGES_PATH, 
-            DataFrame,
-            types=Dict(
-                :edge_idx => Int,
-                :leaf_count => Int,
-                :radius_in_mm => Float64,
-                :flow_in_mm3_per_s => Float64,
-                :length_in_mm => Float64,
-                :pressure_drop_in_kg_per_mm_s2 => Float64
-            ); 
-            delim=","
+# Arguments
+- `EDGES_PATH`: path to the CSV file with edge attributes.
+"""
+function read_edge_attributes(EDGES_PATH::String)::DataFrame
+    edges_attrib_df::DataFrame = CSV.read(
+        EDGES_PATH, 
+        DataFrame,
+        types=Dict(
+            :edge_idx => Int,
+            :leaf_count => Int,
+            :radius_in_mm => Float64,
+            :flow_in_mm3_per_s => Float64,
+            :length_in_mm => Float64,
+            :pressure_drop_in_kg_per_mm_s2 => Float64
+        ); 
+        delim=","
+    )
+    rename!(
+        edges_attrib_df,
+        Dict(
+            :edge_idx => :target_id,
+            :leaf_count => :leaf,
+            :radius_in_mm => :radius,
+            :flow_in_mm3_per_s => :flows,
+            :length_in_mm => :length,
+            :pressure_drop_in_kg_per_mm_s2 => :pressure_drop
         )
-        rename!(
-            edges_attrib_df,
-            Dict(
-                :edge_idx => :target_id,
-                :leaf_count => :leaf,
-                :radius_in_mm => :radius,
-                :flow_in_mm3_per_s => :flows,
-                :length_in_mm => :length,
-                :pressure_drop_in_kg_per_mm_s2 => :pressure_drop
-            )
+    )
+    edges_attrib_df.flows  .= edges_attrib_df.flows .* (S_PER_MIN / MM3_PER_L) # mm³/s → L/min
+    edges_attrib_df.volumes .= π .* edges_attrib_df.radius .^ 2 .* edges_attrib_df.length ./ MM3_PER_L  # mm³ → L
+
+    return edges_attrib_df
+end
+
+"""
+    read_nodes(NODES_PATH) -> DataFrame
+
+Read node spatial coordinates from CSV and return a `DataFrame` with columns
+`[:ids, :x, :y, :z]` (coordinates in mm, unchanged from source).
+
+# Arguments
+- `NODES_PATH`: path to the CSV file with node coordinates.
+"""
+function read_nodes(NODES_PATH::String)::DataFrame
+    nodes_df::DataFrame = CSV.read(
+        NODES_PATH, DataFrame,
+        types=Dict(
+            :node_idx => Int,
+            :x_coord_in_mm => Float64,
+            :y_coord_in_mm => Float64,
+            :z_coord_in_mm => Float64,
+        ); 
+        delim=","
+    )
+    rename!(
+        nodes_df,
+        Dict(
+            :node_idx => :ids,
+            :x_coord_in_mm => :x,
+            :y_coord_in_mm => :y,
+            :z_coord_in_mm => :z,
         )
-        edges_attrib_df.flows  .= edges_attrib_df.flows .* (S_PER_MIN / MM3_PER_L) # mm³/s → L/min
-        edges_attrib_df.volumes .= π .* edges_attrib_df.radius .^ 2 .* edges_attrib_df.length ./ MM3_PER_L  # mm³ → L
+    )
 
-        return edges_attrib_df
-    end
-
-    """
-        read_nodes(NODES_PATH) -> DataFrame
-
-    Read node spatial coordinates from CSV and return a `DataFrame` with columns
-    `[:ids, :x, :y, :z]` (coordinates in mm, unchanged from source).
-
-    # Arguments
-    - `NODES_PATH`: path to the CSV file with node coordinates.
-    """
-    function read_nodes(NODES_PATH::String)::DataFrame
-        nodes_df::DataFrame = CSV.read(
-            NODES_PATH, DataFrame,
-            types=Dict(
-                :node_idx => Int,
-                :x_coord_in_mm => Float64,
-                :y_coord_in_mm => Float64,
-                :z_coord_in_mm => Float64,
-            ); 
-            delim=","
-        )
-        rename!(
-            nodes_df,
-            Dict(
-                :node_idx => :ids,
-                :x_coord_in_mm => :x,
-                :y_coord_in_mm => :y,
-                :z_coord_in_mm => :z,
-            )
-        )
-
-        return nodes_df
-    end
-
+    return nodes_df
 end

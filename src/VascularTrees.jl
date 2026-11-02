@@ -10,10 +10,7 @@ module VascularTrees
     include("common/logging.jl");      @reexport using .LogUtils
     
     # part that processes initial trees (.vtk files) and saves them in .arrow format
-    include("trees_processing/read_tree_files.jl")
-    include("trees_processing/helpers.jl")
-    include("trees_processing/individual_trees.jl")
-    include("trees_processing/terminal_nodes.jl")
+    include("trees_processing/processing.jl")
     
     # part that runs simulations
     include("models/pharmacokinetic_models.jl")

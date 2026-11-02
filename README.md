@@ -70,8 +70,7 @@ must exist in `results/julia_vessel_trees/Rectangle_quad/Rectangle_quad_10/julia
 
 ```julia
 using VascularTrees
-using VascularTrees.ProcessIndividualTrees: process_julia_graph
-using VascularTrees.ProcessTerminalNodes: process_terminal_nodes
+using VascularTrees.TreesProcessing: process_julia_graph, process_terminal_nodes
 using VascularTrees.Simulation: run_simulations
 using VascularTrees.Visualization: write_vtkhdf_files
 

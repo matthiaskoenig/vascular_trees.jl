@@ -1,9 +1,3 @@
-using NearestNeighbors,
-    StaticArrays,
-    Statistics,
-    Hungarian,
-    Combinatorics
-
 # d(p, q) = (p_x - q_x)² + (p_y - q_y)² + (p_z - q_z)²
 """
     sq_dist(p, q)
@@ -240,7 +234,7 @@ function alternating_assignment!(groups, trees, greedy_cost, max_iter, tol)
 
             # cost_matrix[g, i] = d(c_g, p_i), p_i - coordinates of node i of tree t
             cost_matrix = [sq_dist(centroids[group_idx], trees[t, node_idx])
-                           for group_idx in axes(groups, 2), node_idx in axes(trees, 2)]
+                        for group_idx in axes(groups, 2), node_idx in axes(trees, 2)]
             # assignment[g] = node of tree t for group g; every node used once, sum of costs smallest
             assignment, _ = hungarian(cost_matrix)
             groups[t, :] .= assignment
@@ -256,14 +250,17 @@ function alternating_assignment!(groups, trees, greedy_cost, max_iter, tol)
 end
 
 """
-    find_closest_nodes(coords, k)
+    find_closest_nodes!(coords, k) -> coords
 
 Group the nodes of several trees so that each group has one node from every tree and the nodes
 in a group are as close as possible. `coords[t, i]` holds the coordinates `(x, y, z)` of node
 `i` of tree `t`; `k` is the number of neighbours checked in the greedy step. Logs how much the
 result can still be improved at most (compared with [`calculate_lower_bound`](@ref)).
+
+`coords` is reordered in place: afterwards column `g` holds the coordinates of the nodes of
+group `g`, one node per tree.
 """
-function find_closest_nodes(coords::Matrix, k::Int)
+function find_closest_nodes!(coords::Matrix, k::Int)
     trees = SVector{3,Float64}.(coords)
     n_trees = size(coords, 1)
     n_nodes = size(coords, 2)
@@ -281,12 +278,19 @@ function find_closest_nodes(coords::Matrix, k::Int)
     gap = (cost - bound) / bound * 100
 
     @info "At most $(gap)% improvement is left"
+
+    # new coords[t, g] = old coords[t, groups[t, g]]: column g holds the nodes of group g
+    # (the right side is copied first, so the row is not overwritten while it is read)
+    for t in axes(coords, 1)
+        coords[t, :] .= coords[t, groups[t, :]]
+    end
+    return groups
 end
 
-coords = permutedims(hcat(
-    [[0.0, 0.0, 0.0],  [10.0, 0.0, 0.0], [0.0, 10.0, 0.0], [0.0, 0.0, 10.0]],  # tree 1: reference tree
-    [[0.0, 10.1, 0.0], [0.1, 0.0, 0.0],  [0.0, 0.0, 10.1], [10.1, 0.0, 0.0]],  # tree 2
-    [[0.0, 0.0, 9.9],  [9.9, 0.0, 0.0],  [0.0, 0.1, 0.0],  [0.0, 9.9, 0.0]],   # tree 3
-    [[10.0, 0.2, 0.0], [0.0, 0.0, 10.2], [0.0, 9.8, 0.0],  [0.0, 0.0, 0.2]],   # tree 4
-))
-result = find_closest_nodes(coords, 1)
+# coords = permutedims(hcat(
+#     [[0.0, 0.0, 0.0],  [10.0, 0.0, 0.0], [0.0, 10.0, 0.0], [0.0, 0.0, 10.0]],  # tree 1: reference tree
+#     [[0.0, 10.1, 0.0], [0.1, 0.0, 0.0],  [0.0, 0.0, 10.1], [10.1, 0.0, 0.0]],  # tree 2
+#     [[0.0, 0.0, 9.9],  [9.9, 0.0, 0.0],  [0.0, 0.1, 0.0],  [0.0, 9.9, 0.0]],   # tree 3
+#     [[10.0, 0.2, 0.0], [0.0, 0.0, 10.2], [0.0, 9.8, 0.0],  [0.0, 0.0, 0.2]],   # tree 4
+# ))
+# find_closest_nodes!(coords, 1)
