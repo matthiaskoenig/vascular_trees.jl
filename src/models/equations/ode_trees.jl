@@ -36,7 +36,12 @@ function jf_inflow!(du::Vector, u::Vector, p::VascularTreeParameters, t::Float64
     pre_idx, pre_off = p.predecessors_idx, p.predecessors_offset
     post_idx, post_off = p.successors_idx, p.successors_offset
 
-    u[end] = f_intervention(t)
+    #   dose input means changing how the root's equation reads its predecessor.
+    # dose: f_intervention is an infusion rate (amount/min), u holds concentrations, so the
+    # marginal element (u[end]) gets the concentration of the incoming blood, rate / Q_root
+    # (Q_root: flow of the root edge, the successor of the marginal element)
+    root_element = view(post_idx, post_off[end-1]:post_off[end]-1)
+    u[end] = f_intervention(t) / sum(view(flows, root_element))
     # if p.id == "A"
     #     u[end] = f_intervention(t)
     # end

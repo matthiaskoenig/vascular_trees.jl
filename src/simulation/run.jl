@@ -60,11 +60,17 @@ function run_simulations(
     # "T" (without a value) to u0 as well
     n_species = dictionary(id => length(u0[id]) for id in keys(u0))
     insert!(n_species, "T", length(u0_terminal))
-    stage("preallocating solutions ($(sum(n_species)) species * $n_time_points time points)") do
-        check_disk_space(tree_info, sum(n_species), n_time_points,
-                         sim_options.save_simulations && !sim_options.benchmark)
+    if sim_options.benchmark
+        # nothing is stored when benchmarking (see integrate!): empty matrices, no temporary files
         for (graph_subsystem, n) in pairs(n_species)
-            insert!(solutions, graph_subsystem, mmap_solution(tree_info, graph_subsystem, n, n_time_points))
+            insert!(solutions, graph_subsystem, Matrix{Float64}(undef, n, 0))
+        end
+    else
+        stage("preallocating solutions ($(sum(n_species)) species * $n_time_points time points)") do
+            check_disk_space(tree_info, sum(n_species), n_time_points, sim_options.save_simulations)
+            for (graph_subsystem, n) in pairs(n_species)
+                insert!(solutions, graph_subsystem, mmap_solution(tree_info, graph_subsystem, n, n_time_points))
+            end
         end
     end
 

@@ -52,7 +52,7 @@ module SimulationRunner
     # === Graph options ===
     # options for graph, i.e., number of nodes and type of tree
     t_options = TreeOptions(
-        n_nodes = [10, 100, 1000],  #, 100, 1000, 10000, 100000, 1000000
+        n_nodes = [10, 100, 1000, 10000, 100000, 1000000, 10000000],  #, 100, 1000, 10000, 100000, 1000000, 10000000
         tree_configurations = [
             "Rectangle_quad",
             #"Rectangle_trio",
@@ -67,7 +67,7 @@ module SimulationRunner
         tspan = (0.0, 16.0),  # [min]
         steps = 800,          # number of time steps, dt = tspan[2] / steps
         save_simulations = true,
-        benchmark = false,
+        benchmark = true,
         save_abstol = 1e-9,
         save_reltol = 1e-6
     )

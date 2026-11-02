@@ -21,7 +21,7 @@ analytic Jacobian `jac!`.
 
 # Arguments
 - `solutions`: for every subsystem a `(n_species, steps+1)` matrix, one column per stored
-time point.
+time point; not used when `sim_options.benchmark` (nothing is stored, see [`integrate!`](@ref)).
 - `u0_terminal`, `p_terminal`: initial values (a vector, see `jf_terminal!`) and parameters
 of the terminal part.
 - `u0`, `p`: initial values and parameters of the trees, with tree ids as keys.
@@ -92,7 +92,8 @@ function solve_tree!(
                     max_gap = sim_options.save_max_gap)
     return stage("integration ($(sim_options.steps) steps)") do
         integrate!(solutions["T"], integrator_terminal, size(p_terminal.flow_values, 1),
-                inflow_rows, tree_bindings, tmin, dt, save_criteria, progress)
+                inflow_rows, tree_bindings, tmin, dt, sim_options.steps + 1,
+                !sim_options.benchmark, save_criteria, progress)
     end
 
 end
@@ -117,12 +118,15 @@ end
 
 """
     integrate!(solution_terminal, integrator_terminal, n_rows, inflow_rows, tree_bindings,
-                tmin, dt, save_criteria, progress) -> times
+                tmin, dt, n_time_points, store, save_criteria, progress) -> times
 
 Time loop of [`solve_tree!`](@ref): store the state of every subsystem at the current time
 point (`solution_terminal` and `b.sol` of each tree binding, one column per stored time point),
-then advance all subsystems by `dt` and exchange the coupling values. The number of time points
-is `size(solution_terminal, 2)`; after the last one is stored, no further step is integrated.
+then advance all subsystems by `dt` and exchange the coupling values. After the last of the
+`n_time_points` time points is stored, no further step is integrated.
+
+With `store = false` (benchmarking) nothing is stored or checked: the solutions are not
+touched (they may have 0 columns) and the returned `times` is empty.
 
 Adaptive saving (`save_criteria = (abstol, reltol, max_gap)`, see `SimulationOptions`): a time
 point is stored only if it is the first or the last one, if `max_gap` steps passed since the
@@ -140,8 +144,7 @@ The terminal state is a vector holding the `(n_rows, n_terminals)` block in colu
 order (see `jf_terminal!`), so row `ki` of the block is the strided range `ki:n_rows:end`.
 """
 function integrate!(solution_terminal, integrator_terminal, n_rows, inflow_rows, tree_bindings,
-                    tmin, dt, save_criteria, progress)
-    n_time_points = size(solution_terminal, 2)
+                    tmin, dt, n_time_points, store, save_criteria, progress)
     n_terminal_state = length(integrator_terminal.u)
     save_all = save_criteria.abstol == 0 && save_criteria.reltol == 0
     times = Float64[]
@@ -150,14 +153,16 @@ function integrate!(solution_terminal, integrator_terminal, n_rows, inflow_rows,
     for kl in 1:n_time_points
         # dose of the inflow trees at the kl-th time point, so that it is stored and seen by
         # the adaptive saving (the solver does not read it back: du = 0, jf_inflow! overwrites it)
-        for b in tree_bindings
-            b.is_inflow && (b.integ.u[end] = f_intervention(tmin + (kl - 1) * dt))
+        if store
+            for b in tree_bindings
+                b.is_inflow && (b.integ.u[end] = f_intervention(tmin + (kl - 1) * dt))
+            end
         end
         # store numerical solutions (state at the kl-th time point) in the next free column
-        if save_all || kl == 1 || kl == n_time_points ||
+        if store && (save_all || kl == 1 || kl == n_time_points ||
                 kl - kl_last_saved >= save_criteria.max_gap ||
                 state_changed(tree_bindings, integrator_terminal, solution_terminal, n_saved,
-                    save_criteria.abstol, save_criteria.reltol)
+                    save_criteria.abstol, save_criteria.reltol))
             n_saved += 1
             for b in tree_bindings
                 copyto!(view(b.sol, :, n_saved), b.integ.u)
