@@ -2,7 +2,7 @@
 
 julia_version = "1.13.1"
 manifest_format = "2.1"
-project_hash = "69eff1b80f21a611c5f75196adbb08799fd4f80a"
+project_hash = "be4e3ff80a1a5a48863465c07ed07de42e348131"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -271,6 +271,12 @@ git-tree-sha1 = "a633156e74096f90b3b5e833529292b651b5671a"
 registries = "General"
 uuid = "5ae59095-9a9b-59fe-a467-6f913c188581"
 version = "0.13.3"
+
+[[deps.Combinatorics]]
+git-tree-sha1 = "c761b00e7755700f9cdf5b02039939d1359330e1"
+registries = "General"
+uuid = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
+version = "1.1.0"
 
 [[deps.CommonSolve]]
 deps = ["PrecompileTools"]
@@ -2251,7 +2257,7 @@ version = "1.29.0"
     Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [[deps.VascularTrees]]
-deps = ["Arrow", "BenchmarkTools", "CSV", "DataFrames", "DataFramesMeta", "Dictionaries", "DifferentialEquations", "HDF5", "Hungarian", "InteractiveUtils", "Mmap", "NearestNeighbors", "OrdinaryDiffEq", "PProf", "Parameters", "Profile", "ProgressMeter", "Reexport", "Revise", "SciMLBase", "SparseArrays", "StaticArrays", "StyledStrings", "Sundials", "Tables", "TimerOutputs"]
+deps = ["Arrow", "BenchmarkTools", "CSV", "Combinatorics", "DataFrames", "DataFramesMeta", "Dictionaries", "DifferentialEquations", "HDF5", "Hungarian", "InteractiveUtils", "Mmap", "NearestNeighbors", "OrdinaryDiffEq", "PProf", "Parameters", "Profile", "ProgressMeter", "Reexport", "Revise", "SciMLBase", "SparseArrays", "StaticArrays", "StyledStrings", "Sundials", "Tables", "TimerOutputs"]
 path = "."
 uuid = "87ddc3cc-728b-4545-b71e-e2b9cf7abe66"
 version = "0.1.0"
