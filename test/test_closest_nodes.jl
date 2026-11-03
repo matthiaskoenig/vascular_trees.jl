@@ -6,7 +6,13 @@ coords = permutedims(hcat(
     [[0.0, 0.0, 9.9],  [9.9, 0.0, 0.0],  [0.0, 0.1, 0.0],  [0.0, 9.9, 0.0]],   # tree 3
     [[10.0, 0.2, 0.0], [0.0, 0.0, 10.2], [0.0, 9.8, 0.0],  [0.0, 0.0, 0.2]],   # tree 4
 ))
-k = 3
-compute_bound = true
+# greedy step + alternating step (auction or Hungarian) for the closest terminal nodes
+m_options = MatchingOptions(
+    k_greedy = 3,
+    max_iter = 10,
+    tol = 1e-8,
+    algorithm = AuctionAssignment(k_assign = 10, auction_tol = 1e-6),
+    compute_bound = true,
+)
 
-find_closest_nodes!(coords, k, compute_bound)
+find_closest_nodes!(coords, m_options)

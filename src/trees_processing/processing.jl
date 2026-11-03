@@ -28,6 +28,10 @@ module TreesProcessing
         Hungarian,
         Combinatorics
 
+    using ..Options:
+        MatchingOptions,
+        HungarianAssignment
+
     using ..Definitions:
         FlowDirections,
         ODE_groups

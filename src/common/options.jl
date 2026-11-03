@@ -3,13 +3,16 @@
 
 Option structs set by the user in the run scripts (run_simulations.jl,
 build_arrow_graphs.jl, create_vtk.jl): which trees to use, how to simulate,
-which ODE solver to use and whether to benchmark.
+which ODE solver to use, whether to benchmark and how to match the terminal nodes.
 """
 module Options
     export TreeOptions, 
         SimulationOptions, 
         BenchmarkOptions, 
-        SolverOptions
+        SolverOptions,
+        MatchingOptions,
+        AssignmentAlgorithm,
+        HungarianAssignment
 
     using Parameters
     using SciMLBase
@@ -112,5 +115,46 @@ module Options
     # whether the solver is a Sundials algorithm with the sparse KLU linear solver
     uses_klu(::Sundials.SundialsODEAlgorithm{M, L}) where {M, L} = L == :KLU
     uses_klu(::SciMLBase.AbstractODEAlgorithm) = false
+
+    """
+        AssignmentAlgorithm
+
+    Algorithm that gives the nodes of one tree to the groups in the alternating step of
+    `find_closest_nodes!`, e.g. [`HungarianAssignment`](@ref).
+    """
+    abstract type AssignmentAlgorithm end
+
+    """
+        HungarianAssignment()
+
+    Exact solve with the Hungarian algorithm on the dense `n * n` cost matrix
+    (memory O(n²), time O(n³) per tree). Only usable for small trees.
+    """
+    struct HungarianAssignment <: AssignmentAlgorithm end
+
+    """
+        MatchingOptions(; k_greedy = 3, max_iter = 10, tol = 1e-8,
+                         algorithm = HungarianAssignment(), compute_bound = false)
+
+    How the closest terminal nodes of the trees are matched (`find_closest_nodes!`).
+
+    # Fields
+    - `k_greedy`: number of neighbours checked in the greedy step.
+    - `max_iter`: maximal number of rounds of the alternating step.
+    - `tol`: the alternating step stops when the total cost improves by less than `tol` (relative).
+    - `algorithm`: [`AssignmentAlgorithm`](@ref) used in the alternating step.
+    - `compute_bound`: also compute the lower bound of the cost and log the possible improvement;
+    slow (m(m - 1)/2 dense Hungarian runs).
+    """
+    @with_kw struct MatchingOptions{A<:AssignmentAlgorithm}
+        k_greedy::Int = 3
+        max_iter::Int = 10
+        tol::Float64 = 1e-8
+        algorithm::A = HungarianAssignment()
+        compute_bound::Bool = false
+        @assert k_greedy >= 1 "k_greedy must be >= 1"
+        @assert max_iter >= 1 "max_iter must be >= 1"
+        @assert tol >= 0 "tol must be >= 0"
+    end
 
 end

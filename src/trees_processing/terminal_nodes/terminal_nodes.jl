@@ -21,16 +21,17 @@ TODO: Flow affiliations are wrong.
 =#
 
 """
-    process_terminal_nodes(tree_info)
+    process_terminal_nodes(tree_info, find_closest_tnodes, matching_options = MatchingOptions())
 
 Load every individual vessel tree listed in `tree_info.vascular_trees`, collect the
 terminal node information with [`prepare_tnodes_info`](@ref), and save it to
-`<tree_info.GRAPH_DIR>/graphs/T.arrow`.
+`<tree_info.GRAPH_DIR>/graphs/T.arrow`. If `find_closest_tnodes` is `true`, the terminals are
+matched with [`find_closest_nodes!`](@ref) using `matching_options` (see `MatchingOptions`).
 
 `tree_info` must provide `GRAPH_DIR`, `vascular_trees` and `tree_components`
 (with the keys `:inflow_trees` and `:outflow_trees`).
 """
-function process_terminal_nodes(tree_info, find_closest_tnodes)
+function process_terminal_nodes(tree_info, find_closest_tnodes, matching_options = MatchingOptions())
     @info "Processing terminal nodes..."
 
     # tree name => its table; the order of the output rows comes from
@@ -39,7 +40,7 @@ function process_terminal_nodes(tree_info, find_closest_tnodes)
     # load the tables of all trees (graphs) that belong to this tree configuration
     collect_graphs_information!(graphs, tree_info)
 
-    tnodes_info_df = prepare_tnodes_info(graphs, tree_info, find_closest_tnodes)
+    tnodes_info_df = prepare_tnodes_info(graphs, tree_info, find_closest_tnodes, matching_options)
     save_as_arrow(tnodes_info_df, joinpath(tree_info.GRAPH_DIR, "graphs/T.arrow"))
     # CSV.write(joinpath(tree_info.GRAPH_DIR, "graphs/T.csv"),tnodes_info_df)
 end
@@ -78,7 +79,8 @@ function collect_graphs_information!(graphs::Dict{String,DataFrame}, tree_info)
 end
 
 """
-    prepare_tnodes_info(graphs::Dict{String,DataFrame}, tree_info, find_closest_tnodes) -> DataFrame
+    prepare_tnodes_info(graphs::Dict{String,DataFrame}, tree_info, find_closest_tnodes,
+                        matching_options) -> DataFrame
 
 Build the terminal node table from the loaded trees in `graphs`.
 
@@ -108,7 +110,8 @@ is not found keeps the coordinates `(0.0, 0.0, 0.0)` and the tree id `""`.
 function prepare_tnodes_info(
     graphs::Dict{String,DataFrame},
     tree_info,
-    find_closest_tnodes
+    find_closest_tnodes,
+    matching_options
 )::DataFrame
     @info "Preparation steps"
     # === Table sizes, needed to preallocate the arrays below
@@ -181,8 +184,7 @@ function prepare_tnodes_info(
     if find_closest_tnodes
         @info "Searching for the closest terminal nodes..."
         # find closest terminal nodes for all trees, reorder coordinates, get matrix with reordered idx
-        init_clusters = 3
-        matching = find_closest_nodes!(species_coordinates, init_clusters, false)  
+        matching = find_closest_nodes!(species_coordinates, matching_options)
 
         @info "Reversing matrices..."
         # based on the coordinates reordering reorder everething else
