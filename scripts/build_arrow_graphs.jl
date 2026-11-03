@@ -51,7 +51,7 @@ function main(;
         k_greedy = 3,
         max_iter = 10,
         tol = 1e-8,
-        algorithm = HungarianAssignment(),
+        algorithm = AuctionAssignment(),
         compute_bound = false,
     )
 )

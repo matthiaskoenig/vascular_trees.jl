@@ -30,7 +30,8 @@ module TreesProcessing
 
     using ..Options:
         MatchingOptions,
-        HungarianAssignment
+        HungarianAssignment,
+        AuctionAssignment
 
     using ..Definitions:
         FlowDirections,

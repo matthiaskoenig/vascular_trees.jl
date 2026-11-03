@@ -15,6 +15,13 @@ tree_info = TreeStructure(;
     tree_components = TreeDefinitions().vascular_trees["Rectangle_quad"],
     GRAPH_DIR = GRAPH_DIR,
 )
+m_options = MatchingOptions(
+    k_greedy = 3,
+    max_iter = 10,
+    tol = 1e-8,
+    algorithm = AuctionAssignment(),
+    compute_bound = false,
+)
 sim_options = SimulationOptions(
     tspan = (0.0, 1.0),
     steps = 10,
@@ -26,7 +33,7 @@ flow_scaling_factor = 1.0
 find_closest_tnodes = false
 
 process_julia_graph(tree_info)
-process_terminal_nodes(tree_info, find_closest_tnodes)
+process_terminal_nodes(tree_info, find_closest_tnodes, m_options)
 for tree ∈ [tree_info.vascular_trees; "T"]
     @test isfile(joinpath(GRAPH_DIR, "graphs", "$(tree).arrow"))
 end

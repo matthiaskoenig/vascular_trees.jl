@@ -12,7 +12,8 @@ module Options
         SolverOptions,
         MatchingOptions,
         AssignmentAlgorithm,
-        HungarianAssignment
+        HungarianAssignment,
+        AuctionAssignment
 
     using Parameters
     using SciMLBase
@@ -120,7 +121,7 @@ module Options
         AssignmentAlgorithm
 
     Algorithm that gives the nodes of one tree to the groups in the alternating step of
-    `find_closest_nodes!`, e.g. [`HungarianAssignment`](@ref).
+    `find_closest_nodes!`: [`HungarianAssignment`](@ref) or [`AuctionAssignment`](@ref).
     """
     abstract type AssignmentAlgorithm end
 
@@ -131,6 +132,39 @@ module Options
     (memory O(n²), time O(n³) per tree). Only usable for small trees.
     """
     struct HungarianAssignment <: AssignmentAlgorithm end
+
+    """
+        AuctionAssignment(; k_start = 4, k_min = 2, k_max = 64, auction_tol = 1e-6, θ = 5.0,
+                           bids_per_entry = 100)
+
+    Approximate solve with the auction algorithm (with ε-scaling) on a sparse problem: every group
+    can only get one of its `k` nodes closest to its centroid or its current node. `k` is adapted
+    per tree and per group: it is doubled if a group gets its farthest candidate (its list was
+    probably too short) or if the auction needs too many bids, and halved if a group gets one of
+    its `k ÷ 4` closest nodes.
+
+    # Fields
+    - `k_start`: first number of candidates per group.
+    - `k_min`, `k_max`: limits of `k`; `k_min >= 2`, the auction needs a second-best candidate.
+    - `auction_tol`: the error of one solve is at most `auction_tol` * the current total cost
+    (final ε = `auction_tol` * cost / n).
+    - `θ`: ε-scaling, the first ε is the largest candidate cost / `θ`, then ε is divided by `θ`
+    after every phase; `θ > 1`.
+    - `bids_per_entry`: bid budget of one solve = `bids_per_entry` * number of candidates of all
+    groups; if it is used up, `k` is doubled for all groups of the tree.
+    """
+    @with_kw struct AuctionAssignment <: AssignmentAlgorithm
+        k_start::Int = 4
+        k_min::Int = 2
+        k_max::Int = 64
+        auction_tol::Float64 = 1e-6
+        θ::Float64 = 5.0
+        bids_per_entry::Int = 100
+        @assert 2 <= k_min <= k_start <= k_max "must be 2 <= k_min <= k_start <= k_max"
+        @assert auction_tol > 0 "auction_tol must be > 0"
+        @assert θ > 1 "θ must be > 1"
+        @assert bids_per_entry >= 1 "bids_per_entry must be >= 1"
+    end
 
     """
         MatchingOptions(; k_greedy = 3, max_iter = 10, tol = 1e-8,

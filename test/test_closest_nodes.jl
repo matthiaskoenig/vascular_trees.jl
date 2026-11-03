@@ -11,8 +11,8 @@ m_options = MatchingOptions(
     k_greedy = 3,
     max_iter = 10,
     tol = 1e-8,
-    algorithm = AuctionAssignment(k_assign = 10, auction_tol = 1e-6),
-    compute_bound = true,
+    algorithm = AuctionAssignment(),
+    compute_bound = false,
 )
 
 find_closest_nodes!(coords, m_options)
