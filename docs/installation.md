@@ -4,6 +4,7 @@
 - [Clone the repository](#clone-the-repository)
 - [Install SyntheticVascularTrees.jl](#install-syntheticvasculartreesjl)
 - [Install dependencies](#install-dependencies)
+  - [Development tools](#development-tools)
 - [Environment activation](#environment-activation)
   - [Activate the project](#activate-the-project)
   - [Multithreading](#multithreading)
@@ -43,6 +44,27 @@ are installed with:
 
 ```bash
 julia --project -e "import Pkg; Pkg.instantiate()"
+```
+
+### Development tools
+
+Tools that are only needed while developing (Revise, BenchmarkTools, PProf, PackageCompiler)
+are not dependencies of the package. Install them once into the global environment, so they
+are available in every project:
+
+```julia
+pkg> activate @v1.13
+pkg> add Revise BenchmarkTools PProf PackageCompiler
+```
+
+and load Revise automatically in `~/.julia/config/startup.jl`:
+
+```julia
+try
+    using Revise
+catch e
+    @warn "Revise could not be loaded" exception = e
+end
 ```
 
 ## Environment activation

@@ -1,13 +1,22 @@
+using VascularTrees
+using VascularTrees.Simulation: run_simulations
+
+# Definitions of the available tree configurations (inflow / outflow trees)
+const trees::TreeDefinitions = TreeDefinitions()
+
 """
+    main(; t_options, flow_scaling_factors, sim_options, sol_options,
+           additional_sol_options, bench_options, debug)
+
 Load graph files in arrow format and run the coupled-tree simulations.
 
-The simulations start as soon as this file is included
-(e.g. `julia --project scripts/run_simulations.jl`), using the options
-defined in the options sections below.
+Run: `julia --project scripts/run_simulations.jl`, or in the REPL
+`include("scripts/run_simulations.jl")` (or `includet` with Revise loaded), then
+`main(t_options = TreeOptions(n_nodes = [10], tree_configurations = ["Rectangle_quad"]))`.
 
 The graph tables must exist (see "Inputs"); the `simulations` output folder is created if needed.
 
-What must/may be specified in the code below:
+What must/may be specified (keyword arguments, defaults below):
 1. must
     1.1. t_options (graph options)
     1.2. sim_options (simulation options)
@@ -31,24 +40,11 @@ Outputs:
    and sim_options.save_simulations = true
 2. jrunning_times.csv - if sim_options.benchmark and bench_options.save_running_times = true
 
+Order of the runs: configurations (outermost), number of nodes, flow scaling factors (innermost).
+
 TODO: run macros @timeit only when you need it - now it is so, but it is dirty
 """
-module SimulationRunner
-    # === Imports ===
-    using Revise
-    using VascularTrees
-    using VascularTrees.Simulation: run_simulations
-
-    # === Logging ===
-    # colored log prefixes; debug = true also shows the per-subsystem stages of VascularTrees
-    setup_logging(debug = false)
-
-    # Definitions of the available tree configurations (inflow / outflow trees)
-    const trees::TreeDefinitions = TreeDefinitions()
-
-
-    # ============================ Options ============================
-
+function main(;
     # === Graph options ===
     # options for graph, i.e., number of nodes and type of tree
     t_options = TreeOptions(
@@ -57,10 +53,9 @@ module SimulationRunner
             "Rectangle_quad",
             #"Rectangle_trio",
         ],
-    )
-
+    ),
     # factors by which the flow is scaled, 1.0 is the original flow
-    flow_scaling_factors = [1.0] # 1.0/16, 1.0/8, 1.0/4, 1.0/2, 1.0, 1.0*2, 1.0*4, 1.0*8, 1.0*16
+    flow_scaling_factors = [1.0], # 1.0/16, 1.0/8, 1.0/4, 1.0/2, 1.0, 1.0*2, 1.0*4, 1.0*8, 1.0*16
 
     # === Simulation options ===
     sim_options = SimulationOptions(
@@ -70,55 +65,50 @@ module SimulationRunner
         benchmark = false,
         save_abstol = 1e-9,
         save_reltol = 1e-6
-    )
+    ),
 
     # === ODE Solver options ===
     # integrator, tolerances
-    sol_options = SolverOptions()
+    sol_options = SolverOptions(),
     # additional integrator arguments
     # these arguments are not mandatory
     additional_sol_options::NamedTuple = (
         dense = false,
         save_everystep = false,
         progress = false
-    )
+    ),
 
-    
     # === Benchmark options ===
     # do not write anything here in brackets if you are okay with default variant
-    bench_options = BenchmarkOptions(save_running_times = true, n_iterations = 5)
+    bench_options = BenchmarkOptions(save_running_times = true, n_iterations = 5),
 
+    # colored log prefixes; debug = true also shows the per-subsystem stages of VascularTrees
+    debug = false,
+)
+    setup_logging(debug = debug)
 
-    # ============================== Run ==============================
-
-    """
-        simulate_all_trees()
-
-    Run the simulation for every combination of tree configuration, number of nodes and flow
-    scaling factor from the options above. Order: configurations (outermost), number of nodes,
-    flow scaling factors (innermost).
-    """
-    function simulate_all_trees()
-        # product varies its first iterator fastest, so the order is reversed here
-        for (flow_scaling_factor, n_node, tree_configuration) ∈ Iterators.product(
-            flow_scaling_factors,
-            t_options.n_nodes,
-            t_options.tree_configurations,
+    # product varies its first iterator fastest, so the order is reversed here
+    for (flow_scaling_factor, n_node, tree_configuration) ∈ Iterators.product(
+        flow_scaling_factors,
+        t_options.n_nodes,
+        t_options.tree_configurations,
+    )
+        tree_info =
+            TreeStructure(; tree_configuration = tree_configuration, n_node = n_node, tree_components = trees.vascular_trees[tree_configuration])
+        @info "Working on $(tree_info.graph_id)"
+        run_simulations(
+            tree_info,
+            sim_options,
+            sol_options,
+            additional_sol_options,
+            flow_scaling_factor,
+            bench_options,
         )
-            tree_info =
-                TreeStructure(; tree_configuration = tree_configuration, n_node = n_node, tree_components = trees.vascular_trees[tree_configuration])
-            @info "Working on $(tree_info.graph_id)"
-            run_simulations(
-                tree_info,
-                sim_options,
-                sol_options,
-                additional_sol_options,
-                flow_scaling_factor,
-                bench_options,
-            )
-        end
     end
+end
 
-    simulate_all_trees() 
-
+# run only when started as a script, not when included in the REPL
+# (VS Code "Execute File in REPL" also includes the file, so call main() yourself there)
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
 end

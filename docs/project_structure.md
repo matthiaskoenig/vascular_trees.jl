@@ -23,7 +23,7 @@ See also: [Usage](usage.md) · [back to README](../README.md)
   [src/visualization/](../src/visualization/)): writes the simulation results of every
   vascular tree as a time-dependent VTKHDF file (tree geometry with `Flow`, `Volume` and
   `Concentration` per edge) for ParaView. Plots of benchmarking results (Makie /
-  AlgebraOfGraphics) are still legacy code in [old/visualization/](../old/visualization/).
+  AlgebraOfGraphics) are still legacy code in [dev/old/visualization/](../dev/old/visualization/).
 
 ## Supported tree configurations
 
@@ -38,11 +38,12 @@ See also: [Usage](usage.md) · [back to README](../README.md)
 ## Repository structure
 
 ```
-scripts/
-├── build_arrow_graphs.jl     # run script: convert generated trees to .arrow tables
-├── run_simulations.jl        # run script: coupled-tree simulations
-├── create_vtk.jl             # run script: VTKHDF files of the simulation results (ParaView)
-└── precompile_project.jl     # precompile workload for building the sysimage
+Project.toml / Manifest.toml  # package dependencies (Manifest committed for reproducibility)
+scripts/                      # run scripts, each defines main(; options...)
+├── build_arrow_graphs.jl     #   convert generated trees to .arrow tables
+├── run_simulations.jl        #   coupled-tree simulations
+├── create_vtk.jl             #   VTKHDF files of the simulation results (ParaView)
+└── precompile_project.jl     #   precompile workload for building the sysimage
 src/
 ├── VascularTrees.jl          # main module
 ├── common/                   # paths, tree definitions, option structs, table utilities
@@ -56,9 +57,16 @@ src/
 │   ├── solver/               # time loop and coupling of the trees
 │   └── results/              # saving of solutions and benchmarking
 └── visualization/            # writing of the VTKHDF files
+test/                         # test suite: julia --project -e "import Pkg; Pkg.test()"
+├── runtests.jl               #   entry point, includes the test_*.jl files
+├── Project.toml              #   test-only dependencies (Test, Aqua, HDF5, ...)
+└── data/Rectangle_quad_10/   #   input files of the smallest tree for the pipeline test
 docs/                         # documentation
-sbml/                         # test scripts for importing SBML models
-old/                          # legacy code (incl. benchmarking plots, not yet refactored)
+dev/                          # not part of the package (see dev/README.md)
+├── old/                      #   legacy code (incl. benchmarking plots, not yet refactored)
+├── examples/                 #   early prototype scripts
+├── sbml/                     #   test scripts for importing SBML models
+└── Speedup.md, TODO.md       #   working notes
 ```
 
 ## Results folder structure

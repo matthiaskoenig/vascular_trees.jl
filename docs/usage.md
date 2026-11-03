@@ -14,6 +14,16 @@ Only the input files of step 1 must be placed by hand (see
 [Results folder structure](project_structure.md#results-folder-structure)); the output
 folders of steps 2–4 are created by the run scripts when needed.
 
+Every run script defines a function `main` whose keyword arguments are the options (with the
+defaults written in the script). Started from the terminal, the script calls `main()` with
+these defaults. In the REPL, the script can be loaded without starting a run and `main` called
+with other options:
+
+```julia
+julia> includet("scripts/run_simulations.jl")   # include, if Revise is not loaded
+julia> main(t_options = TreeOptions(n_nodes = [10], tree_configurations = ["Rectangle_quad"]))
+```
+
 ## 1. Generate vascular trees
 
 Generate the synthetic vascular trees with
@@ -32,9 +42,9 @@ graph directory:
 julia --project scripts/build_arrow_graphs.jl
 ```
 
-Processing starts as soon as the file is included. Which trees are processed is set in
-the `TreeOptions` struct inside [the script](../scripts/build_arrow_graphs.jl) (`n_nodes`
-and `tree_configurations`). The resulting `.arrow` tables are written to the `graphs/`
+Which trees are processed is set by the `t_options` keyword argument of `main` in
+[the script](../scripts/build_arrow_graphs.jl) (a `TreeOptions` with `n_nodes` and
+`tree_configurations`). The resulting `.arrow` tables are written to the `graphs/`
 subfolder of the graph directory (created if needed).
 
 ## 3. Run simulations
@@ -43,8 +53,7 @@ subfolder of the graph directory (created if needed).
 julia --project scripts/run_simulations.jl
 ```
 
-The simulations start as soon as the file is included, using the options defined in
-[the script](../scripts/run_simulations.jl).
+The options are the keyword arguments of `main` in [the script](../scripts/run_simulations.jl).
 
 ### Options
 
@@ -52,6 +61,14 @@ The simulations start as soon as the file is included, using the options defined
   (every combination is run).
 - `SimulationOptions` — time span `tspan` [min], number of `steps`, whether to save the
   solutions (`save_simulations`) and whether to benchmark (`benchmark`).
+  - Adaptive saving: with `save_abstol` / `save_reltol` > 0 a time point is stored only if a
+    species changed by more than `save_abstol + save_reltol * |u_saved|` since the last stored
+    point, and at least every `save_max_gap` steps (the script default is
+    `save_abstol = 1e-9`, `save_reltol = 1e-6`; `0.0` for both stores every time point).
+  - `show_progress` — progress bar of the time loop (default `true`, never shown when
+    benchmarking).
+
+  See the docstring of `SimulationOptions` for details.
 - `SolverOptions` — ODE solver (any
   [SciML algorithm](https://docs.sciml.ai/DiffEqDocs/stable/solvers/ode_solve/), e.g.
   `Tsit5()` or `CVODE_BDF()`), its tolerances and whether to use the analytic Jacobian
@@ -61,6 +78,8 @@ The simulations start as soon as the file is included, using the options defined
 - `BenchmarkOptions` — number of timed iterations and whether to save the running times
   (used only if `benchmark = true`).
 - `flow_scaling_factors` — factors by which the flow is scaled (`1.0` = original flow).
+- `debug` — `true` also logs the per-subsystem stages with their running times (all three
+  scripts have this option).
 
 All option structs are defined in [src/common/options.jl](../src/common/options.jl).
 
@@ -81,8 +100,8 @@ In the graph directory:
 julia --project scripts/create_vtk.jl
 ```
 
-Writes the results of step 3 as time-dependent VTKHDF files. Options inside
-[the script](../scripts/create_vtk.jl): `TreeOptions`, `flow_scaling_factors` and `dt` — they
+Writes the results of step 3 as time-dependent VTKHDF files. Options (keyword arguments of
+`main` in [the script](../scripts/create_vtk.jl)): `t_options`, `flow_scaling_factors` and `dt` — they
 select the simulation files, so they must be the values used in step 3
 (`dt = (tspan[2] - tspan[1]) / steps`).
 

@@ -20,17 +20,16 @@ module Simulation
 
     export run_simulations
 
-    using DifferentialEquations, 
-        DataFrames, 
-        CSV, 
-        Dictionaries, 
-        TimerOutputs, 
-        ProgressMeter, 
-        Arrow, 
+    using OrdinaryDiffEq,
+        SciMLBase,
+        DataFrames,
+        CSV,
+        Dictionaries,
+        TimerOutputs,
+        ProgressMeter,
+        Arrow,
         SparseArrays,
         Sundials,
-        Profile,
-        PProf,
         Mmap
 
     using ..Definitions: FlowDirections, ODE_groups, VascularTreeParameters
@@ -42,7 +41,7 @@ module Simulation
     using ..PharmacokineticModels.Interventions: f_intervention
 
     # Which trees are inflow / outflow, and the numbers marking the ODE groups of the species
-    # (both defined in utils.jl)
+    # (both defined in definitions.jl)
     const flow_direction = FlowDirections()
     const groups = ODE_groups()
 

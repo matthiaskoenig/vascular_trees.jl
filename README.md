@@ -15,7 +15,7 @@ https://github.com/matthiaskoenig/vascular_trees.
   portal) through the liver sinusoids to the outflow trees (venous, biliary), with optional
   benchmarking.
 - **Visualization:** time-dependent VTKHDF files of the simulation results for ParaView
-  (benchmarking plots are still legacy code in `old/`).
+  (benchmarking plots are still legacy code in `dev/old/`).
 
 More details: [Project structure](docs/project_structure.md).
 
@@ -25,6 +25,7 @@ More details: [Project structure](docs/project_structure.md).
 - [Usage](#usage)
 - [Examples / Demos](#examples--demos)
 - [Documentation](#documentation)
+- [Tests](#tests)
 - [License](#license)
 - [Contributors](#contributors)
 - [Funding](#funding)
@@ -56,8 +57,9 @@ julia --project scripts/run_simulations.jl
 julia --project scripts/create_vtk.jl
 ```
 
-The options (tree configurations, numbers of nodes, solver, benchmarking, ...) are set
-inside the scripts. Only the generated trees must be placed in the
+The options (tree configurations, numbers of nodes, solver, benchmarking, ...) are the
+keyword arguments of the `main` function of each script; the defaults are written in the
+script. Only the generated trees must be placed in the
 [`results/` folder](docs/project_structure.md#results-folder-structure) by hand; the output
 folders are created by the scripts.
 All options and outputs: [docs/usage.md](docs/usage.md).
@@ -106,6 +108,17 @@ write_vtkhdf_files(tree_info, 1.0, 0.02)
 - [Project structure](docs/project_structure.md): features, supported tree configurations,
   repository and results folder structure
 - [Sysimage](docs/sysimage.md): building and using a sysimage (terminal and VS Code)
+
+## Tests
+
+```bash
+julia --project -e "import Pkg; Pkg.test()"
+```
+
+The tests ([test/](test/)) run the whole workflow on a copy of the smallest tree
+(`Rectangle_quad`, 10 nodes, input files in `test/data/`) in a temporary folder, check the
+VTKHDF writer on a hand-made tree and run the [Aqua.jl](https://github.com/JuliaTesting/Aqua.jl)
+package checks.
 
 ## License
 

@@ -22,5 +22,8 @@
   "sandbox": {
     "enabled": true,
     "autoAllowBashIfSandboxed": true
+  },
+  "enabledPlugins": {
+    "documenter-vitepress@julia-agent-skills": true
   }
 }

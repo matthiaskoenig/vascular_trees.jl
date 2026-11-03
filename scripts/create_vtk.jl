@@ -1,9 +1,18 @@
+using VascularTrees
+using VascularTrees.Visualization: write_vtkhdf_files
+
+# Definitions of the available tree configurations (inflow / outflow trees)
+const trees::TreeDefinitions = TreeDefinitions()
+
 """
+    main(; t_options, flow_scaling_factors, dt, debug)
+
 Write the simulation results as time-dependent VTKHDF files for ParaView.
 
-Run: `julia --project scripts/create_vtk.jl` (writing starts as soon as the file is included).
+Run: `julia --project scripts/create_vtk.jl`, or in the REPL
+`include("scripts/create_vtk.jl")` (or `includet` with Revise loaded), then `main(dt = 0.1)`.
 
-What must be specified below:
+What must be specified (keyword arguments, defaults below):
 1. t_options (tree configurations and numbers of nodes)
 2. flow_scaling_factors and dt - must be the values of the simulations
    (dt = (tspan[2] - tspan[1]) / steps of the SimulationOptions in run_simulations.jl)
@@ -18,23 +27,10 @@ Outputs, in the `vtkhdf/` folder of the graph directory (created if needed):
    lines of the tree with `Flow`, `Volume` and the time-dependent `Concentration` per edge.
    Open in ParaView ≥ 5.12; after rewriting a file that is open in ParaView, use
    File > Reload Files.
+
+Order of the runs: configurations (outermost), number of nodes, flow scaling factors (innermost).
 """
-module CreateVTK
-    # === Imports ===
-    using Revise
-    using VascularTrees
-    using VascularTrees.Visualization: write_vtkhdf_files
-
-    # === Logging ===
-    # colored log prefixes; debug = true also shows the per-subsystem stages of VascularTrees
-    setup_logging(debug = false)
-
-    # Definitions of the available tree configurations (inflow / outflow trees)
-    const trees::TreeDefinitions = TreeDefinitions()
-
-
-    # ============================ Options ============================
-
+function main(;
     # === Graph options ===
     # options for graph, i.e., number of nodes and type of tree
     t_options = TreeOptions(
@@ -43,38 +39,31 @@ module CreateVTK
             "Rectangle_quad",
             #"Rectangle_trio",
         ],
-    )
-
+    ),
     # factors by which the flow is scaled, 1.0 is the original flow
-    flow_scaling_factors = [1.0] # 1.0/16, 1.0/8, 1.0/4, 1.0/2, 1.0, 1.0*2, 1.0*4, 1.0*8, 1.0*16
-
+    flow_scaling_factors = [1.0], # 1.0/16, 1.0/8, 1.0/4, 1.0/2, 1.0, 1.0*2, 1.0*4, 1.0*8, 1.0*16
     # time step of the simulations [min], part of the simulation file names
-    dt = 0.02
+    dt = 0.02,
+    # colored log prefixes; debug = true also shows the per-subsystem stages of VascularTrees
+    debug = false,
+)
+    setup_logging(debug = debug)
 
-
-    # ============================== Run ==============================
-
-    """
-        create_all_vtks()
-
-    Write the VTKHDF files for every combination of tree configuration, number of nodes and flow
-    scaling factor from the options above. Order: configurations (outermost), number of nodes,
-    flow scaling factors (innermost).
-    """
-    function create_all_vtks()
-        # product varies its first iterator fastest, so the order is reversed here
-        for (flow_scaling_factor, n_node, tree_configuration) ∈ Iterators.product(
-            flow_scaling_factors,
-            t_options.n_nodes,
-            t_options.tree_configurations,
-        )
-            tree_info =
-                TreeStructure(; tree_configuration = tree_configuration, n_node = n_node, tree_components = trees.vascular_trees[tree_configuration])
-            @info "Working on $(tree_info.graph_id)"
-            write_vtkhdf_files(tree_info, flow_scaling_factor, dt)
-        end
+    # product varies its first iterator fastest, so the order is reversed here
+    for (flow_scaling_factor, n_node, tree_configuration) ∈ Iterators.product(
+        flow_scaling_factors,
+        t_options.n_nodes,
+        t_options.tree_configurations,
+    )
+        tree_info =
+            TreeStructure(; tree_configuration = tree_configuration, n_node = n_node, tree_components = trees.vascular_trees[tree_configuration])
+        @info "Working on $(tree_info.graph_id)"
+        write_vtkhdf_files(tree_info, flow_scaling_factor, dt)
     end
+end
 
-    create_all_vtks()
-
+# run only when started as a script, not when included in the REPL
+# (VS Code "Execute File in REPL" also includes the file, so call main() yourself there)
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
 end

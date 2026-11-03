@@ -91,23 +91,29 @@ module TableUtils
     end
 
     """
-    decompose_lists(lists) -> (flat_values, offsets)
+    decompose_lists(lists, first_offset) -> (flat_values, offsets)
 
     Store a vector of variable-length lists (e.g. `pre_elements` / `post_elements`, one list of
     neighbour indices per edge) as two flat vectors instead of one small vector per list:
 
     - `flat_values`: all lists concatenated, in order.
-    - `offsets`: `length(lists) + 1` start positions; list `k` is
-      `flat_values[offsets[k] : offsets[k+1]-1]`. Empty lists give equal neighbouring offsets.
+    - `offsets`: `length(lists) + 1` start positions, starting at `first_offset`. With
+      `first_offset = 1` (Julia indexing) list `k` is `flat_values[offsets[k] : offsets[k+1]-1]`;
+      `first_offset = 0` gives the 0-based offsets of the VTKHDF format. Empty lists give equal
+      neighbouring offsets.
 
-    Example: `[[5], [], [7, 8]]` → `flat_values = [5, 7, 8]`, `offsets = [1, 2, 2, 4]`.
+    Example: `[[5], [], [7, 8]]` with `first_offset = 1` → `flat_values = [5, 7, 8]`,
+    `offsets = [1, 2, 2, 4]`; with `first_offset = 0` → `offsets = [0, 1, 1, 3]`.
+
+    `lists` can also be a vector of `(source, target)` tuples (edges); each tuple is a list of
+    two values.
 
     `lists` can be any vector of vectors, including an Arrow list column, so the per-list vectors
     are never materialized.
     """
     function decompose_lists(lists::AbstractVector{<:AbstractVector{<:Integer}}, first_offset::Int)
         offsets = get_offsets(lists, first_offset)
-        flat_values = flatten_lists(lists, offsets[end] - 1)
+        flat_values = flatten_lists(lists, offsets[end] - first_offset)
         return flat_values, offsets
     end
     function decompose_lists(lists::AbstractVector{<:Tuple{<:Integer, <:Integer}}, first_offset::Int)
@@ -118,10 +124,11 @@ module TableUtils
     end
 
     """
-    get_offsets(lists) -> Vector{Int}
+    get_offsets(lists, first_offset) -> Vector{Int}
 
     Start position of each list in the concatenated vector, plus one entry past the end:
-    `offsets[1] = 1`, `offsets[k+1] = offsets[k] + length(lists[k])`. See [`decompose_lists`](@ref).
+    `offsets[1] = first_offset`, `offsets[k+1] = offsets[k] + length(lists[k])`. See
+    [`decompose_lists`](@ref).
     """
     function get_offsets(lists::AbstractVector{<:AbstractVector{<:Integer}}, first_offset::Int)::Vector{Int}
         n_lists = length(lists)
@@ -137,7 +144,7 @@ module TableUtils
     flatten_lists(lists, n_values) -> Vector{Int}
 
     All values of `lists` concatenated in order. `n_values` must be the total number of values
-    (`offsets[end] - 1` from [`get_offsets`](@ref)).
+    (`offsets[end] - first_offset` from [`get_offsets`](@ref)).
     """
     function flatten_lists(lists::AbstractVector{<:AbstractVector{<:Integer}}, n_values::Int)::Vector{Int}
         flat_values = Vector{Int}(undef, n_values)

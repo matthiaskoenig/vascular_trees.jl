@@ -12,6 +12,7 @@ module Options
         SolverOptions
 
     using Parameters
+    using SciMLBase
     using Sundials
     using OrdinaryDiffEq
 

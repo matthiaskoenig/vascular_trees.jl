@@ -30,9 +30,9 @@ end
 #     [
 #         "VascularTrees",
 #         # ODE solving
-#         "DifferentialEquations", "OrdinaryDiffEq", "Sundials", "SciMLBase", "SparseArrays",
+#         "OrdinaryDiffEq", "Sundials", "SciMLBase", "SparseArrays",
 #         # tables / IO
-#         "Arrow", "CSV", "DataFrames", "DataFramesMeta", "Tables", "Dictionaries", "HDF5",
+#         "Arrow", "CSV", "DataFrames", "Tables", "Dictionaries", "HDF5",
 #         # utilities used inside the package
 #         "Parameters", "Reexport", "ProgressMeter", "TimerOutputs",
 #     ];

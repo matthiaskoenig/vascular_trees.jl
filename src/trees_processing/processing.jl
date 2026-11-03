@@ -18,9 +18,7 @@ module TreesProcessing
         process_terminal_nodes
 
     using DataFrames,
-        DataFramesMeta,
         Parameters,
-        InteractiveUtils,
         Arrow,
         ProgressMeter,
         CSV,

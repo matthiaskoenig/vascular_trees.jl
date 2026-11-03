@@ -7,7 +7,7 @@
 
 See also: [Installation](installation.md) · [Usage](usage.md) · [back to README](../README.md)
 
-Loading `DifferentialEquations`, `Sundials`, `Arrow`, … and compiling the package functions
+Loading `OrdinaryDiffEq`, `Sundials`, `Arrow`, … and compiling the package functions
 takes a long time at the start of every Julia session. A custom sysimage built with
 [PackageCompiler.jl](https://github.com/JuliaLang/PackageCompiler.jl) contains these
 packages and the already compiled package functions, so `using VascularTrees` is instant
@@ -28,9 +28,9 @@ and the first simulation runs without compilation.
               [
                   "VascularTrees",
                   # ODE solving
-                  "DifferentialEquations", "OrdinaryDiffEq", "Sundials", "SciMLBase", "SparseArrays",
+                  "OrdinaryDiffEq", "Sundials", "SciMLBase", "SparseArrays",
                   # tables / IO
-                  "Arrow", "CSV", "DataFrames", "DataFramesMeta", "Tables", "Dictionaries",
+                  "Arrow", "CSV", "DataFrames", "Tables", "Dictionaries", "HDF5",
                   # utilities used inside the package
                   "Parameters", "Reexport", "ProgressMeter", "TimerOutputs",
               ];
@@ -85,5 +85,5 @@ Check that the sysimage is used:
 julia> unsafe_string(Base.JLOptions().image_file)   # …/vascular_trees.jl/JuliaSysimage.so
 ```
 
-Note: `Shift+Enter` inside `scripts/run_simulations.jl` or `scripts/build_arrow_graphs.jl`
-sends the whole `module … end` block, i.e. starts the full run.
+Note: the scripts in `scripts/` only run their `main()` when started from the terminal, so
+`includet("scripts/run_simulations.jl")` in the REPL defines `main` without starting a run.

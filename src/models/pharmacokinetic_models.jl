@@ -16,8 +16,7 @@ using ..Definitions:
     TerminalParameters, 
     VascularTreeParameters
 
-using InteractiveUtils, 
-    SparseArrays
+using SparseArrays
 
 include("interventions.jl")
 using .Interventions: f_intervention
