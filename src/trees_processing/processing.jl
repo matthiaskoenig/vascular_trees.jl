@@ -57,6 +57,8 @@ module TreesProcessing
     include("read_tree_files.jl")
     include("trees/edge_labeling.jl")
     include("trees/individual_trees.jl")
+    include("terminal_nodes/alterating_algorithms/hungarian.jl")
+    include("terminal_nodes/alterating_algorithms/auction.jl")
     include("terminal_nodes/closest_nodes.jl")
     include("terminal_nodes/terminal_nodes.jl")
 
