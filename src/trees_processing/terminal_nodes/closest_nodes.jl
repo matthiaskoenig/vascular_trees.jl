@@ -69,8 +69,9 @@ each of the other trees (knn). `neighbours[t]` holds these nodes for tree `t + 1
 """
 function find_neighbours!(neighbours, trees, reference_tree, k)
     # use knn algorithm to find closest nodes to the reference tree (usually, it is A) from other trees
-    # these other trees now are not used as default tree afterwards, do its only A to other
-    for (t, tree) in enumerate(eachrow(trees[2:end, :]))
+    # only tree 1 is the reference; the other trees are searched for its neighbours
+    for t in 1:size(trees, 1) - 1
+        tree = view(trees, t + 1, :)
         # neighbours[t] holds the nodes of tree t + 1 closest to each node of the reference tree
         neighbours[t], _ = knn(KDTree(tree), reference_tree, min(k, length(tree)))
     end
@@ -140,21 +141,22 @@ function assign_free_nodes!(groups, taken, trees)
         # c_g = (sum of p_s over trees s that already have a node in group g) / (number of such trees)
         centroids = [mean(trees[t_other, groups[t_other, group_idx]] for t_other in axes(groups, 1) if groups[t_other, group_idx] != 0) for group_idx in open_groups]
 
-        # all (open group index, node index) combinations, scored by distance from the node to the group's centroid
-        options = collect(Iterators.product(eachindex(open_groups), free_nodes))
         # costs[g, i] = d(c_g, p_i), p_i - coordinates of free node i of tree t
-        costs = [sq_dist(centroids[group_idx], trees[t, node_idx]) for (group_idx, node_idx) in options]
+        costs = [sq_dist(centroids[g], trees[t, free_nodes[i]])
+            for g in eachindex(open_groups), i in eachindex(free_nodes)]
         # smallest distance first
         order = sortperm(vec(costs))
+        idx = CartesianIndices(costs)
 
         group_filled = falses(length(open_groups))
         node_taken = falses(size(trees, 2))
         # lower sq distance - better combination, no duplications, principle as in select_greedy!
         for o in order
-            group_idx, node_idx = options[o]
-            (group_filled[group_idx] || node_taken[node_idx]) && continue
-            groups[t, open_groups[group_idx]] = node_idx
-            group_filled[group_idx] = true                # mark the group and the node as taken
+            g, i = Tuple(idx[o])
+            node_idx = free_nodes[i]
+            (group_filled[g] || node_taken[node_idx]) && continue
+            groups[t, open_groups[g]] = node_idx
+            group_filled[g] = true                # mark the group and the node as taken
             node_taken[node_idx] = true
         end
     end
@@ -218,28 +220,46 @@ end
 
 Improve the groups step by step. For every tree: take the centroids of the groups without this
 tree and give the nodes of the tree to the groups again in the best way (Hungarian algorithm).
-Repeat until the cost improves by less than `tol` (relative) or `max_iter` rounds are done.
-Returns the new total cost.
+A tree is solved again only if another tree's assignment changed since its last solve.
+Stops when no tree has to be solved again, the cost improves by less than `tol` (relative), or
+`max_iter` rounds are done. Returns the new total cost.
 """
 function alternating_assignment!(groups, trees, greedy_cost, max_iter, tol)
-    rel_change = 1
     cost = greedy_cost
+    n = size(groups, 2)
+    m = size(trees, 1)
+
+    needs_solve = trues(size(trees, 1))   # needs_solve[t]: tree t has to be solved (again)
+    cost_matrix = Matrix{Float64}(undef, n, n)
+    centroids = Vector{SVector{3,Float64}}(undef, n)
+    # S[g] = p_1 + p_2 + ... + p_m, sum of the nodes of group g
+    S = [sum(trees[s, groups[s, g]] for s in 1:m) for g in axes(groups, 2)]
+
     for _ in 1:max_iter
         for t in axes(trees, 1)
-
-            # centroid of each group without tree t
-            # c_g = (sum of p_s over all trees s ≠ t in group g) / (m - 1)
-            other_trees = [t_other for t_other in axes(groups, 1) if t_other != t]
-            centroids = [mean(trees[t_other, groups[t_other, group_idx]] for t_other in other_trees) for group_idx in axes(groups, 2)]
-
+            needs_solve[t] || continue
+            # centroid of group g without tree t = (sum of all m nodes - node of tree t) / (m - 1)
+            # c_g = (S[g] - p_t) / (m - 1)
+            for g in axes(groups, 2)
+                centroids[g] = (S[g] - trees[t, groups[t, g]]) / (m - 1)
+            end
             # cost_matrix[g, i] = d(c_g, p_i), p_i - coordinates of node i of tree t
-            cost_matrix = [sq_dist(centroids[group_idx], trees[t, node_idx])
-                        for group_idx in axes(groups, 2), node_idx in axes(trees, 2)]
+            for i in axes(trees, 2), g in 1:n          # column-major: g inner
+                cost_matrix[g, i] = sq_dist(centroids[g], trees[t, i])
+            end
             # assignment[g] = node of tree t for group g; every node used once, sum of costs smallest
             assignment, _ = hungarian(cost_matrix)
-            groups[t, :] .= assignment
+            # update S
+            for g in axes(groups, 2)                                   
+                S[g] += trees[t, assignment[g]] - trees[t, groups[t, g]]
+            end
+            if assignment != view(groups, t, :)
+                groups[t, :] .= assignment
+                needs_solve .= true        # every other tree's subproblem changed
+            end
+            needs_solve[t] = false      # t was just solved
         end
-
+        any(needs_solve) || break          # converged: nothing left to re-solve
         new_cost = calculate_total_cost(trees, groups)
         # rel_change = (old cost - new cost) / old cost
         rel_change = (cost - new_cost) / cost
@@ -250,17 +270,20 @@ function alternating_assignment!(groups, trees, greedy_cost, max_iter, tol)
 end
 
 """
-    find_closest_nodes!(coords, k) -> coords
+    find_closest_nodes!(coords, k, compute_bound) -> groups
 
 Group the nodes of several trees so that each group has one node from every tree and the nodes
 in a group are as close as possible. `coords[t, i]` holds the coordinates `(x, y, z)` of node
-`i` of tree `t`; `k` is the number of neighbours checked in the greedy step. Logs how much the
-result can still be improved at most (compared with [`calculate_lower_bound`](@ref)).
+`i` of tree `t`; `k` is the number of neighbours checked in the greedy step. If
+`compute_bound` is `true`, the lower bound ([`calculate_lower_bound`](@ref)) is also computed
+and it is logged how much the result can still be improved at most; this is slow
+(m(m - 1)/2 Hungarian runs).
 
 `coords` is reordered in place: afterwards column `g` holds the coordinates of the nodes of
-group `g`, one node per tree.
+group `g`, one node per tree. Returns `groups`: `groups[t, g]` is the original index of the node
+of tree `t` in group `g`.
 """
-function find_closest_nodes!(coords::Matrix, k::Int)
+function find_closest_nodes!(coords::Matrix, k::Int, compute_bound::Bool)
     trees = SVector{3,Float64}.(coords)
     n_trees = size(coords, 1)
     n_nodes = size(coords, 2)
@@ -271,13 +294,15 @@ function find_closest_nodes!(coords::Matrix, k::Int)
     max_iter = 10
     tol = 10e-09
 
-    bound = calculate_lower_bound(n_trees, trees)
     greedy_cost = get_greedy_solution!(groups, reference_tree, trees, k)
     cost = alternating_assignment!(groups, trees, greedy_cost, max_iter, tol)
-    # gap = (cost - bound) / bound * 100 [%]
-    gap = (cost - bound) / bound * 100
 
-    @info "At most $(gap)% improvement is left"
+    if compute_bound
+        bound = calculate_lower_bound(n_trees, trees)
+        # gap = (cost - bound) / bound * 100 [%]
+        gap = (cost - bound) / bound * 100
+        @info "At most $(gap)% improvement is left"
+    end
 
     # new coords[t, g] = old coords[t, groups[t, g]]: column g holds the nodes of group g
     # (the right side is copied first, so the row is not overwritten while it is read)

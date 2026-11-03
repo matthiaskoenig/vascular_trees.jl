@@ -180,7 +180,7 @@ function prepare_tnodes_info(
     @info "Searching for the closest terminal nodes..."
     # find closest terminal nodes for all trees, reorder coordinates, get matrix with reordered idx
     init_clusters = 3
-    matching = find_closest_nodes!(species_coordinates, init_clusters)  
+    matching = find_closest_nodes!(species_coordinates, init_clusters, false)  
 
     @info "Reversing matrices..."
     # based on the coordinates reordering reorder everething else
