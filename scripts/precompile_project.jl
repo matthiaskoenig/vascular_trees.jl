@@ -8,7 +8,7 @@ for cfg in ["Rectangle_quad"]
     tree_info = TreeStructure(; tree_configuration = cfg, n_node = 10,
                               tree_components = trees.vascular_trees[cfg])
     process_julia_graph(tree_info)
-    process_terminal_nodes(tree_info)
+    process_terminal_nodes(tree_info, true)
     run_simulations(
         tree_info,
         SimulationOptions(tspan = (0.0, 16.0), 
@@ -33,6 +33,8 @@ end
 #         "OrdinaryDiffEq", "Sundials", "SciMLBase", "SparseArrays",
 #         # tables / IO
 #         "Arrow", "CSV", "DataFrames", "Tables", "Dictionaries", "HDF5",
+#         # closest nodes
+#         "NearestNeighbors", "StaticArrays", "Statistics", "Hungarian", "Combinatorics",
 #         # utilities used inside the package
 #         "Parameters", "Reexport", "ProgressMeter", "TimerOutputs",
 #     ];

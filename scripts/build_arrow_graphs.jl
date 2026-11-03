@@ -42,6 +42,7 @@ function main(;
     ),
     # colored log prefixes; debug = true also shows the per-subsystem stages of VascularTrees
     debug = false,
+    find_closest_tnodes = true
 )
     setup_logging(debug = debug)
 
@@ -56,7 +57,7 @@ function main(;
             # load (.arrow) every graph that this tree includes, collect info that we
             # need for the correct ODEs for the terminal part that connects all the parts of this tree
             # together and save it in one file (as .arrow)
-            process_terminal_nodes(tree_info)
+            process_terminal_nodes(tree_info, find_closest_tnodes)
         end
     end
 end

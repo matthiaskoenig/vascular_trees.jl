@@ -23,9 +23,10 @@ sim_options = SimulationOptions(
     show_progress = false,
 )
 flow_scaling_factor = 1.0
+find_closest_tnodes = false
 
 process_julia_graph(tree_info)
-process_terminal_nodes(tree_info)
+process_terminal_nodes(tree_info, find_closest_tnodes)
 for tree ∈ [tree_info.vascular_trees; "T"]
     @test isfile(joinpath(GRAPH_DIR, "graphs", "$(tree).arrow"))
 end

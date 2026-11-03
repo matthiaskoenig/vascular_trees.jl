@@ -30,7 +30,7 @@ terminal node information with [`prepare_tnodes_info`](@ref), and save it to
 `tree_info` must provide `GRAPH_DIR`, `vascular_trees` and `tree_components`
 (with the keys `:inflow_trees` and `:outflow_trees`).
 """
-function process_terminal_nodes(tree_info)
+function process_terminal_nodes(tree_info, find_closest_tnodes)
     @info "Processing terminal nodes..."
 
     # tree name => its table; the order of the output rows comes from
@@ -39,7 +39,7 @@ function process_terminal_nodes(tree_info)
     # load the tables of all trees (graphs) that belong to this tree configuration
     collect_graphs_information!(graphs, tree_info)
 
-    tnodes_info_df = prepare_tnodes_info(graphs, tree_info)
+    tnodes_info_df = prepare_tnodes_info(graphs, tree_info, find_closest_tnodes)
     save_as_arrow(tnodes_info_df, joinpath(tree_info.GRAPH_DIR, "graphs/T.arrow"))
     # CSV.write(joinpath(tree_info.GRAPH_DIR, "graphs/T.csv"),tnodes_info_df)
 end
@@ -78,7 +78,7 @@ function collect_graphs_information!(graphs::Dict{String,DataFrame}, tree_info)
 end
 
 """
-    prepare_tnodes_info(graphs::Dict{String,DataFrame}, tree_info) -> DataFrame
+    prepare_tnodes_info(graphs::Dict{String,DataFrame}, tree_info, find_closest_tnodes) -> DataFrame
 
 Build the terminal node table from the loaded trees in `graphs`.
 
@@ -108,6 +108,7 @@ is not found keeps the coordinates `(0.0, 0.0, 0.0)` and the tree id `""`.
 function prepare_tnodes_info(
     graphs::Dict{String,DataFrame},
     tree_info,
+    find_closest_tnodes
 )::DataFrame
     @info "Preparation steps"
     # === Table sizes, needed to preallocate the arrays below
@@ -177,29 +178,33 @@ function prepare_tnodes_info(
         species_affiliations[tree_row, found] .= tree_name
     end
 
-    @info "Searching for the closest terminal nodes..."
-    # find closest terminal nodes for all trees, reorder coordinates, get matrix with reordered idx
-    init_clusters = 3
-    matching = find_closest_nodes!(species_coordinates, init_clusters, false)  
+    if find_closest_tnodes
+        @info "Searching for the closest terminal nodes..."
+        # find closest terminal nodes for all trees, reorder coordinates, get matrix with reordered idx
+        init_clusters = 3
+        matching = find_closest_nodes!(species_coordinates, init_clusters, false)  
 
-    @info "Reversing matrices..."
-    # based on the coordinates reordering reorder everething else
-    k_inflow = 2
-    k_outflow = 1
-    for (tree_row, tree_id) in enumerate(tree_info.vascular_trees)
-        perm = view(matching, tree_row, :)
-        species_affiliations[tree_row, :] .= species_affiliations[tree_row, perm]
-        if graphs[tree_id][1, :is_inflow]
-            flow_values[k_inflow, :] .= flow_values[k_inflow, perm]
-            flow_ids[k_inflow, :] .= flow_ids[k_inflow, perm]
-            species_ids[k_inflow, :] .= species_ids[k_inflow, perm]
-            k_inflow += 1
-        else
-            # The terminal ODEs only need the total outflow of each terminal, so the
-            # flows of all outflow trees are added together in row 1.
-            flow_values[1, :] .+= view(outflow_values, k_outflow, perm)
-            k_outflow += 1
+        @info "Reversing matrices..."
+        # based on the coordinates reordering reorder everething else
+        k_inflow = 2
+        k_outflow = 1
+        for (tree_row, tree_id) in enumerate(tree_info.vascular_trees)
+            perm = view(matching, tree_row, :)
+            species_affiliations[tree_row, :] .= species_affiliations[tree_row, perm]
+            if graphs[tree_id][1, :is_inflow]
+                flow_values[k_inflow, :] .= flow_values[k_inflow, perm]
+                flow_ids[k_inflow, :] .= flow_ids[k_inflow, perm]
+                species_ids[k_inflow, :] .= species_ids[k_inflow, perm]
+                k_inflow += 1
+            else
+                # The terminal ODEs only need the total outflow of each terminal, so the
+                # flows of all outflow trees are added together in row 1.
+                flow_values[1, :] .+= view(outflow_values, k_outflow, perm)
+                k_outflow += 1
+            end
         end
+    else
+        matching = [j for i in 1:size(species_coordinates, 1), j in 1:size(species_coordinates, 2)]
     end
 
     tnodes_info_df = assemble_tnodes_table(

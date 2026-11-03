@@ -6,7 +6,6 @@ Collected from `src/` and `scripts/`.
 
 - [ ] Flow affiliations are wrong. ([L20](src/trees_processing/terminal_nodes.jl#L20))
 - [ ] Taken from the "V" tree only; assumes every configuration has a "V" tree. ([L142](src/trees_processing/terminal_nodes.jl#L142))
-- [ ] add the possibility to process term nodes withoght finding the matching one
 
 ## scripts/run_simulations.jl
 
