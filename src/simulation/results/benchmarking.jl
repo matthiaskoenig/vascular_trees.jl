@@ -11,7 +11,8 @@ module Benchmarking
         times::TimerOutput,
         n_node::Int64,
         tree_configuration::String,
-        n_species::Int64,
+        n_states::Int64,
+        n_distinct_species::Int64,
         solver_name::String,
         n_term::Int64,
     )
@@ -45,14 +46,16 @@ module Benchmarking
         tree_configurations::Vector{String} =
             ["$(tree_configuration)" for _ ∈ eachindex(allocated_bytes)]
         n_nodes::Vector{Int} = [n_node for _ ∈ eachindex(allocated_bytes)]
-        n_sp::Vector{Int} = [n_species for _ ∈ eachindex(allocated_bytes)]
+        n_st::Vector{Int} = [n_states for _ ∈ eachindex(allocated_bytes)]
+        n_sp::Vector{Int} = [n_distinct_species for _ ∈ eachindex(allocated_bytes)]
         solver_names::Vector{String} = [solver_name for _ ∈ eachindex(allocated_bytes)]
         n_terminals::Vector{Int} = [n_term for _ ∈ eachindex(allocated_bytes)]
         table = (
             n_calls = n_calls,
             call_orders = call_orders,
             times_min = times_ns / 60 * 10^-9,
-            n_species = n_sp,
+            n_states = n_st,
+            n_distinct_species = n_sp,
             allocated_gbytes = allocated_bytes / 2^30,
             solver_names = solver_names,
             n_node = n_nodes,

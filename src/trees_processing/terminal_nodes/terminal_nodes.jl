@@ -206,7 +206,7 @@ function prepare_tnodes_info(
             end
         end
     else
-        matching = [j for i in 1:size(species_coordinates, 1), j in 1:size(species_coordinates, 2)]
+        matching = repeat((1:n_terminals)', n_vascular_trees)
     end
 
     tnodes_info_df = assemble_tnodes_table(

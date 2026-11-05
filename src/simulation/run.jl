@@ -91,13 +91,14 @@ function run_simulations(
 
             show(to, sortby = :firstexec)
             if bench_options.save_running_times
-                @info "Pay attention to the number of species, they could be calculated in a wrong way"
                 n_terminal::Int = size(p_terminal.flow_values, 2)
+                species_counts = count_species(p_terminal, p)
                 save_times_as_csv(
                     to,
                     tree_info.n_node,
                     tree_info.graph_id,
-                    n_terminal * 9,
+                    species_counts.n_states,
+                    species_counts.n_distinct,
                     sol_options.solver_name,
                     n_terminal,
                 )
@@ -138,4 +139,23 @@ function run_simulations(
             rm(mmap_path(tree_info, graph_subsystem); force = true)
         end
     end
+end
+
+"""
+    count_species(p_terminal, p) -> (n_states, n_distinct)
+
+Number of species of the coupled system, counted in two ways. Every tree contains one
+terminal self-edge per terminal, a copy of the terminal compartment, so these are left
+out of the trees.
+- `n_states`: states integrated by the solvers: the whole terminal block plus the tree
+  states without terminal edges. Rows 2..n of the terminal block are copies of the inflow
+  preterminal species (set by synchronization), but they are states of the terminal integrator.
+- `n_distinct`: physically distinct species: only the terminal compartments (row 1 of the
+  terminal block) plus the tree states without terminal edges.
+"""
+function count_species(p_terminal, p)
+    n_tree_species = sum(p_tree -> count(!=(groups.terminal), p_tree.ODE_groups), p)
+    n_rows, n_terminals = size(p_terminal.flow_values)
+    return (n_states = n_rows * n_terminals + n_tree_species,
+            n_distinct = n_terminals + n_tree_species)
 end

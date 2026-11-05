@@ -37,14 +37,14 @@ function main(;
     # === Graph options ===
     # options for graph, i.e., number of nodes and type of tree
     t_options = TreeOptions(
-        n_nodes = [10, 100, 1000, 10000, 100000, 1000000, 10000000],  #10, 100, 1000, 10000, 100000
+        n_nodes = [1000000, 10000000],  #10, 100, 1000, 10000, 100000
         tree_configurations = [
             "Rectangle_quad",
         ],
     ),
     # colored log prefixes; debug = true also shows the per-subsystem stages of VascularTrees
     debug = false,
-    find_closest_tnodes = true,
+    find_closest_tnodes = false,
     # === Matching options ===
     # greedy step + alternating step (Hungarian) for the closest terminal nodes
     m_options = MatchingOptions(
