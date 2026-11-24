@@ -35,43 +35,43 @@ const EXAMPLE = "Rectangle_quad/Rectangle_quad_10"
 ::: {.toc-group}
 **Overview**
 
-- [Liver vascularization as coupled trees](#/trees)
-- [Pipeline](#/pipeline)
+- [Liver vascularization as coupled trees](#trees)
+- [Pipeline](#pipeline)
 :::
 
 ::: {.toc-group .s1}
 **Step 1 — `build_arrow_graphs.jl`**
 
-- [Overview: 1a and 1b](#/step1-overview)
-- [1a · Tree → ODE table](#/s1a) · [added edges](#/s1a-edges) · [`<tree>.arrow`](#/s1a-table)
-- [1b · Terminal nodes](#/s1b) · [matching](#/s1b-matching) · [`T.arrow`](#/s1b-table)
+- [Overview: 1a and 1b](#step1-overview)
+- [1a · Tree → ODE table](#s1a) · [added edges](#s1a-edges) · [`<tree>.arrow`](#s1a-table)
+- [1b · Terminal nodes](#s1b) · [matching](#s1b-matching) · [`T.arrow`](#s1b-table)
 :::
 
 ::: {.toc-group .s2}
 **Step 2 — `run_simulations.jl`**
 
-- [Overview: 2a, 2b, 2c](#/step2-overview)
-- [2a · Setup](#/s2a) · [matrices: tree](#/s2a-tree) · [matrices: terminal part](#/s2a-terminal)
-- [2b · Pharmacokinetic model](#/s2b)
-- [2c · Coupling in time](#/s2c) · [diagram](#/s2c-diagram) · [`simulations/*.arrow`](#/s2c-table)
+- [Overview: 2a, 2b, 2c](#step2-overview)
+- [2a · Setup](#s2a) · [matrices: tree](#s2a-tree) · [matrices: terminal part](#s2a-terminal)
+- [2b · Pharmacokinetic model](#s2b)
+- [2c · Coupling in time](#s2c) · [diagram](#s2c-diagram) · [`simulations/*.arrow`](#s2c-table)
 :::
 
 ::: {.toc-group .s3}
 **Step 3 — `create_vtk.jl`**
 
-- [3 · From numbers to an animation](#/s3)
+- [3 · From numbers to an animation](#s3)
 :::
 
 ::: {.toc-group .s3}
 **Simulation results**
 
-- [10²](#/sim-100) · [10⁴](#/sim-10000) · [10⁵](#/sim-100000) · [10⁶](#/sim-1000000) terminal nodes
+- [10²](#sim-100) · [10⁴](#sim-10000) · [10⁵](#sim-100000) · [10⁶](#sim-1000000) terminal nodes
 :::
 
 ::: {.toc-group .s3}
 **Code and performance**
 
-- [Software design](#/design) · [Benchmark](#/benchmark) · [Next steps](#/next)
+- [Software design](#design) · [Benchmark](#benchmark) · [Next steps](#next)
 :::
 :::
 
@@ -292,17 +292,66 @@ What do we need?
 
 ## 1a · Which edges are added to a tree {#s1a-edges}
 
-```{mermaid}
-%%| fig-width: 11
-flowchart LR
-    O(("0")):::virt -- "marginal (0)<br/>dose enters" --> R(("root"))
-    R -- "inner (1)" --> N(("n"))
-    N -- "preterminal (2)" --> L1(("leaf 1"))
-    N -- "preterminal (2)" --> L2(("leaf 2"))
-    L1 -- "terminal (3)" --> L1
-    L2 -- "terminal (3)" --> L2
+```{=html}
+<svg viewBox="0 0 1000 370" style="width:88%;max-width:1000px;height:auto;display:block;margin:0 auto" font-family="Roboto, sans-serif">
+  <defs>
+    <marker id="ah-tree" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4a5568"/>
+    </marker>
+    <marker id="ah-added" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2b6cb0"/>
+    </marker>
+  </defs>
 
-    classDef virt fill:#fff,stroke:#718096,stroke-dasharray:4 3
+  <!-- edges of the generated tree (grey) -->
+  <g stroke="#4a5568" stroke-width="2.4" fill="none" marker-end="url(#ah-tree)">
+    <line x1="364" y1="170" x2="524" y2="170"/>
+    <line x1="590" y1="158" x2="755" y2="93"/>
+    <line x1="590" y1="182" x2="755" y2="247"/>
+  </g>
+  <g font-size="17" fill="#2d3748" text-anchor="middle">
+    <text x="444" y="158">inner (1)</text>
+    <text x="664" y="112" transform="rotate(-21.4 664 112)">preterminal (2)</text>
+    <text x="668" y="252" transform="rotate(21.4 668 252)">preterminal (2)</text>
+  </g>
+
+  <!-- edges added for the ODEs (blue): marginal edge and round self-loops -->
+  <g stroke="#2b6cb0" stroke-width="2.8" fill="none" marker-end="url(#ah-added)">
+    <line x1="124" y1="170" x2="294" y2="170"/>
+    <path d="M815,60 C 885,5 885,155 815,100"/>
+    <path d="M815,240 C 885,185 885,335 815,280"/>
+  </g>
+  <g font-size="17" fill="#2b6cb0" font-weight="500">
+    <text x="210" y="158" text-anchor="middle">marginal (0)</text>
+    <text x="210" y="196" text-anchor="middle" font-size="15" font-weight="400" font-style="italic">dose enters</text>
+    <text x="878" y="86">terminal (3)</text>
+    <text x="878" y="266">terminal (3)</text>
+  </g>
+
+  <!-- nodes -->
+  <g stroke-width="2" fill="#fff">
+    <circle cx="90"  cy="170" r="32" stroke="#718096" stroke-dasharray="5 4"/>
+    <circle cx="330" cy="170" r="32" stroke="#4a5568"/>
+    <circle cx="558" cy="170" r="32" stroke="#4a5568"/>
+    <circle cx="790" cy="80"  r="32" stroke="#4a5568"/>
+    <circle cx="790" cy="260" r="32" stroke="#4a5568"/>
+  </g>
+  <g font-size="17" fill="#2d3748" text-anchor="middle" dominant-baseline="central">
+    <text x="90"  y="170" fill="#718096">0</text>
+    <text x="330" y="170">root</text>
+    <text x="558" y="170">n</text>
+    <text x="790" y="80">leaf 1</text>
+    <text x="790" y="260">leaf 2</text>
+  </g>
+
+  <!-- legend -->
+  <g font-size="15" fill="#4a5568" dominant-baseline="central">
+    <line x1="250" y1="350" x2="290" y2="350" stroke="#4a5568" stroke-width="2.4"/>
+    <text x="300" y="350">edge of the generated tree</text>
+    <line x1="540" y1="350" x2="580" y2="350" stroke="#2b6cb0" stroke-width="2.8"/>
+    <text x="590" y="350" fill="#2b6cb0">edge added for the ODEs</text>
+  </g>
+</svg>
 ```
 
 ::: {.small}
@@ -623,20 +672,46 @@ u_B[sidx_B] .= u_T[1:n_rows:end]
 ::::
 :::::
 
-## 2b · Pharmacokinetic model {#s2b}
+## 2b · Model: inflow trees (A, P) {#s2b}
 
-One concentration per edge; mass balance with flow $Q$ and volume $V$:
+One concentration $C_e$ per edge, mass balance with flow $Q$ and volume $V$,
+$\;\frac{dC_e}{dt} = \frac{1}{V_e}\left(\text{inflow} - \text{outflow}\right)$ — one equation per ODE group:
+
+::: {.eq-table}
+| group | edge | equation |
+|:--|:--|:--|
+| **0** marginal | before the root, the dose enters | $C_0(t) = \text{infusion rate}(t) \,/\, Q_{\text{root}}$ — set, not integrated |
+| **1** inner | inside the tree | $\dfrac{dC_e}{dt} = \dfrac{1}{V_e}\left(Q_e\,C_{\text{parent}} - \sum_{\text{children}} Q_c\;C_e\right)$ |
+| **2** preterminal | ends at a leaf | $\dfrac{dC_e}{dt} = \dfrac{Q_e}{V_e}\left(C_{\text{parent}} - C_e\right)$ |
+| **3** terminal | self-loop at the leaf | $0$ — placeholder, $T_k$ is solved in the terminal part |
+:::
+
+## 2b · Model: terminal part (sinusoids) {#s2b-terminal}
 
 $$
-\frac{dC_e}{dt} = \frac{1}{V_e}\left(\sum_{\text{in}} Q\,C_{\text{in}} - Q_{\text{out}}\,C_e\right)
+\frac{dT_k}{dt} = \frac{1}{V_T}\left(\sum_{i \in \{A,\,P\}} Q_{i,k}\,C_{i,k} - Q_{\text{out},k}\,T_k\right)
 $$
 
 ::: {.small}
-- **Inflow trees (A, P):** marginal edge carries the dose, $C_0(t) = \text{infusion rate}(t) / Q_{\text{root}}$
-- **Terminal part (sinusoids):**
-  $\dfrac{dT_k}{dt} = \dfrac{1}{V_T}\left(\sum_{\text{A,P}} Q\,C_{\text{preterminal}} - Q_{\text{out}}\,T_k\right)$
-- **Outflow trees (V, B):** the same balance; the edges at the leaves get $T_k$ as their inflow,
-  the marginal edge is what leaves the liver
+- $k$: terminal node; $C_{i,k}$, $Q_{i,k}$: concentration and flow of the preterminal edge of
+  inflow tree $i$ that ends at terminal $k$
+- $Q_{\text{out},k} = Q_{V,k} + Q_{B,k}$: **the sum of the flows of the outflow preterminal
+  edges** at terminal $k$ (row 1 of `T.arrow`, `flow_value_1`)
+- rows 2..n of the terminal block are copies of $C_{A,k}$, $C_{P,k}$, set by synchronization
+  ($dC/dt = 0$ in the terminal part)
+:::
+
+## 2b · Model: outflow trees (V, B) {#s2b-outflow}
+
+Flow runs from the leaves to the root: an edge collects from several upstream edges (its children).
+
+::: {.eq-table}
+| group | edge | equation |
+|:--|:--|:--|
+| **3** terminal | self-loop at the leaf | $0$ — copy of $T_k$, set by synchronization |
+| **2** preterminal | starts at a leaf | $\dfrac{dC_e}{dt} = \dfrac{Q_e}{V_e}\left(T_k - C_e\right)$ |
+| **1** inner | inside the tree | $\dfrac{dC_e}{dt} = \dfrac{1}{V_e}\left(\sum_{\text{children}} Q_c\,C_c - Q_e\,C_e\right)$ |
+| **0** marginal | after the root, leaves the liver | $\dfrac{dC_0}{dt} = \dfrac{Q_{\text{root}}}{V_0}\left(C_{\text{root}} - C_0\right)$ |
 :::
 
 ## 2c · Coupling the subsystems in time {#s2c}

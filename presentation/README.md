@@ -100,7 +100,7 @@ The functions are defined in `plots.jl`:
 
 New section slides (blue): a heading with one `#`, e.g.
 `# Simulation results {#results background-color="#2b6cb0"}`. The `{#id}` is what the contents
-slide links to (`[text](#/results)`).
+slide links to (`[text](#results)`).
 
 ## Known issues
 
