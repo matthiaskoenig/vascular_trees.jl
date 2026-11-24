@@ -20,7 +20,7 @@ If `sol_options.compute_jacobian`, the trees and the terminal part are solved wi
 analytic Jacobian `jac!`.
 
 # Arguments
-- `solutions`: for every subsystem a `(n_species, steps+1)` matrix, one column per stored
+- `solutions`: for every subsystem a `(n_states, steps+1)` matrix, one column per stored
 time point; not used when `sim_options.benchmark` (nothing is stored, see [`integrate!`](@ref)).
 - `u0_terminal`, `p_terminal`: initial values (a vector, see `jf_terminal!`) and parameters
 of the terminal part.

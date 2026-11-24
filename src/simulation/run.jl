@@ -53,17 +53,17 @@ function run_simulations(
     #    is checked first, because a full disk is noticed only while writing (crash)
     # own keys: map(length, u0) would share the keys of u0, and the insert! below would add
     # "T" (without a value) to u0 as well
-    n_species = dictionary(id => length(u0[id]) for id in keys(u0))
-    insert!(n_species, "T", length(u0_terminal))
+    n_states = dictionary(id => length(u0[id]) for id in keys(u0))
+    insert!(n_states, "T", length(u0_terminal))
     if sim_options.benchmark
         # nothing is stored when benchmarking (see integrate!): empty matrices, no temporary files
-        for (graph_subsystem, n) in pairs(n_species)
+        for (graph_subsystem, n) in pairs(n_states)
             insert!(solutions, graph_subsystem, Matrix{Float64}(undef, n, 0))
         end
     else
-        stage("preallocating solutions ($(sum(n_species)) species * $n_time_points time points)") do
-            check_disk_space(tree_info, sum(n_species), n_time_points, sim_options.save_simulations)
-            for (graph_subsystem, n) in pairs(n_species)
+        stage("preallocating solutions ($(sum(n_states)) states * $n_time_points time points)") do
+            check_disk_space(tree_info, sum(n_states), n_time_points, sim_options.save_simulations)
+            for (graph_subsystem, n) in pairs(n_states)
                 insert!(solutions, graph_subsystem, mmap_solution(tree_info, graph_subsystem, n, n_time_points))
             end
         end
@@ -151,18 +151,19 @@ end
 """
     count_species(p_terminal, p) -> (n_states, n_distinct)
 
-Number of species of the coupled system, counted in two ways. Every tree contains one
-terminal self-edge per terminal, a copy of the terminal compartment, so these are left
-out of the trees.
-- `n_states`: states integrated by the solvers: the whole terminal block plus the tree
-  states without terminal edges. Rows 2..n of the terminal block are copies of the inflow
-  preterminal species (set by synchronization), but they are states of the terminal integrator.
+Number of species of the coupled system, counted in two ways.
+- `n_states`: states integrated (and stored) by the solvers: the whole terminal block plus
+  all states of the trees, i.e. the sum of the lengths of all `u0` vectors. It contains
+  copies: rows 2..n of the terminal block are copies of the inflow preterminal species, and
+  every tree has one terminal self-edge per terminal, a copy of the terminal compartment
+  (both set by synchronization).
 - `n_distinct`: physically distinct species: only the terminal compartments (row 1 of the
   terminal block) plus the tree states without terminal edges.
 """
 function count_species(p_terminal, p)
+    n_tree_states  = sum(p_tree -> length(p_tree.ODE_groups), p)
     n_tree_species = sum(p_tree -> count(!=(groups.terminal), p_tree.ODE_groups), p)
     n_rows, n_terminals = size(p_terminal.flow_values)
-    return (n_states = n_rows * n_terminals + n_tree_species,
+    return (n_states = n_rows * n_terminals + n_tree_states,
             n_distinct = n_terminals + n_tree_species)
 end

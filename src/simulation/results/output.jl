@@ -29,38 +29,38 @@ function mmap_path(tree_info, graph_subsystem)
 end
 
 """
-    check_disk_space(tree_info, n_species_total, n_time_points, save_results)
+    check_disk_space(tree_info, n_states_total, n_time_points, save_results)
 
 Throw an error if the `simulations` folder of the graph has less free space than the worst
 case: every time point stored in the temporary files (see [`mmap_solution`](@ref)) and, if
-`save_results`, once more in the `.arrow` files (approximately, the species ids are not counted).
+`save_results`, once more in the `.arrow` files (approximately, the states ids are not counted).
 
 The temporary files are sparse, so a full disk is not detected when they are created, but only
 later, when the solution is written to them: Julia then crashes with a bus error.
 """
-function check_disk_space(tree_info, n_species_total::Int, n_time_points::Int, save_results::Bool)
+function check_disk_space(tree_info, n_states_total::Int, n_time_points::Int, save_results::Bool)
     simulations_dir = mkpath(joinpath(tree_info.GRAPH_DIR, "simulations"))
     n_copies = save_results ? 2 : 1
-    needed = n_copies * n_species_total * n_time_points * sizeof(Float64)
+    needed = n_copies * n_states_total * n_time_points * sizeof(Float64)
     available = diskstat(simulations_dir).available
     if needed > available
         error("Not enough disk space in $(simulations_dir): " *
               "$(round(needed / 1e9; digits = 1)) GB needed in the worst case " *
-              "($(n_species_total) species, $(n_time_points) time points), " *
+              "($(n_states_total) states, $(n_time_points) time points), " *
               "$(round(available / 1e9; digits = 1)) GB available")
     end
 end
 
 
 """
-    mmap_solution(tree_info, graph_subsystem, n_species, n_time_points) -> Matrix{Float64}
+    mmap_solution(tree_info, graph_subsystem, n_states, n_time_points) -> Matrix{Float64}
 
-Zero matrix `(n_species, n_time_points)` backed by a temporary file in the `simulations`
+Zero matrix `(n_states, n_time_points)` backed by a temporary file in the `simulations`
 folder, so that the solution of large graphs does not have to fit in RAM.
 """
-function mmap_solution(tree_info, graph_subsystem, n_species, n_time_points)
+function mmap_solution(tree_info, graph_subsystem, n_states, n_time_points)
     path = mmap_path(tree_info, graph_subsystem)
-    M = open(io -> Mmap.mmap(io, Matrix{Float64}, (n_species, n_time_points)), path, "w+")
+    M = open(io -> Mmap.mmap(io, Matrix{Float64}, (n_states, n_time_points)), path, "w+")
     return M   # file is zero-filled on creation
 end
 

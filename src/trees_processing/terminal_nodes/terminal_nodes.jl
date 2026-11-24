@@ -185,28 +185,27 @@ function prepare_tnodes_info(
         @info "Searching for the closest terminal nodes..."
         # find closest terminal nodes for all trees, reorder coordinates, get matrix with reordered idx
         matching = find_closest_nodes!(species_coordinates, matching_options)
-
-        @info "Reversing matrices..."
-        # based on the coordinates reordering reorder everething else
-        k_inflow = 2
-        k_outflow = 1
-        for (tree_row, tree_id) in enumerate(tree_info.vascular_trees)
-            perm = view(matching, tree_row, :)
-            species_affiliations[tree_row, :] .= species_affiliations[tree_row, perm]
-            if graphs[tree_id][1, :is_inflow]
-                flow_values[k_inflow, :] .= flow_values[k_inflow, perm]
-                flow_ids[k_inflow, :] .= flow_ids[k_inflow, perm]
-                species_ids[k_inflow, :] .= species_ids[k_inflow, perm]
-                k_inflow += 1
-            else
-                # The terminal ODEs only need the total outflow of each terminal, so the
-                # flows of all outflow trees are added together in row 1.
-                flow_values[1, :] .+= view(outflow_values, k_outflow, perm)
-                k_outflow += 1
-            end
-        end
     else
         matching = repeat((1:n_terminals)', n_vascular_trees)
+    end
+    
+    # based on the coordinates reordering reorder everething else
+    k_inflow = 2
+    k_outflow = 1
+    for (tree_row, tree_id) in enumerate(tree_info.vascular_trees)
+        perm = view(matching, tree_row, :)
+        species_affiliations[tree_row, :] .= species_affiliations[tree_row, perm]
+        if graphs[tree_id][1, :is_inflow]
+            flow_values[k_inflow, :] .= flow_values[k_inflow, perm]
+            flow_ids[k_inflow, :] .= flow_ids[k_inflow, perm]
+            species_ids[k_inflow, :] .= species_ids[k_inflow, perm]
+            k_inflow += 1
+        else
+            # The terminal ODEs only need the total outflow of each terminal, so the
+            # flows of all outflow trees are added together in row 1.
+            flow_values[1, :] .+= view(outflow_values, k_outflow, perm)
+            k_outflow += 1
+        end
     end
 
     tnodes_info_df = assemble_tnodes_table(
