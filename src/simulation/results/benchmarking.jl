@@ -2,73 +2,58 @@ module Benchmarking
     export save_times_as_csv
 
     using CSV
+    using DataFrames
     using TimerOutputs
-    using Tables
-    
+
     using ..Paths: BENCHMARKING_RESULTS_PATH
 
-    function save_times_as_csv(
-        times::TimerOutput,
-        n_node::Int64,
-        tree_configuration::String,
-        n_states::Int64,
-        n_distinct_species::Int64,
-        solver_name::String,
-        n_term::Int64,
+    """
+        timer_row(timer, call_order, iteration) -> NamedTuple
+
+    One row of the running times table from one entry of `TimerOutputs.todict`.
+    """
+    timer_row(timer, call_order, iteration) = (
+        n_calls = timer["n_calls"],
+        call_orders = call_order,
+        iteration = iteration,
+        times_min = timer["time_ns"] / 1e9 / 60,
+        allocated_gbytes = timer["allocated_bytes"] / 2^30,
     )
 
-        total_times = TimerOutputs.todict(times)["inner_timers"]
-        n_calls::Vector{Int} = []
-        call_orders::Vector{String} = []
-        times_ns::Vector{Float64} = []
-        allocated_bytes::Vector{Float64} = []
-        for graph_id ∈ keys(total_times)
-            indiv_times = get(get(total_times, graph_id, NaN), "inner_timers", NaN)
-            len = length(keys(indiv_times))
+    """
+        save_times_as_csv(times, run_info; path = BENCHMARKING_RESULTS_PATH)
 
-            n_call = get(get(total_times, graph_id, NaN), "n_calls", NaN)
-            time_ns = get(get(total_times, graph_id, NaN), "time_ns", NaN)
-            allocated_mem = get(get(total_times, graph_id, NaN), "allocated_bytes", NaN)
-            push!(n_calls, n_call)
-            push!(call_orders, "Total time (all iterations)")
-            push!(times_ns, time_ns)
-            push!(allocated_bytes, allocated_mem)
-            for subgraph_id ∈ keys(indiv_times)
-                n_call_minor = get(get(indiv_times, subgraph_id, NaN), "n_calls", NaN)
-                time_ns = get(get(indiv_times, subgraph_id, NaN), "time_ns", NaN)
-                allocated_mem = get(get(indiv_times, subgraph_id, NaN), "allocated_bytes", NaN)
-                push!(n_calls, n_call_minor)
-                push!(call_orders, "Call")
-                push!(times_ns, time_ns)
-                push!(allocated_bytes, allocated_mem)
+    Add the running times measured in `times` to the CSV file `path`.
+
+    Per graph (`run_simulations` times every graph as `<graph_id>` with one inner timer
+    `<graph_id>_<k>` per iteration `k`) one row `"Total time (all iterations)"` and one row
+    `"Call"` per iteration are written, in the order of the iterations. Every field of
+    `run_info` (e.g. solver, tolerances, number of nodes, version) becomes a column with the
+    same value in all these rows.
+
+    The columns are matched by name with the rows already in the file: the whole file is read,
+    the new rows are added and the file is written again. A column that exists only in the old
+    or only in the new rows is empty (`missing`) in the others, so the old rows stay valid when
+    the columns change.
+    """
+    function save_times_as_csv(times::TimerOutput, run_info::NamedTuple;
+                               path::String = BENCHMARKING_RESULTS_PATH)
+        rows = NamedTuple[]
+        for (graph_id, graph_timer) in TimerOutputs.todict(times)["inner_timers"]
+            push!(rows, timer_row(graph_timer, "Total time (all iterations)", missing))
+            calls = graph_timer["inner_timers"]
+            # inner timers are named "<graph_id>_<k>"; a Dict has no order, so sort by k
+            iteration(name) = parse(Int, chopprefix(name, "$(graph_id)_"))
+            for name in sort!(collect(keys(calls)); by = iteration)
+                push!(rows, timer_row(calls[name], "Call", iteration(name)))
             end
         end
-        tree_configurations::Vector{String} =
-            ["$(tree_configuration)" for _ ∈ eachindex(allocated_bytes)]
-        n_nodes::Vector{Int} = [n_node for _ ∈ eachindex(allocated_bytes)]
-        n_st::Vector{Int} = [n_states for _ ∈ eachindex(allocated_bytes)]
-        n_sp::Vector{Int} = [n_distinct_species for _ ∈ eachindex(allocated_bytes)]
-        solver_names::Vector{String} = [solver_name for _ ∈ eachindex(allocated_bytes)]
-        n_terminals::Vector{Int} = [n_term for _ ∈ eachindex(allocated_bytes)]
-        table = (
-            n_calls = n_calls,
-            call_orders = call_orders,
-            times_min = times_ns / 60 * 10^-9,
-            n_states = n_st,
-            n_distinct_species = n_sp,
-            allocated_gbytes = allocated_bytes / 2^30,
-            solver_names = solver_names,
-            n_node = n_nodes,
-            tree_configuration = tree_configurations,
-            n_terminals = n_terminals,
-        )
+        new_rows = DataFrame(rows)
+        # scalars become constant columns
+        insertcols!(new_rows, pairs(run_info)...)
 
-        if isfile(BENCHMARKING_RESULTS_PATH)
-            kwargs = (writeheader = false, append = true, delim = ',')
-        else
-            kwargs = (writeheader = true, delim = ',')
-        end
-        CSV.write(BENCHMARKING_RESULTS_PATH, table; kwargs...)
+        table = isfile(path) ? vcat(CSV.read(path, DataFrame), new_rows; cols = :union) : new_rows
+        CSV.write(path, table)
     end
 
 end

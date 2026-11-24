@@ -48,7 +48,7 @@ function main(;
     # === Graph options ===
     # options for graph, i.e., number of nodes and type of tree
     t_options = TreeOptions(
-        n_nodes = [1000000, 10000000],  #, 100, 1000, 10000, 100000, 1000000, 10000000
+        n_nodes = [10000000],  #, 10, 100, 1000, 10000, 100000, 1000000, 10000000
         tree_configurations = [
             "Rectangle_quad",
             #"Rectangle_trio",
@@ -80,7 +80,8 @@ function main(;
 
     # === Benchmark options ===
     # do not write anything here in brackets if you are okay with default variant
-    bench_options = BenchmarkOptions(save_running_times = true, n_iterations = 5),
+    # version: number of this benchmark series in jrunning_times.csv (last used: 7)
+    bench_options = BenchmarkOptions(save_running_times = true, n_iterations = 5, version = 8),
 
     # colored log prefixes; debug = true also shows the per-subsystem stages of VascularTrees
     debug = false,

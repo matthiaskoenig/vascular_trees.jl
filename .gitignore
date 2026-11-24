@@ -4,8 +4,7 @@ vascular_trees.jl.code-workspace
 SyntheticVascularTrees.jl
 /results
 *.svg
-.claude/CLAUDE.md
+.claude
 JuliaSysimage.so
-.claude/settings.local.json
 *.pb.gz
 test/Manifest.toml

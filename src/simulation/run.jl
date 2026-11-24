@@ -91,17 +91,24 @@ function run_simulations(
 
             show(to, sortby = :firstexec)
             if bench_options.save_running_times
-                n_terminal::Int = size(p_terminal.flow_values, 2)
                 species_counts = count_species(p_terminal, p)
-                save_times_as_csv(
-                    to,
-                    tree_info.n_node,
-                    tree_info.graph_id,
-                    species_counts.n_states,
-                    species_counts.n_distinct,
-                    sol_options.solver_name,
-                    n_terminal,
+                # one column per field, see save_times_as_csv
+                run_info = (
+                    n_states           = species_counts.n_states,
+                    n_distinct_species = species_counts.n_distinct,
+                    solver             = sol_options.solver_name,
+                    n_node             = tree_info.n_node,
+                    tree_id            = tree_info.graph_id,
+                    n_terminals        = size(p_terminal.flow_values, 2),
+                    tolerance          = sol_options.relative_tolerance,
+                    abs_tolerance      = sol_options.absolute_tolerance,
+                    jacobian           = sol_options.compute_jacobian,
+                    dt                 = sim_options.dt,
+                    save_reltol        = sim_options.save_reltol,
+                    save_abstol        = sim_options.save_abstol,
+                    version            = bench_options.version,
                 )
+                save_times_as_csv(to, run_info)
             end
             reset_timer!(to)
         else

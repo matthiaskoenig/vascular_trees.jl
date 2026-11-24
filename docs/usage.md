@@ -75,8 +75,9 @@ The options are the keyword arguments of `main` in [the script](../scripts/run_s
   (`compute_jacobian`, default `true`). The Jacobian is sparse, so with CVODE use a sparse
   linear solver: `CVODE_BDF(linear_solver = :KLU)` (the default solver). KLU requires
   `compute_jacobian = true`; this is checked when `SolverOptions` is constructed.
-- `BenchmarkOptions` — number of timed iterations and whether to save the running times
-  (used only if `benchmark = true`).
+- `BenchmarkOptions` — number of timed iterations, whether to save the running times and the
+  `version` number of the benchmark series (required when saving; use a new number when the
+  code changes). Used only if `benchmark = true`.
 - `flow_scaling_factors` — factors by which the flow is scaled (`1.0` = original flow).
 - `debug` — `true` also logs the per-subsystem stages with their running times (all three
   scripts have this option).
@@ -92,7 +93,10 @@ In the graph directory:
   has one row per species: a `species_ids` column followed by one column per time point
   (`t_<time>`).
 - `results/julia_vessel_trees/jrunning_times.csv` — benchmark running times (if
-  `benchmark = true` and `save_running_times = true`).
+  `benchmark = true` and `save_running_times = true`): per graph one row
+  `Total time (all iterations)` and one row `Call` per iteration, with the run settings
+  (solver, tolerances, `dt`, `version`, ...) as columns. New rows are matched to the existing
+  columns by name; columns that old rows do not have are left empty.
 
 ## 4. Create VTKHDF files (ParaView)
 

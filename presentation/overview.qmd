@@ -1,0 +1,885 @@
+---
+title: "VascularTrees.jl"
+subtitle: "Pharmacokinetic simulations on synthetic liver vascular trees"
+author: "Mariia Myshkina, Matthias König"
+date: today
+format:
+  revealjs:
+    theme: [simple, theme.scss]
+    css: styles.css
+    slide-number: true
+    transition: none
+    width: 1280
+    height: 720
+    code-line-numbers: false
+mermaid:
+  theme: neutral
+engine: julia
+julia:
+  exeflags: ["--project=@."]
+execute:
+  echo: false
+  warning: false
+---
+
+```{julia}
+#| include: false
+include("plots.jl")   # plot_benchmark, plot_simulation, arrow_example
+# smallest tree, used for the example tables
+const EXAMPLE = "Rectangle_quad/Rectangle_quad_10"
+```
+
+## Contents {#contents}
+
+::: {.contents}
+::: {.toc-group}
+**Overview**
+
+- [Liver vascularization as coupled trees](#/trees)
+- [Pipeline](#/pipeline)
+:::
+
+::: {.toc-group .s1}
+**Step 1 — `build_arrow_graphs.jl`**
+
+- [Overview: 1a and 1b](#/step1-overview)
+- [1a · Tree → ODE table](#/s1a) · [added edges](#/s1a-edges) · [`<tree>.arrow`](#/s1a-table)
+- [1b · Terminal nodes](#/s1b) · [matching](#/s1b-matching) · [`T.arrow`](#/s1b-table)
+:::
+
+::: {.toc-group .s2}
+**Step 2 — `run_simulations.jl`**
+
+- [Overview: 2a, 2b, 2c](#/step2-overview)
+- [2a · Setup](#/s2a) · [matrices: tree](#/s2a-tree) · [matrices: terminal part](#/s2a-terminal)
+- [2b · Pharmacokinetic model](#/s2b)
+- [2c · Coupling in time](#/s2c) · [diagram](#/s2c-diagram) · [`simulations/*.arrow`](#/s2c-table)
+:::
+
+::: {.toc-group .s3}
+**Step 3 — `create_vtk.jl`**
+
+- [3 · From numbers to an animation](#/s3)
+:::
+
+::: {.toc-group .s3}
+**Simulation results**
+
+- [10²](#/sim-100) · [10⁴](#/sim-10000) · [10⁵](#/sim-100000) · [10⁶](#/sim-1000000) terminal nodes
+:::
+
+::: {.toc-group .s3}
+**Code and performance**
+
+- [Software design](#/design) · [Benchmark](#/benchmark) · [Next steps](#/next)
+:::
+:::
+
+## Liver vascularization as coupled trees {#trees}
+
+```{=html}
+<svg viewBox="0 0 900 320" style="width:80%;height:auto;display:block;margin:0.3em auto 0.6em auto" font-family="Roboto, sans-serif">
+  <defs>
+    <marker id="ah-liver" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4a5568"/>
+    </marker>
+  </defs>
+  <text x="150" y="22" text-anchor="middle" font-size="18" fill="#718096">inflow</text>
+  <text x="750" y="22" text-anchor="middle" font-size="18" fill="#718096">outflow</text>
+
+  <rect x="40" y="40" width="220" height="80" rx="10" fill="#D81818"/>
+  <text x="150" y="80" text-anchor="middle" dominant-baseline="central" font-size="22" fill="#fff" font-weight="500">Arterial tree (A)</text>
+  <rect x="40" y="210" width="220" height="80" rx="10" fill="#8E44AD"/>
+  <text x="150" y="250" text-anchor="middle" dominant-baseline="central" font-size="22" fill="#fff" font-weight="500">Portal tree (P)</text>
+
+  <circle cx="450" cy="165" r="88" fill="#D57326"/>
+  <text x="450" y="152" text-anchor="middle" dominant-baseline="central" font-size="22" fill="#fff" font-weight="500">Sinusoids</text>
+  <text x="450" y="182" text-anchor="middle" dominant-baseline="central" font-size="16" fill="#fff">terminal part (T)</text>
+
+  <rect x="640" y="40" width="220" height="80" rx="10" fill="#0C5BB0"/>
+  <text x="750" y="80" text-anchor="middle" dominant-baseline="central" font-size="22" fill="#fff" font-weight="500">Venous tree (V)</text>
+  <rect x="640" y="210" width="220" height="80" rx="10" fill="#6CC04A"/>
+  <text x="750" y="250" text-anchor="middle" dominant-baseline="central" font-size="22" fill="#fff" font-weight="500">Biliary tree (B)</text>
+
+  <g stroke="#4a5568" stroke-width="2.5" fill="none" marker-end="url(#ah-liver)">
+    <line x1="262" y1="80" x2="368" y2="128"/>
+    <line x1="262" y1="250" x2="368" y2="202"/>
+    <line x1="532" y1="128" x2="636" y2="82"/>
+    <line x1="532" y1="202" x2="636" y2="248"/>
+  </g>
+</svg>
+```
+
+| Configuration      | Inflow trees | Outflow trees |
+|:-------------------|:------------:|:-------------:|
+| `Rectangle_trio`   | A, P         | V             |
+| `Rectangle_quad`   | A, P         | V, B          |
+
+::: {.notes}
+Trees are generated with SyntheticVascularTrees.jl (E. Jessen, D. Schillinger, TU Darmstadt).
+Sizes from 10 to 10^6 terminal nodes.
+:::
+
+## Pipeline: independent steps {#pipeline}
+
+```{=html}
+<svg viewBox="0 0 1120 500" style="width:100%;height:auto;max-height:600px;display:block;margin:0 auto" font-family="Roboto, sans-serif">
+  <defs>
+    <marker id="ah-pipe" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4a5568"/>
+    </marker>
+  </defs>
+
+  <!-- ===== row 1: left to right ===== -->
+  <rect x="10" y="80" width="190" height="70" rx="8" fill="#edf2f7" stroke="#718096" stroke-dasharray="6 4"/>
+  <text x="105" y="106" text-anchor="middle" font-size="18" fill="#2d3748">SyntheticVascular-</text>
+  <text x="105" y="130" text-anchor="middle" font-size="18" fill="#2d3748">Trees.jl</text>
+
+  <rect x="250" y="46" width="80" height="28" rx="5" fill="#cbd5e0"/>
+  <text x="290" y="66" text-anchor="middle" font-size="17" font-weight="700" fill="#2d3748">julia/</text>
+  <rect x="250" y="70" width="250" height="100" rx="6" fill="#fff" stroke="#718096" stroke-width="1.5"/>
+  <text x="375" y="102" text-anchor="middle" font-size="17">A · P · V · B .lg</text>
+  <text x="375" y="128" text-anchor="middle" font-size="17">*_edges.csv</text>
+  <text x="375" y="154" text-anchor="middle" font-size="17">*_nodes.csv</text>
+
+  <rect x="545" y="94" width="250" height="52" rx="26" fill="#2b6cb0"/>
+  <text x="670" y="120" text-anchor="middle" dominant-baseline="central" font-size="18" font-weight="500" fill="#fff">build_arrow_graphs.jl</text>
+
+  <rect x="840" y="46" width="90" height="28" rx="5" fill="#cbd5e0"/>
+  <text x="885" y="66" text-anchor="middle" font-size="17" font-weight="700" fill="#2d3748">graphs/</text>
+  <rect x="840" y="70" width="270" height="100" rx="6" fill="#fff" stroke="#718096" stroke-width="1.5"/>
+  <text x="975" y="110" text-anchor="middle" font-size="17">A · P · V · B .arrow</text>
+  <text x="975" y="142" text-anchor="middle" font-size="17">T.arrow</text>
+
+  <!-- ===== row 2: right to left ===== -->
+  <rect x="850" y="290" width="250" height="52" rx="26" fill="#2b6cb0"/>
+  <text x="975" y="316" text-anchor="middle" dominant-baseline="central" font-size="18" font-weight="500" fill="#fff">run_simulations.jl</text>
+
+  <rect x="520" y="262" width="120" height="28" rx="5" fill="#cbd5e0"/>
+  <text x="580" y="282" text-anchor="middle" font-size="17" font-weight="700" fill="#2d3748">simulations/</text>
+  <rect x="520" y="286" width="280" height="90" rx="6" fill="#fff" stroke="#718096" stroke-width="1.5"/>
+  <text x="660" y="320" text-anchor="middle" font-size="17">A · P · V · B · T</text>
+  <text x="660" y="350" text-anchor="middle" font-size="16">_simulations_‹dt›_dt.arrow</text>
+
+  <rect x="250" y="290" width="220" height="52" rx="26" fill="#2b6cb0"/>
+  <text x="360" y="316" text-anchor="middle" dominant-baseline="central" font-size="18" font-weight="500" fill="#fff">create_vtk.jl</text>
+
+  <rect x="10" y="262" width="90" height="28" rx="5" fill="#cbd5e0"/>
+  <text x="55" y="282" text-anchor="middle" font-size="17" font-weight="700" fill="#2d3748">vtkhdf/</text>
+  <rect x="10" y="286" width="200" height="90" rx="6" fill="#fff" stroke="#718096" stroke-width="1.5"/>
+  <text x="110" y="320" text-anchor="middle" font-size="17">A · P · V · B</text>
+  <text x="110" y="350" text-anchor="middle" font-size="16">_‹dt›_dt.vtkhdf</text>
+
+  <!-- ===== outputs below row 2 ===== -->
+  <rect x="20" y="430" width="180" height="55" rx="8" fill="#edf2f7" stroke="#718096" stroke-dasharray="6 4"/>
+  <text x="110" y="458" text-anchor="middle" dominant-baseline="central" font-size="18" fill="#2d3748">ParaView</text>
+
+  <rect x="860" y="430" width="230" height="50" rx="6" fill="#fff" stroke="#a0aec0" stroke-dasharray="3 3"/>
+  <text x="975" y="456" text-anchor="middle" dominant-baseline="central" font-size="17" fill="#4a5568">jrunning_times.csv</text>
+
+  <!-- ===== arrows ===== -->
+  <g stroke="#4a5568" stroke-width="2.2" fill="none" marker-end="url(#ah-pipe)">
+    <line x1="200" y1="115" x2="246" y2="115"/>
+    <line x1="500" y1="120" x2="541" y2="120"/>
+    <line x1="795" y1="120" x2="836" y2="120"/>
+    <line x1="975" y1="170" x2="975" y2="286"/>
+    <line x1="850" y1="316" x2="804" y2="316"/>
+    <line x1="520" y1="316" x2="474" y2="316"/>
+    <line x1="250" y1="316" x2="214" y2="316"/>
+    <line x1="110" y1="376" x2="110" y2="426"/>
+  </g>
+  <g stroke="#718096" stroke-width="2" fill="none" stroke-dasharray="6 5" marker-end="url(#ah-pipe)">
+    <line x1="975" y1="342" x2="975" y2="426"/>
+    <line x1="850" y1="170" x2="372" y2="287"/>
+  </g>
+  <text x="985" y="392" font-size="15" fill="#718096" font-style="italic">benchmark</text>
+  <text x="600" y="214" font-size="15" fill="#718096" font-style="italic" transform="rotate(-13 600 214)">geometry</text>
+</svg>
+```
+
+::: {.notes}
+Each step only reads files, so any step can be rerun alone: re-simulate with another solver
+without reprocessing; re-visualize without re-simulating. create_vtk must use the same dt and
+flow scaling factor as run_simulations (they are part of the file names).
+:::
+
+# Step 1 — `build_arrow_graphs.jl` {#step1 background-color="#2b6cb0"}
+
+## Step 1 at a glance {#step1-overview}
+
+::: {.cards}
+::: {.card .c1}
+[1a]{.tag} **Individual trees**
+
+`process_julia_graph`
+
+::: {.io}
+`julia/<tree>.lg`, `_edges.csv`, `_nodes.csv`<br>→ `graphs/<tree>.arrow`
+:::
+
+- runs **for every tree separately** — A, P, V, B do not know each other
+- turns a generated tree into an **ODE-ready table**: one row per edge, added edges,
+  ODE groups, neighbours, direction of blood flow
+:::
+
+::: {.card-arrow}
+→
+:::
+
+::: {.card .c2}
+[1b]{.tag} **Terminal nodes**
+
+`process_terminal_nodes`
+
+::: {.io}
+all `graphs/<tree>.arrow`<br>→ `graphs/T.arrow`
+:::
+
+- the **only place where the trees meet**
+- matches the leaves of the trees by position and builds the sinusoid compartments
+  $T_k$ that couple them
+:::
+:::
+
+::: {.small .center .muted}
+1a must run before 1b — 1b reads the tables written by 1a
+:::
+
+## 1a · From a generated tree to an ODE table {#s1a}
+
+::: {.nhh}
+::: {.box .have .fragment fragment-index=2}
+What do we have?
+
+- `.lg`: edge list `(source, target)` — only the skeleton
+- `_nodes.csv`: coordinates; **attributes stored on nodes** — a node describes the edge
+  *arriving* at it
+- every tree read from root to leaves, also **outflow trees** (V, B) — against the blood flow
+- units mm³, s
+:::
+
+::: {.arrow .fragment fragment-index=3}
+→
+:::
+
+::: {.box .how .fragment fragment-index=3}
+How do we get there?
+
+1. **join** skeleton + attributes on `target_id`, convert to L, L/min; $V = \pi r^2 l$
+2. **label** edges: *preterminal* (target is never a source), *start* (source is never a target)
+3. **add edges**: a self-loop $(n,n)$ per leaf = terminal compartment; $(0,\text{root})$ = marginal (dose)
+4. **ODE group** per edge (0 marginal, 1 inner, 2 preterminal, 3 terminal)
+5. **reverse** outflow trees
+6. **predecessors / successors** of every edge
+7. save `graphs/<tree>.arrow`
+:::
+
+::: {.arrow .fragment fragment-index=3}
+→
+:::
+
+::: {.box .need .fragment fragment-index=1}
+What do we need?
+
+- **one ODE species per edge** (concentration in that vessel segment)
+- for every edge: flow $Q$, volume $V$, **where it gets blood from, where it sends it**
+- edges **in the direction of blood flow**
+- an entry point for the **dose**
+- an exit point at every leaf, to connect to the **sinusoids**
+- which **equation** each edge needs
+:::
+:::
+
+## 1a · Which edges are added to a tree {#s1a-edges}
+
+```{mermaid}
+%%| fig-width: 11
+flowchart LR
+    O(("0")):::virt -- "marginal (0)<br/>dose enters" --> R(("root"))
+    R -- "inner (1)" --> N(("n"))
+    N -- "preterminal (2)" --> L1(("leaf 1"))
+    N -- "preterminal (2)" --> L2(("leaf 2"))
+    L1 -- "terminal (3)" --> L1
+    L2 -- "terminal (3)" --> L2
+
+    classDef virt fill:#fff,stroke:#718096,stroke-dasharray:4 3
+```
+
+::: {.small}
+- **We work with edges, not with nodes:** one ODE species = one vessel segment (edge). A node
+  has no volume, so the place where the dose enters and the terminal compartment at a leaf
+  need **their own edges** — the marginal edge $(0, \text{root})$ and the self-loops $(n, n)$
+- **The trees stay independent:** every tree is processed alone and has its own table; they are
+  connected only later, through `T.arrow` (1b)
+- inflow tree shown; for outflow trees the arrows are reversed (leaves → root → 0)
+:::
+
+## 1a · `graphs/<tree>.arrow` — one row per edge {#s1a-table}
+
+::: {.smaller}
+One row = one edge = one ODE species, in the order used by the solver. Columns that describe the
+whole tree (id, nodes, special edges) are shorter and padded with `missing`: an Arrow table needs
+columns of equal length.
+:::
+
+::: {.tbl-small}
+```{julia}
+arrow_example("$EXAMPLE/graphs/A.arrow"; rows = n -> [1, 2, 3, n - 1, n],
+              cols = [:all_edges, :species_ids, :flows, :volumes, :ODE_groups, :predecessors, :successors])
+```
+:::
+
+::: {.tiny}
+| Columns | Length | Content |
+|:--|:--|:--|
+| `all_edges`, `species_ids`, `flow_ids`, `volume_ids`, `flows` [L/min], `volumes` [L], `ODE_groups` | one per edge | the edge and its ODE species |
+| `predecessors`, `successors` | one list per edge | **row numbers** of the edges before / after it |
+| `vascular_tree_id`, `is_inflow` | row 1 | the tree |
+| `nodes_ids`, `nodes_coordinates` | one per node | geometry (for 1b and the visualization) |
+| `start_edge`, `preterminal_edges`, `terminal_edges` | one per such edge | special edges |
+:::
+
+## 1b · Connecting the trees: terminal nodes {#s1b}
+
+::: {.nhh}
+::: {.box .have .fragment fragment-index=2}
+What do we have?
+
+- the `.arrow` tables of all trees from 1a
+- the same number $N$ of leaves in every tree
+- but the trees were **generated independently**: leaf $k$ of A has nothing to do with leaf $k$ of V
+- only the **coordinates** of the leaves
+:::
+
+::: {.arrow .fragment fragment-index=3}
+→
+:::
+
+::: {.box .how .fragment fragment-index=3}
+How do we get there?
+
+- **group the leaves by position**: one leaf per tree per group, leaves of a group close together
+  (next slide)
+- the grouping is a **permutation per tree**: reorder flows, species ids, coordinates of every tree
+  with it
+- outflow flows of V and B are **summed** per terminal
+- save `graphs/T.arrow`: one row per terminal $T_k$ — its inflow species, flows, coordinates
+:::
+
+::: {.arrow .fragment fragment-index=3}
+→
+:::
+
+::: {.box .need .fragment fragment-index=1}
+What do we need?
+
+- **sinusoid compartments** $T_k$
+- each $T_k$ gets blood from **one leaf of every inflow tree** (A, P) and drains into
+  **one leaf of every outflow tree** (V, B)
+- for each $T_k$: inflow flows, total outflow flow
+:::
+:::
+
+## 1b · Matching the leaves of different trees {#s1b-matching}
+
+$$
+\min_{\text{groups}} \sum_{g=1}^{N} \sum_{t=1}^{m} \lVert p_{t,g} - \mu_g \rVert^2,
+\qquad \mu_g = \tfrac{1}{m}\textstyle\sum_t p_{t,g}
+$$
+
+:::: {.columns}
+::: {.column width="50%"}
+**1. Greedy start**
+
+- for every leaf of A: its $k$ nearest leaves in the other trees (kd-tree)
+- score all combinations, take the best ones, each leaf only once
+- pair the leftovers
+:::
+::: {.column width="50%"}
+**2. Alternating improvement**
+
+- fix all trees but one, re-assign that tree's leaves to the group centroids
+- `HungarianAssignment()` — exact
+- `AuctionAssignment()` — sparse, $k$ candidates, $k$ adapted per group
+- repeat until nothing changes
+:::
+::::
+
+**Quality check:** lower bound = optimal pairwise matchings (Hungarian), summed, divided by $m$
+
+<!-- TODO: figure — matched groups in 3D, cost vs. lower bound -->
+
+## 1b · `graphs/T.arrow` — one row per terminal {#s1b-table}
+
+::: {.smaller}
+Row $k$ = terminal $T_k$. Each group of columns `<name>_1, <name>_2, …` is one **block** of the
+terminal matrices, stored column by column (`species_id_1` = row 1 of the block, …).
+:::
+
+::: {.tbl-small}
+```{julia}
+arrow_example("$EXAMPLE/graphs/T.arrow"; rows = n -> [1, 2, 3, n],
+              cols = [:species_id_1, :species_id_2, :species_id_3, :flow_value_1, :flow_value_2,
+                      :flow_value_3, :synch_idx_1, :synch_idx_2, :synch_idx_3, :synch_idx_4])
+```
+:::
+
+::: {.tiny}
+| Columns | Block rows | Content |
+|:--|:--|:--|
+| `species_id_*` | $1 + n_\text{in}$ | `T_k`, then the preterminal species of A, P feeding it |
+| `flow_id_*`, `flow_value_*` | $1 + n_\text{in}$ | `Outflow` = $Q_V + Q_B$, then $Q_A$, $Q_P$ |
+| `coordinates_*`, `affiliation_*` | $n_\text{trees}$ | position of the leaf in A, P, V, B and its tree |
+| `synch_idx_*` | $n_\text{trees}$ | **result of the matching**: which preterminal edge of tree A, P, V, B belongs to $T_k$ |
+| `volume` | — | $V_T$, the same for all terminals |
+:::
+
+# Step 2 — `run_simulations.jl` {#step2 background-color="#2b6cb0"}
+
+## Step 2 at a glance {#step2-overview}
+
+::: {.cards}
+::: {.card .c1}
+[2a]{.tag} **Setting up**
+
+`run_simulations`
+
+::: {.io}
+`graphs/*.arrow`<br>→ parameters, initial values, matrices
+:::
+
+- one ODE problem per subsystem A, P, V, B, T
+- synchronization indices from the matching
+- sparsity pattern of the Jacobian, solution matrices on disk
+:::
+
+::: {.card-arrow}
+→
+:::
+
+::: {.card .c2}
+[2b]{.tag} **Model**
+
+`jf_inflow!`, `jf_outflow!`, `jf_terminal!`, `jac!`
+
+::: {.io}
+state → time derivative
+:::
+
+- mass balance per edge with flow $Q$ and volume $V$
+- one right-hand side per kind of subsystem
+- analytic Jacobian
+:::
+
+::: {.card-arrow}
+→
+:::
+
+::: {.card .c3}
+[2c]{.tag} **Coupling in time**
+
+`solve_tree!`, `integrate!`
+
+::: {.io}
+five integrators<br>→ `simulations/*.arrow`
+:::
+
+- every $dt$: advance each subsystem, **exchange** the shared species, store
+- result: concentration over time for every species
+:::
+:::
+
+## 2a · Setting up the problem {#s2a}
+
+::: {.nhh}
+::: {.box .have .fragment fragment-index=2}
+What do we have?
+
+- `graphs/<tree>.arrow`: edges, $Q$, $V$, ODE groups, predecessors / successors
+- `graphs/T.arrow`: which preterminal species feed which terminal
+:::
+
+::: {.arrow .fragment fragment-index=3}
+→
+:::
+
+::: {.box .how .fragment fragment-index=3}
+How do we get there?
+
+- **one ODE problem per subsystem**: A, P, V, B and T — five smaller problems instead of one huge one
+- parameters as **flat arrays** (index + offset) → type-stable, fast right-hand side
+- **synchronization indices**: which species of a tree touches which $T_k$ (from the matching)
+- **analytic sparse Jacobian** → `CVODE_BDF` with the sparse solver `KLU`
+- results go to **memory-mapped files** on disk (do not need to fit in RAM); free disk space is checked first
+:::
+
+::: {.arrow .fragment fragment-index=3}
+→
+:::
+
+::: {.box .need .fragment fragment-index=1}
+What do we need?
+
+- **concentration over time** in every edge of every tree and in every sinusoid
+- for a given dose and time span
+- for trees with up to $10^6$ leaves — **millions of species**
+:::
+:::
+
+## 2a · Matrices in `solve_tree!` — one tree {#s2a-tree}
+
+::::: {.mat-slide}
+:::: {.columns}
+::: {.column width="52%"}
+**State `u[tree]`**: a vector, one entry per edge, in the row order of `<tree>.arrow`
+
+```{=html}
+<table class="mat"><tr>
+<td class="g">A_1_15</td><td class="A">A_3_2</td><td class="g">A_3_7</td><td class="e">…</td>
+<td class="T">T_1</td><td class="e">…</td><td class="T">T_13</td><td class="g">Marginal</td></tr>
+<tr><th>inner</th><th>preterminal</th><th>inner</th><th></th><th>terminal</th><th></th><th>terminal</th><th>dose</th></tr>
+</table>
+```
+
+**Neighbours** (`VascularTreeParameters`): all lists in one flat vector + offsets
+
+```{=html}
+<table class="mat">
+<tr><th style="text-align:right">predecessors_idx</th><td class="g">39</td><td class="g">14</td><td class="g">14</td><td class="e">…</td></tr>
+<tr><th style="text-align:right">predecessors_offset</th><td class="g">1</td><td class="g">2</td><td class="g">3</td><td class="g">4</td><td class="e">…</td></tr>
+</table>
+```
+
+::: {.smaller}
+predecessors of edge `ke` = `idx[offset[ke] : offset[ke+1]-1]` — no vector of vectors,
+one loop over contiguous memory
+:::
+:::
+
+::: {.column width="48%"}
+**Jacobian `J[tree]`**: sparse $n \times n$
+
+- `J[ke, ke]` (outflow of the edge) and `J[post, ke]` (what the edge sends to its successors)
+- **lower triangular** in flow order; the model is linear → $J$ does not depend on $u$ or $t$
+- only its sparsity pattern is allocated once (`jac_prototype`)
+
+**Solution `solutions[tree]`**: $n_\text{species} \times (\text{steps} + 1)$
+
+- column = stored time point (adaptive saving)
+- memory-mapped file in `simulations/` → large trees do not need to fit in RAM
+- written as `simulations/<tree>_simulations_<dt>_dt.arrow`
+:::
+::::
+:::::
+
+## 2a · Matrices in `solve_tree!` — terminal part and coupling {#s2a-terminal}
+
+::::: {.mat-slide}
+:::: {.columns}
+::: {.column width="55%"}
+**Terminal state**: block $(1 + n_\text{in}) \times N$, column $k$ = terminal $T_k$
+
+```{=html}
+<table class="mat">
+<tr><th></th><th>k = 1</th><th>k = 2</th><th></th><th>k = N</th></tr>
+<tr><th>row 1</th><td class="T">T_1</td><td class="T">T_2</td><td class="e">…</td><td class="T">T_N</td></tr>
+<tr><th>row 2</th><td class="A">A pre. of T_1</td><td class="A">A pre. of T_2</td><td class="e">…</td><td class="A">…</td></tr>
+<tr><th>row 3</th><td class="P">P pre. of T_1</td><td class="P">P pre. of T_2</td><td class="e">…</td><td class="P">…</td></tr>
+</table>
+```
+
+::: {.smaller}
+- `flow_values`: same shape — row 1 = $Q_V + Q_B$, rows 2, 3 = $Q_A$, $Q_P$
+- stored as **one vector, column by column** (Sundials' Jacobian needs a vector):
+  `[T_1, A, P, T_2, A, P, …]` → row $i$ = `u[i : n_rows : end]`
+:::
+:::
+
+::: {.column width="45%"}
+**Synchronization indices** `sidx[tree]` (from `synch_idx_*` in `T.arrow`): positions of the
+species of a tree that touch the terminals, ordered by $k$
+
+```{=html}
+<table class="mat">
+<tr><th></th><th>k = 1</th><th>k = 2</th><th></th></tr>
+<tr><th>A, P: preterminal</th><td class="A">3</td><td class="A">2</td><td class="e">…</td></tr>
+<tr><th>V, B: terminal</th><td class="V">4</td><td class="V">3</td><td class="e">…</td></tr>
+</table>
+```
+
+**Exchange after every step** $dt$:
+
+::: {.code-sm}
+```julia
+# inflow trees → terminal part (row 2, 3)
+u_T[2:n_rows:end] .= u_A[sidx_A]
+u_T[3:n_rows:end] .= u_P[sidx_P]
+# terminal part (row 1) → outflow trees
+u_V[sidx_V] .= u_T[1:n_rows:end]
+u_B[sidx_B] .= u_T[1:n_rows:end]
+```
+:::
+:::
+::::
+:::::
+
+## 2b · Pharmacokinetic model {#s2b}
+
+One concentration per edge; mass balance with flow $Q$ and volume $V$:
+
+$$
+\frac{dC_e}{dt} = \frac{1}{V_e}\left(\sum_{\text{in}} Q\,C_{\text{in}} - Q_{\text{out}}\,C_e\right)
+$$
+
+::: {.small}
+- **Inflow trees (A, P):** marginal edge carries the dose, $C_0(t) = \text{infusion rate}(t) / Q_{\text{root}}$
+- **Terminal part (sinusoids):**
+  $\dfrac{dT_k}{dt} = \dfrac{1}{V_T}\left(\sum_{\text{A,P}} Q\,C_{\text{preterminal}} - Q_{\text{out}}\,T_k\right)$
+- **Outflow trees (V, B):** the same balance; the edges at the leaves get $T_k$ as their inflow,
+  the marginal edge is what leaves the liver
+:::
+
+## 2c · Coupling the subsystems in time {#s2c}
+
+::: {.nhh}
+::: {.box .have .fragment fragment-index=2}
+What do we have?
+
+- five **independent integrators**
+- each knows only its own species
+- shared species exist as **copies** in two subsystems (preterminal in A/P and T, terminal in T and V/B)
+:::
+
+::: {.arrow .fragment fragment-index=3}
+→
+:::
+
+::: {.box .how .fragment fragment-index=3}
+How do we get there? — **every time step** $dt$:
+
+1. set the dose at the marginal edges
+2. **store** the state (only if something changed enough — adaptive saving)
+3. **advance** every subsystem by $dt$ separately
+4. **exchange**: preterminal $C$ of A, P → T; $T_k$ → terminal species of V, B
+5. re-initialise the integrators with the new values
+
+Result: `simulations/<tree>_simulations_<dt>_dt.arrow` — row = species, column = time point
+:::
+
+::: {.arrow .fragment fragment-index=3}
+→
+:::
+
+::: {.box .need .fragment fragment-index=1}
+What do we need?
+
+- one **coupled** solution: material leaves A, P only through the $T_k$ and enters V, B only from them
+:::
+:::
+
+## 2c · Coupling the subsystems in time {#s2c-diagram}
+
+```{=html}
+<svg viewBox="0 0 900 330" style="width:72%;height:auto;display:block;margin:0 auto" font-family="Roboto, sans-serif">
+  <defs>
+    <marker id="ah-coupling" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4a5568"/>
+    </marker>
+  </defs>
+  <text x="450" y="22" text-anchor="middle" font-size="18" fill="#718096" font-style="italic">exchange after every time step dt</text>
+  <rect x="40" y="40" width="160" height="80" rx="10" fill="#D81818"/>
+  <text x="120" y="80" text-anchor="middle" dominant-baseline="central" font-size="22" fill="#fff" font-weight="500">A</text>
+  <rect x="40" y="210" width="160" height="80" rx="10" fill="#8E44AD"/>
+  <text x="120" y="250" text-anchor="middle" dominant-baseline="central" font-size="22" fill="#fff" font-weight="500">P</text>
+  <circle cx="450" cy="165" r="88" fill="#D57326"/>
+  <text x="450" y="165" text-anchor="middle" dominant-baseline="central" font-size="22" fill="#fff" font-weight="500">T</text>
+  <rect x="700" y="40" width="160" height="80" rx="10" fill="#0C5BB0"/>
+  <text x="780" y="80" text-anchor="middle" dominant-baseline="central" font-size="22" fill="#fff" font-weight="500">V</text>
+  <rect x="700" y="210" width="160" height="80" rx="10" fill="#6CC04A"/>
+  <text x="780" y="250" text-anchor="middle" dominant-baseline="central" font-size="22" fill="#fff" font-weight="500">B</text>
+  <g stroke="#4a5568" stroke-width="2.5" fill="none" marker-end="url(#ah-coupling)">
+    <line x1="202" y1="80" x2="368" y2="128"/>
+    <line x1="202" y1="250" x2="368" y2="202"/>
+    <line x1="532" y1="128" x2="696" y2="82"/>
+    <line x1="532" y1="202" x2="696" y2="248"/>
+  </g>
+  <g font-size="16" fill="#2d3748">
+    <text x="290" y="80" text-anchor="middle">preterminal C</text>
+    <text x="290" y="262" text-anchor="middle">preterminal C</text>
+    <text x="615" y="86" text-anchor="middle">T_k</text>
+    <text x="615" y="262" text-anchor="middle">T_k</text>
+  </g>
+</svg>
+```
+
+- the exchange happens only **between steps** → $dt$ controls the coupling error
+- default solver: `CVODE_BDF(linear_solver = :KLU)` with the analytic Jacobian
+
+## 2c · `simulations/*.arrow` — one row per species {#s2c-table}
+
+::: {.small}
+One file per subsystem (A, P, V, B, T). **Row = species, column = stored time point**
+(`t_<time>`; with adaptive saving not equally spaced). In `T` the species follow the terminal
+block column by column: `T_k`, then the copies of its A and P preterminal species.
+:::
+
+::: {.tbl-small}
+```{julia}
+arrow_example("$EXAMPLE/simulations/T_simulations_0.02_dt.arrow"; rows = n -> [1, 2, 3, 4, n],
+              cols = [:species_ids, Symbol("t_0.0"), Symbol("t_0.02"), Symbol("t_0.04"),
+                      Symbol("t_7.0"), Symbol("t_16.0")])
+```
+:::
+
+# Step 3 — `create_vtk.jl` {#step3 background-color="#2b6cb0"}
+
+## 3 · From numbers to an animation {#s3}
+
+::: {.nhh}
+::: {.box .have .fragment fragment-index=2}
+What do we have?
+
+- `graphs/<tree>.arrow`: node ids + **coordinates**, edges, $Q$, $V$, species ids
+- `simulations/<tree>…arrow`: **one row per species**, one column per stored time point
+- the two tables are connected only by the **species ids**
+:::
+
+::: {.arrow .fragment fragment-index=3}
+→
+:::
+
+::: {.box .how .fragment fragment-index=3}
+How do we get there?
+
+1. nodes → **points**, edges → **lines** (the marginal edge is dropped: node 0 has no coordinates)
+2. match simulation rows to lines by **species id**
+3. $Q$, $V$ (constant) and $C(t)$ as **cell data** — one value per edge
+4. geometry stored **once**, every time step points to it; concentrations of all steps one after another
+5. one `vtkhdf/<tree>_<dt>_dt.vtkhdf` per tree (T has no geometry → not written)
+:::
+
+::: {.arrow .fragment fragment-index=3}
+→
+:::
+
+::: {.box .need .fragment fragment-index=1}
+What do we need?
+
+- see **where the substance is** at every time point
+- in ParaView: the 3D tree, coloured by concentration, with a **time slider**
+:::
+:::
+
+<!-- TODO: ParaView screenshot / animation of Concentration over time -->
+
+# Simulation results {#results background-color="#2b6cb0"}
+
+## Simulation · 100 terminal nodes {#sim-100}
+
+```{julia}
+#| fig-align: center
+# any saved simulation: plot_simulation(tree_configuration, n_node; dt, flow_factor, zoom, max_terminals)
+# saved simulations are listed by available_simulations()
+plot_simulation("Rectangle_quad", 100; dt = 0.02, zoom = (6.8, 8.0))
+```
+
+## Simulation · 10 000 terminal nodes {#sim-10000}
+
+```{julia}
+#| fig-align: center
+plot_simulation("Rectangle_quad", 10000; dt = 0.02, zoom = (6.8, 8.0))
+```
+
+## Simulation · 100 000 terminal nodes {#sim-100000}
+
+```{julia}
+#| fig-align: center
+plot_simulation("Rectangle_quad", 100000; dt = 0.02, zoom = (6.8, 8.0))
+```
+
+## Simulation · 1 000 000 terminal nodes {#sim-1000000}
+
+::: {.warning}
+⚠ `T.arrow` of this graph was built without matching: the outflow of every terminal is 0, so the
+substance accumulates. To be rebuilt and simulated again.
+:::
+
+```{julia}
+#| fig-align: center
+plot_simulation("Rectangle_quad", 1000000; dt = 0.02, zoom = (6.8, 8.0), size = (1100, 500))
+```
+
+# Code and performance {#code background-color="#2b6cb0"}
+
+## Software design {#design}
+
+:::: {.columns}
+::: {.column width="45%"}
+::: {.code-xs}
+```
+src/
+├── VascularTrees.jl     # main module
+├── common/              # paths, definitions,
+│                        # options, table utils, logging
+├── trees_processing/    # step 1
+│   ├── trees/           #   individual trees
+│   └── terminal_nodes/  #   matching (Hungarian,
+│                        #   auction)
+├── models/              # ODEs, Jacobians, dose
+├── simulation/          # step 2
+│   ├── setup/           #   parameters, problems
+│   ├── solver/          #   time loop, coupling
+│   └── results/         #   output, benchmarking
+└── visualization/       # step 3: VTKHDF
+scripts/                 # one script per step,
+                         # main(; options...)
+test/                    # whole workflow + Aqua.jl
+```
+:::
+:::
+
+::: {.column width="55%"}
+::: {.code-xs}
+```julia
+run_simulations(
+    tree_info,
+    SimulationOptions(tspan = (0.0, 16.0), steps = 800,
+                      save_simulations = true,
+                      benchmark = false),
+    SolverOptions(solver = CVODE_BDF(linear_solver = :KLU)),
+    (dense = false, save_everystep = false),
+    1.0,                 # flow scaling factor
+    BenchmarkOptions(),
+)
+```
+:::
+
+::: {.small}
+- every step = one script with one `main(; options...)`
+- all settings in **option structs**, checked when they are built
+- sysimage built from `scripts/precompile_project.jl` for a fast start-up
+- tests run the whole workflow on the smallest tree
+:::
+:::
+::::
+
+## Benchmark {#benchmark}
+
+```{julia}
+#| fig-align: center
+# versions = nothing → the highest version in jrunning_times.csv; e.g. versions = [1, 6, 7]
+plot_benchmark(versions = nothing)
+```
+
+::: {.notes}
+Data: results/julia_vessel_trees/jrunning_times.csv, mean ± std of the timed calls.
+:::
+
+## What should be done next {#next}
+
+- switch for the Jacobian: calculate it or not
+- optimise the VTKHDF writer — it currently crashes for $10^6$ terminal nodes
+- process the trees **with** matching of the closest terminal nodes:
+  - `HungarianAssignment()` once as the **gold standard**
+  - check the other algorithm (`AuctionAssignment()`) against it
+- run the simulations on the trees with matched terminal nodes

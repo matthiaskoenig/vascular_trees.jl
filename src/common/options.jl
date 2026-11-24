@@ -73,17 +73,22 @@ module Options
     end
 
     """
-        BenchmarkOptions(; save_running_times = false, n_iterations = 1)
+        BenchmarkOptions(; save_running_times = false, n_iterations = 1, version = nothing)
 
     Used only if `SimulationOptions.benchmark = true`.
 
     # Fields
     - `save_running_times`: write the measured running times to a CSV file.
     - `n_iterations`: how many times every simulation is run and timed.
+    - `version`: number of the benchmark series, written to the `version` column of the CSV
+    file; required if `save_running_times = true`. Use a new number when the code changes,
+    the presentation plots the highest version by default.
     """
     @with_kw struct BenchmarkOptions
         save_running_times::Bool = false
         n_iterations::Int = 1
+        version::Union{Int,Nothing} = nothing
+        @assert !save_running_times || version !== nothing "save_running_times = true needs a version"
     end
 
     """
