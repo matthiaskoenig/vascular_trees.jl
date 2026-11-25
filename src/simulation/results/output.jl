@@ -29,26 +29,47 @@ function mmap_path(tree_info, graph_subsystem)
 end
 
 """
-    check_disk_space(tree_info, n_states_total, n_time_points, save_results)
+    check_disk_space(tree_info, n_states_total, n_time_points, sim_options)
 
-Throw an error if the `simulations` folder of the graph has less free space than the worst
-case: every time point stored in the temporary files (see [`mmap_solution`](@ref)) and, if
-`save_results`, once more in the `.arrow` files (approximately, the states ids are not counted).
+Check the free space of the `simulations` folder of the graph against the space needed for
+the solution: the temporary files (see [`mmap_solution`](@ref)) and, if
+`sim_options.save_simulations`, once more the `.arrow` files (approximately, the states ids
+are not counted).
+
+- Every time point stored (`save_abstol = save_reltol = 0`): error if the `n_time_points`
+  time points do not fit.
+- Adaptive saving: the number of stored time points is known only after the run. Error if
+  even the minimum does not fit (first and last time point, plus one every `save_max_gap`
+  steps); only a warning if the worst case (all `n_time_points`) does not fit.
 
 The temporary files are sparse, so a full disk is not detected when they are created, but only
 later, when the solution is written to them: Julia then crashes with a bus error.
 """
-function check_disk_space(tree_info, n_states_total::Int, n_time_points::Int, save_results::Bool)
+function check_disk_space(tree_info, n_states_total::Int, n_time_points::Int, sim_options)
     simulations_dir = mkpath(joinpath(tree_info.GRAPH_DIR, "simulations"))
-    n_copies = save_results ? 2 : 1
-    needed = n_copies * n_states_total * n_time_points * sizeof(Float64)
+    n_copies = sim_options.save_simulations ? 2 : 1
+    bytes(n_points) = n_copies * n_states_total * n_points * sizeof(Float64)
+    gb(b) = round(b / 1e9; digits = 1)
     available = diskstat(simulations_dir).available
-    if needed > available
+    worst_case = bytes(n_time_points)
+    worst_case <= available && return nothing
+
+    save_all = sim_options.save_abstol == 0 && sim_options.save_reltol == 0
+    # time points that are always stored: first, last and one every save_max_gap steps
+    n_min_points = save_all ? n_time_points :
+        min(n_time_points, cld(n_time_points - 1, sim_options.save_max_gap) + 1)
+    needed_min = bytes(n_min_points)
+    if needed_min > available
         error("Not enough disk space in $(simulations_dir): " *
-              "$(round(needed / 1e9; digits = 1)) GB needed in the worst case " *
-              "($(n_states_total) states, $(n_time_points) time points), " *
-              "$(round(available / 1e9; digits = 1)) GB available")
+              "$(gb(needed_min)) GB needed at least " *
+              "($(n_states_total) states, $(n_min_points) time points), " *
+              "$(gb(available)) GB available")
     end
+    @warn "Disk space in $(simulations_dir) may not be enough: " *
+          "$(gb(worst_case)) GB needed if all $(n_time_points) time points are stored, " *
+          "$(gb(available)) GB available (at most " *
+          "$(fld(available, bytes(1))) time points fit; adaptive saving stores fewer)"
+    return nothing
 end
 
 

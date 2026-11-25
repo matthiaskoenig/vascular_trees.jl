@@ -62,7 +62,7 @@ function run_simulations(
         end
     else
         stage("preallocating solutions ($(sum(n_states)) states * $n_time_points time points)") do
-            check_disk_space(tree_info, sum(n_states), n_time_points, sim_options.save_simulations)
+            check_disk_space(tree_info, sum(n_states), n_time_points, sim_options)
             for (graph_subsystem, n) in pairs(n_states)
                 insert!(solutions, graph_subsystem, mmap_solution(tree_info, graph_subsystem, n, n_time_points))
             end
