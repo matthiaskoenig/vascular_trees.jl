@@ -12,7 +12,8 @@ module Definitions
         TreeStructure,  
         ODE_groups, 
         VascularTreeParameters,
-        TerminalParameters
+        TerminalParameters,
+        VoxelGrid
 
     using Parameters
 
@@ -65,6 +66,8 @@ module Definitions
     - `graph_id`: `"<tree_configuration>_<n_node>"`, name of the graph folder.
     - `tree_components`: tree ids of the configuration, grouped as `:inflow_trees` / `:outflow_trees`.
     - `vascular_trees`: flat list of all tree ids, e.g. `["A", "P", "V", "B"]`.
+    - `CONFIG_DIR`: directory of the tree configuration, parent of `GRAPH_DIR`.
+    - `MESH`: paths of the `.ply` mesh files in `CONFIG_DIR` (empty if there are none or the folder doesn't exist).
     - `GRAPH_DIR`: directory with the graph files; simulation results go to its `simulations` subfolder.
     """
     Base.@kwdef struct TreeStructure{S<:String}
@@ -73,7 +76,9 @@ module Definitions
         graph_id::S = "$(tree_configuration)_$(n_node)"
         tree_components::Dict{Symbol,Vector{S}}
         vascular_trees::Vector{S} = reduce(vcat, values(tree_components))
-        GRAPH_DIR::S = joinpath(JULIA_RESULTS_DIR, tree_configuration, graph_id)
+        CONFIG_DIR::S = joinpath(JULIA_RESULTS_DIR, tree_configuration)
+        MESH::Vector{S} = isdir(CONFIG_DIR) ? filter(endswith(".ply"), readdir(CONFIG_DIR, join=true)) : S[]
+        GRAPH_DIR::S = joinpath(CONFIG_DIR, graph_id)
     end
 
     """
@@ -165,5 +170,11 @@ module Definitions
         terminal_outflow::Array{T, 2} = zeros(1, terminal_matrix_size[2])
         terminal_difference::Array{T, 2} = zeros(1, terminal_matrix_size[2])
         synch_indices::Array{Int, 2} = zeros(Int, 1, terminal_matrix_size[2])
+    end
+
+    struct VoxelGrid
+        origin::NTuple{3,Float64}
+        h::Float64
+        dims::NTuple{3,Int}
     end
 end

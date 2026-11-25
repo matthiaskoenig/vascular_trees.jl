@@ -26,7 +26,11 @@ module TreesProcessing
         StaticArrays,
         Statistics,
         Hungarian,
-        Combinatorics
+        Combinatorics,
+        FileIO,
+        GeometryBasics,
+        LinearAlgebra
+
 
     using ..Options:
         MatchingOptions,
@@ -35,7 +39,9 @@ module TreesProcessing
 
     using ..Definitions:
         FlowDirections,
-        ODE_groups
+        ODE_groups,
+        VoxelGrid,
+        TreeStructure
 
     using ..TableUtils:
         get_extended_vector,
@@ -59,6 +65,8 @@ module TreesProcessing
     include("trees/individual_trees.jl")
     include("terminal_nodes/alterating_algorithms/hungarian.jl")
     include("terminal_nodes/alterating_algorithms/auction.jl")
+    include("terminal_nodes/colorful_partition/mesh_partition.jl")
+    include("terminal_nodes/colorful_partition/partition.jl")
     include("terminal_nodes/closest_nodes.jl")
     include("terminal_nodes/terminal_nodes.jl")
 

@@ -181,6 +181,12 @@ function prepare_tnodes_info(
         species_affiliations[tree_row, found] .= tree_name
     end
 
+    if length(tree_info.MESH) > 1
+        @warn "Multiple meshes found in $(tree_info.CONFIG_DIR), using the first one."
+    elseif  length(tree_info.MESH) == 0
+        @warn "No mesh found in $(tree_info.CONFIG_DIR), volume will be 1 L."
+    end
+
     if find_closest_tnodes
         @info "Searching for the closest terminal nodes..."
         # find closest terminal nodes for all trees, reorder coordinates, get matrix with reordered idx

@@ -8,3 +8,4 @@ SyntheticVascularTrees.jl
 JuliaSysimage.so
 *.pb.gz
 test/Manifest.toml
+test/output
