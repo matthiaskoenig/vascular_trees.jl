@@ -278,7 +278,7 @@ end
     make_workspace(algorithm, trees, n) -> workspace
 
 Arrays that [`assign_tree`](@ref) needs, allocated once before the alternating step.
-- [`HungarianAssignment`](@ref): the dense `n × n` cost matrix.
+- [`HungarianAssignment`](@ref): the dense `n * n` cost matrix.
 - [`AuctionAssignment`](@ref): one kd-tree per tree (node coordinates never change, so they are
 built once), `k` of every group of every tree, the candidates of all groups and the state of
 the auction.

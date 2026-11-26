@@ -66,8 +66,8 @@ module TreesProcessing
     include("terminal_nodes/alterating_algorithms/hungarian.jl")
     include("terminal_nodes/alterating_algorithms/auction.jl")
     include("terminal_nodes/colorful_partition/mesh_partition.jl")
-    include("terminal_nodes/colorful_partition/partition.jl")
+    include("terminal_nodes/colorful_partition/node_to_voxel_connection.jl")
+    include("terminal_nodes/partition.jl")
     include("terminal_nodes/closest_nodes.jl")
     include("terminal_nodes/terminal_nodes.jl")
-
 end

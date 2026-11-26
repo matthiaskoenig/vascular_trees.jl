@@ -5,13 +5,6 @@
 
 using VascularTrees.TreesProcessing: voxelize_mesh, compute_mesh_volume, find_voxel_center
 
-coords = permutedims(hcat(
-    [[0.0, 0.0, 0.0],  [10.0, 0.0, 0.0], [0.0, 10.0, 0.0], [0.0, 0.0, 10.0]],  # tree 1: reference tree
-    [[0.0, 10.1, 0.0], [0.1, 0.0, 0.0],  [0.0, 0.0, 10.1], [10.1, 0.0, 0.0]],  # tree 2
-    [[0.0, 0.0, 9.9],  [9.9, 0.0, 0.0],  [0.0, 0.1, 0.0],  [0.0, 9.9, 0.0]],   # tree 3
-    [[10.0, 0.2, 0.0], [0.0, 0.0, 10.2], [0.0, 9.8, 0.0],  [0.0, 0.0, 0.2]],   # tree 4
-))
-
 GRAPH_DIR = joinpath(mktempdir(), "Rectangle_quad_10")
 cp(joinpath(DATA_DIR, "Rectangle_quad_10"), GRAPH_DIR)
 

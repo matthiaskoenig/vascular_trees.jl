@@ -88,3 +88,29 @@
 /* equation tables of the 2b slides (one row per ODE group) */
 .eq-table table { font-size: 0.6em; margin-top: 0.6em; }
 .eq-table th:first-child, .eq-table td:first-child { white-space: nowrap; }
+
+/* ---------- colorful_partition.qmd ---------- */
+/* placeholder for a figure that is not made yet: replace the div by ![](figures/...) */
+.fig-placeholder {
+  border: 2px dashed #a0aec0; border-radius: 10px; background: #f7fafc;
+  min-height: 420px; display: flex; flex-direction: column; justify-content: center;
+  padding: 0.6em 0.9em; font-size: 0.5em; color: #4a5568;
+}
+.fig-placeholder code { font-size: 0.95em; }
+/* step list on the left of the step slides */
+.steps { font-size: 0.55em; }
+.steps p { margin: 0.1em 0 0.25em 0; }
+.steps ul { margin: 0 0 0.5em 0; padding-left: 1.1em; }
+.steps li { margin-bottom: 0.15em; }
+.steps .tag { display: inline-block; background: #2b6cb0; color: #fff; border-radius: 6px; padding: 0 0.4em; margin-right: 0.3em; font-weight: 700; }
+.card.c-a { border-top-color: #a0aec0; }
+.card.c-b { border-top-color: #2f855a; background: #f0fff4; }
+.card.c-c { border-top-color: #a0aec0; }
+/* step slides with figures in a row: figure on top, bullets below */
+.step-figs { margin-top: 0.2em; }
+.step-figs .column > p { margin: 0; }
+.step-figs .steps { font-size: 0.5em; margin-top: 0.3em; }
+/* pipeline table: same text size as the cards (0.6em) */
+.pipeline-tbl table { font-size: 0.6em; margin-top: 0.8em; }
+/* plain text at the same size as the cards (0.6em) */
+.text-06 { font-size: 0.6em; }

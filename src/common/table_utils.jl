@@ -61,7 +61,7 @@ module TableUtils
     the columns keep the element type of the block (`String`, `Float64` or `NTuple{3,Float64}`).
     """
     function block_to_df(block::AbstractMatrix, prefix::String)
-        # n_terminals × rows, eltype stays String / Float64 / NTuple{3,Float64}
+        # n_terminals * rows, eltype stays String / Float64 / NTuple{3,Float64}
         return DataFrame(permutedims(block), ["$(prefix)_$k" for k in 1:size(block, 1)])
     end
 

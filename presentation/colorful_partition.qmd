@@ -1,0 +1,408 @@
+---
+title: "Colorful partition"
+subtitle: "Splitting the liver volume into connected compartments that contain terminal nodes of every tree"
+author: "Mariia Myshkina, Matthias König"
+date: today
+format:
+  revealjs:
+    theme: [simple, theme.scss]
+    css: styles.css
+    slide-number: true
+    transition: none
+    width: 1280
+    height: 720
+  pdf:
+    toc: true
+    number-sections: true
+    colorlinks: true
+---
+
+## The question {#question}
+
+::: {.nhh}
+::: {.box .have}
+What do we have?
+
+- a **closed surface mesh** of the volume $V$ (liver)
+- $N = 4n \approx 400\,000$ terminal nodes, **4 colours** (trees A, P, V, B),
+  $n \approx 100\,000$ per colour
+- now: every terminal gets the **same share** of the volume
+:::
+
+::: {.arrow}
+→
+:::
+
+::: {.box .how}
+What is asked?
+
+Split $V$ into cells so that every cell
+
+1. contains **at least one point of each colour**
+2. is **one connected region inside** $V$
+3. is **compact**, roughly round (Voronoi-like)
+
+and return the **volume of every cell**.
+:::
+
+::: {.arrow}
+→
+:::
+
+::: {.box .need}
+What for?
+
+- one cell = one sinusoid compartment that **couples all four trees**
+- compartment volume from the **real geometry** instead of an equal split
+:::
+:::
+
+## Why is it hard? {#difficulties}
+
+::: {.cards}
+::: {.card}
+**$V$ is not a box**
+
+- the first specification used Delaunay + **mirror points** across the faces of a box
+- exact only for **convex** volumes with flat faces
+- in a non-convex $V$ (e.g. a U-shape), Voronoi neighbours can touch **only outside** $V$
+  → "connected in the graph" ≠ "connected in space"
+:::
+
+::: {.card}
+**No package in Julia**
+
+- what is needed: a 3D Voronoi diagram **restricted to a mesh** (restricted Voronoi diagram)
+- Julia: Voronoi in **2D** only, Delaunay in 3D — no restricted 3D Voronoi
+- exists in **C++** (Geogram) → would need a C wrapper, its own build and maintenance
+:::
+
+::: {.card}
+**Colours and size**
+
+- every cell must have **all 4 colours** — a constraint across groups of points,
+  not only distances
+- every cell must stay **connected** while points are moved between cells
+- $N \approx 400\,000$ points, $\approx 11$ million voxels → must run in about a minute
+:::
+:::
+
+## Three options {#options}
+
+::: {.cards}
+::: {.card .c-a}
+**A · Mirror points**
+
+Delaunay of the points + their mirror images across the faces of $V$
+
+- exact volumes
+- **only for convex polyhedra** ✗
+:::
+
+::: {.card .c-b}
+**B · Voxels** ✓ chosen
+
+Fill $V$ with small cubes, give each cube to its nearest point
+
+- pure Julia, **any shape**
+- connections never pass through the outside
+- volumes ≈ 1 % per final cell (estimate)
+:::
+
+::: {.card .c-c}
+**C · Restricted Voronoi (Geogram, C++)**
+
+Exact cells of every point, cut to $V$
+
+- exact volumes
+- C++ library, wrapper **never compiled**
+- kept as a fallback if exact volumes are needed
+:::
+:::
+
+::: {.small .center .muted}
+Central idea of B: every point owns the part of $V$ closest to it (its **small cell**).
+A final cell is a **group of points** → after the voxel step, everything is done on a graph.
+:::
+
+## Pipeline {#pipeline}
+
+::: {.pipeline-tbl}
+| Step | What | Result |
+|:--|:--|:--|
+| 0 · 1a | voxel size, inside test, nearest point per voxel | `owner` |
+| 1c · 1b · 1d · 1e | one piece per small cell, volumes, neighbour graph, points without voxels | graph |
+| 2 · 3 | seeds, grow cells on the graph | `label` |
+| 4 · 5 · 6 | find cells missing a colour, repair, smooth | all cells colourful |
+| 7 · 8 · 9 | label map, cell volumes, checks | cells + volumes |
+:::
+
+::: {.small .center .muted}
+The graph ignores colours — neighbours are defined only by touching in space.
+Colours enter only in steps 4–6.
+:::
+
+## Steps 0 · 1a — grid, inside test, owners {#s0-1a}
+
+:::: {.columns .step-figs}
+::: {.column width="33%"}
+![](figures/partition/step1_0_grid.pdf){width="100%"}
+
+::: {.steps}
+[0]{.tag} **Voxel grid**
+
+- mean spacing $s = (\mathrm{vol}(V)/N)^{1/3}$
+- voxel size $h = s/3$ → ≈ 27 voxels per point
+:::
+:::
+
+::: {.column width="33%"}
+![](figures/partition/step1_1a_inside.pdf){width="100%"}
+
+::: {.steps}
+[1a]{.tag} **Inside test**
+
+- per column: where does it **cross the surface**?
+- crossings alternate enter / leave
+- odd number → hole in the mesh, column skipped
+:::
+:::
+
+::: {.column width="33%"}
+![](figures/partition/step1_1a_owners.pdf){width="100%"}
+
+::: {.steps}
+[1a]{.tag} **Owners**
+
+- every inside voxel → its **nearest point** (KD-tree)
+- the voxels of a point = its **small cell**
+:::
+:::
+::::
+
+## Steps 1c · 1b — one piece per small cell, volumes {#s1c-1b}
+
+:::: {.columns .step-figs}
+::: {.column width="33%"}
+![](figures/partition/step1_1c_before.pdf){width="100%"}
+
+::: {.steps}
+[1c]{.tag} **Before**
+
+- near thin parts, a point can own voxels on **both sides of a gap**
+- its small cell has **two pieces**
+:::
+:::
+
+::: {.column width="33%"}
+![](figures/partition/step1_1c_after.pdf){width="100%"}
+
+::: {.steps}
+[1c]{.tag} **After**
+
+- each point keeps its **home piece**
+- a stray piece goes to the neighbour it shares the **most faces** with
+:::
+:::
+
+::: {.column width="33%"}
+![](figures/partition/step1_1b_volumes.pdf){width="100%"}
+
+::: {.steps}
+[1b]{.tag} **Small-cell volumes** (after 1c)
+
+- voxels owned × $h^3$
+- sum ≈ $\mathrm{vol}(V)$
+:::
+:::
+::::
+
+## Steps 1d · 1e — the neighbour graph {#s1d-1e}
+
+:::: {.columns .step-figs}
+::: {.column width="40%"}
+![](figures/partition/step1_1d_graph.pdf){width="100%"}
+
+::: {.steps}
+[1d]{.tag} **Neighbour graph**
+
+- two points are **neighbours** if their voxels **share a face**
+- outside voxels belong to nobody → **no edge through the outside**
+- colours are ignored
+:::
+:::
+
+::: {.column width="20%"}
+:::
+
+::: {.column width="40%"}
+![](figures/partition/step1_1e_orphan.pdf){width="100%"}
+
+::: {.steps}
+[1e]{.tag} **Points without voxels**
+
+- a very close neighbour wins all their voxels
+- one edge to the **nearest point that has voxels**; its colour still counts
+:::
+:::
+::::
+
+## Step 2 — seeds {#s2}
+
+:::: {.columns .step-figs}
+::: {.column width="33%"}
+![](figures/partition/step2a_random_seeds.pdf){width="100%"}
+
+::: {.steps}
+[2]{.tag} **Random seeds**
+
+- $m \approx n/4$ random data points
+- ≈ 16 points, ≈ 4 of each colour per cell
+:::
+:::
+
+::: {.column width="33%"}
+![](figures/partition/step2b_lloyd.pdf){width="100%"}
+
+::: {.steps}
+[2]{.tag} **Lloyd rounds**
+
+- 3–5 rounds: points → nearest seed, seed → **mean** of its points
+- even spacing → cells of **similar size**
+:::
+:::
+
+::: {.column width="33%"}
+![](figures/partition/step2c_snap.pdf){width="100%"}
+
+::: {.steps}
+[2]{.tag} **Snap**
+
+- every seed → its **nearest data point**, duplicates dropped
+- a mean can fall outside $V$
+:::
+:::
+::::
+
+## Steps 3 · 4 — grow cells, count colours {#s3-4}
+
+:::: {.columns .step-figs}
+::: {.column width="33%"}
+![](figures/partition/step3a_growing.pdf){width="100%"}
+
+::: {.steps}
+[3]{.tag} **Growing**
+
+- multi-source **Dijkstra** on the graph
+- edge length $\lVert p_i - p_j \rVert$
+:::
+:::
+
+::: {.column width="33%"}
+![](figures/partition/step3b_grown.pdf){width="100%"}
+
+::: {.steps}
+[3]{.tag} **Grown**
+
+- every point takes the label of the seed closest **along the graph**
+- every cell is **connected** and compact
+:::
+:::
+
+::: {.column width="33%"}
+![](figures/partition/step4_counts.pdf){width="100%"}
+
+::: {.steps}
+[4]{.tag} **Count colours**
+
+- points of each colour per cell
+- a cell missing a colour is **deficient** (≈ 2 % per colour expected)
+:::
+:::
+::::
+
+## Steps 5 · 6 — repair and smoothing {#s5-6}
+
+:::: {.columns .step-figs}
+::: {.column width="33%"}
+![](figures/partition/step5a_path.pdf){width="100%"}
+
+::: {.steps}
+[5]{.tag} **Path to the missing colour**
+
+- search outward from the deficient cell for the **nearest point of the missing colour**
+- accepted only if every cell losing points keeps **all colours** and stays **connected**
+:::
+:::
+
+::: {.column width="33%"}
+![](figures/partition/step5b_repaired.pdf){width="100%"}
+
+::: {.steps}
+[5]{.tag} **Repaired**
+
+- the path joins the cell
+- no acceptable path after ~20 tries → **merge** with a neighbouring cell
+:::
+:::
+
+::: {.column width="33%"}
+![](figures/partition/step6_smoothing.pdf){width="100%"}
+
+::: {.steps}
+[6]{.tag} **Smoothing (optional)**
+
+- a boundary point moves to the cell with the **closer centre**
+- only if both cells stay valid
+:::
+:::
+::::
+
+## Steps 7 · 8 · 9 — result and checks {#s7-9}
+
+:::: {.columns .step-figs}
+::: {.column width="45%"}
+![](figures/partition/step7_label_map.pdf){width="100%"}
+
+::: {.steps}
+[7]{.tag} **Label map**
+
+- every voxel gets the cell of its owner
+- 3D: an image of the cells (VTK)
+:::
+:::
+
+::: {.column width="5%"}
+:::
+
+::: {.column width="50%"}
+::: {.steps}
+[8]{.tag} **Cell volumes**
+
+- sum of the small-cell volumes of the cell's points
+
+[9]{.tag} **Checks**
+
+- every cell has **all colours**
+- every cell is **one piece** in space (flood fill over its voxels)
+- $\sum$ cell volumes $= (\text{inside voxels}) \cdot h^3 \approx \mathrm{vol}(V)$
+- accuracy: rerun with $h/1.5$, compare cell volumes
+:::
+:::
+::::
+
+## Status and next steps {#status}
+
+::: {.text-06}
+- **everything is a plan**; the first steps (0 – 1e) are being written in
+  `src/trees_processing/terminal_nodes/colorful_partition/` with tests on a box mesh
+- expected cost for $N = 400\,000$: about **a minute**, memory < 1 GB
+  (start Julia with `-t auto`)
+
+**Next**
+
+1. run steps 0 – 1e on the real mesh and terminal nodes
+2. write steps 2 – 9
+3. validate on a box (compare with the mirror-point method) and on an L-shaped volume
+4. connect the cells to the terminal part $T$ of the simulation
+:::

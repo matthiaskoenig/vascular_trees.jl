@@ -13,14 +13,15 @@ const DATA_DIR = joinpath(@__DIR__, "data")
 #
 # To run only some of the tests, pass their names as test_args, e.g.
 #   julia --project=. -e 'using Pkg; Pkg.test(test_args=["mesh"])'
-# Names: definitions, vtkhdf, mesh, closest, pipeline, aqua. No args runs everything.
+# Names: definitions, vtkhdf, mesh, voxel, closest, pipeline, aqua. No args runs everything.
 const SELECTED = ARGS
 run_test(name) = isempty(SELECTED) || name in SELECTED
 
-@testset "VascularTrees" begin
+@testset "VascularTrees" verbose = true begin   # verbose: pass/fail counts for every nested testset
     run_test("definitions") && @testset "definitions and options" include("test_definitions.jl")
     run_test("vtkhdf")      && @testset "write_vtkhdf" include("test_vtkhdf.jl")
     run_test("mesh")        && @testset "mesh partition" include("test_mesh_partition.jl")
+    run_test("voxel")       && @testset "node to voxel connection" include("test_node_to_voxel.jl")
     run_test("closest")     && @testset "find closest nodes" include("test_closest_nodes.jl")
     run_test("pipeline")    && @testset "pipeline Rectangle_quad_10" include("test_pipeline.jl")
     run_test("aqua")        && @testset "Aqua" include("test_aqua.jl")
