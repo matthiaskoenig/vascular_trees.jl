@@ -29,7 +29,9 @@ module TreesProcessing
         Combinatorics,
         FileIO,
         GeometryBasics,
-        LinearAlgebra
+        LinearAlgebra,
+        SparseArrays,
+        PrettyTables
 
 
     using ..Options:
@@ -41,7 +43,8 @@ module TreesProcessing
         FlowDirections,
         ODE_groups,
         VoxelGrid,
-        TreeStructure
+        TreeStructure,
+        TreePressures
 
     using ..TableUtils:
         get_extended_vector,
@@ -62,6 +65,7 @@ module TreesProcessing
 
     include("read_tree_files.jl")
     include("trees/edge_labeling.jl")
+    include("trees/pressure.jl")
     include("trees/individual_trees.jl")
     include("terminal_nodes/alterating_algorithms/hungarian.jl")
     include("terminal_nodes/alterating_algorithms/auction.jl")

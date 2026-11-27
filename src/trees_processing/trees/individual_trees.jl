@@ -48,6 +48,7 @@ function process_individual_tree(GRAPH_DIR::String, vascular_tree::String)
     edges_df, nodes_df = read_graph(GRAPH_PATH, EDGES_PATH, NODES_PATH)
     add_graph_characteristics!(edges_df, vascular_tree)
     graph_df = build_arrow_df(edges_df, nodes_df, vascular_tree)
+    print(graph_df.predecessors)
     
     mkpath(joinpath(GRAPH_DIR, "graphs"))
     save_as_arrow(graph_df, joinpath(GRAPH_DIR, "graphs/$(vascular_tree).arrow"))
@@ -164,6 +165,7 @@ function build_arrow_df(
         preterminal_edges = get_extended_vector(graph_info.preterminal_edges, df_length),
         flows = edges_df.flows,
         volumes = edges_df.volumes,
+        conductances = edges_df.conductances,
         species_ids = edges_df.species_ids,
         flow_ids = edges_df.flow_ids,
         volume_ids = edges_df.volume_ids,

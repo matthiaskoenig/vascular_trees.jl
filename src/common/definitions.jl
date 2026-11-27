@@ -13,7 +13,8 @@ module Definitions
         ODE_groups, 
         VascularTreeParameters,
         TerminalParameters,
-        VoxelGrid
+        VoxelGrid,
+        TreePressures
 
     using Parameters
 
@@ -38,6 +39,30 @@ module Definitions
             "Rectangle_trio" => Dict(:inflow_trees => ["A", "P"], :outflow_trees => ["V"]),
             "Rectangle_quad" =>
                 Dict(:inflow_trees => ["A", "P"], :outflow_trees => ["V", "B"]), #["P", "A", "V", "B"]
+        )
+    end
+
+    """
+    TreePressures()
+
+    Boundary pressure of every tree at its marginal node (inlet of an inflow tree,
+    outlet of an outflow tree), in mmHg:
+
+    | Tree | Pressure [mmHg] |
+    |:-----|:----------------|
+    | `A`  | 80              |
+    | `P`  | 10              |
+    | `V`  | 3               |
+    | `B`  | 4               |
+
+    Converted to Pa in the pressure system (`MMHG_TO_PA` in `trees/pressure.jl`).
+    """
+    @with_kw struct TreePressures
+        pressures_mmHg::Dict{String,Float64} = Dict(
+            "A" => 80.0,
+            "P" => 10.0,
+            "V" => 3.0,
+            "B" => 4.0,
         )
     end
 

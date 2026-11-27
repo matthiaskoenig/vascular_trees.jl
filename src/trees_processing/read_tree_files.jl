@@ -112,7 +112,7 @@ function read_edge_attributes(EDGES_PATH::String)::DataFrame
     )
     edges_attrib_df.flows  .= edges_attrib_df.flows .* (S_PER_MIN / MM3_PER_L) # mm³/s → L/min
     edges_attrib_df.volumes .= π .* edges_attrib_df.radius .^ 2 .* edges_attrib_df.length ./ MM3_PER_L  # mm³ → L
-
+    edges_attrib_df.conductances .=  compute_hydraulic_conductance.(edges_attrib_df.radius .* 2, edges_attrib_df.length) ./ MM3_PER_L # mm³ / (Pa·s) -> L / (Pa·s)
     return edges_attrib_df
 end
 

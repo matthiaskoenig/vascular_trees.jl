@@ -1,0 +1,645 @@
+---
+title: "Pressure system"
+subtitle: "Steady pressures and flows on the coupled liver vascular trees (`trees/pressure.jl`)"
+author: "Mariia Myshkina, Matthias König"
+date: today
+format:
+  revealjs:
+    theme: [simple, theme.scss]
+    css: styles.css
+    slide-number: true
+    transition: none
+    width: 1280
+    height: 720
+    html-math-method: mathjax
+---
+
+## The question {#question}
+
+::: {.nhh}
+::: {.box .have}
+What do we have?
+
+- 4 trees: inflow **A**, **P**, outflow **V**, **B** (`<tree>.arrow`)
+- per edge $k=(i,j)$: diameter $d_k$, length $l_k$, ODE group, predecessors / successors
+- known pressures at the tree roots: A 80, P 10, V 3, B 4 mmHg
+:::
+
+::: {.arrow}
+→
+:::
+
+::: {.box .how}
+How?
+
+- every edge is a **Poiseuille tube**: flow $\propto$ pressure difference
+- **mass conservation** at every node → one linear equation per edge
+- boundary rows: inflows $Q$, pressure drops, common terminal pressure
+- one **sparse linear system** $A\,x = b$
+:::
+
+::: {.arrow}
+→
+:::
+
+::: {.box .need}
+What for?
+
+- **pressure** in every node, **flow** in every edge
+- flows from the geometry instead of assumed flow values
+- input for the pharmacokinetic simulation
+:::
+:::
+
+## Poiseuille flow in one edge {#poiseuille}
+
+:::: {.columns}
+::: {.column width="55%"}
+::: {.text-06}
+Edge $k = (i, j)$, flow from node $i$ to node $j$:
+
+$$
+q_k = c_k\,(p_i - p_j),
+\qquad
+c_k = \frac{\pi\, d_k^4}{128\,\mu\, l_k}
+$$
+
+| symbol | meaning | unit |
+|:--|:--|:--|
+| $p_i$ | pressure at node $i$ | Pa |
+| $c_k$ | hydraulic conductance | mm³/(Pa·s) |
+| $\mu = 3.71\cdot10^{-3}$ | blood viscosity | Pa·s |
+| $d_k,\ l_k$ | diameter, length | mm |
+| $q_k$ | volume flow | mm³/s |
+
+- pressures in **Pa**: tree pressures in mmHg are multiplied by `MMHG_TO_PA` $=133.322$
+- $c \propto d^4$: halving the diameter → **16×** less flow
+:::
+:::
+
+::: {.column width="45%"}
+```{=html}
+<svg viewBox="0 0 420 200" width="100%" role="img" aria-label="Edge from node i to node j with flow q">
+  <defs><marker id="arrP" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+    <path d="M0,0 L10,5 L0,10 z" fill="#2b6cb0"/></marker></defs>
+  <rect x="80" y="80" width="260" height="40" rx="20" fill="#ebf8ff" stroke="#2b6cb0" stroke-width="2"/>
+  <line x1="120" y1="100" x2="300" y2="100" stroke="#2b6cb0" stroke-width="3" marker-end="url(#arrP)"/>
+  <circle cx="60" cy="100" r="22" fill="#fff" stroke="#4a5568" stroke-width="2"/>
+  <circle cx="360" cy="100" r="22" fill="#fff" stroke="#4a5568" stroke-width="2"/>
+  <text x="60" y="106" text-anchor="middle" font-size="18">i</text>
+  <text x="360" y="106" text-anchor="middle" font-size="18">j</text>
+  <text x="60" y="150" text-anchor="middle" font-size="16" fill="#4a5568">p_i</text>
+  <text x="360" y="150" text-anchor="middle" font-size="16" fill="#4a5568">p_j</text>
+  <text x="210" y="65" text-anchor="middle" font-size="16" fill="#2b6cb0">q = c (p_i − p_j)</text>
+  <text x="210" y="150" text-anchor="middle" font-size="14" fill="#718096">d, l → c</text>
+</svg>
+```
+:::
+::::
+
+::: {.small .center .muted}
+`compute_hydraulic_conductance(d, l)` — the electric analogue: $c$ = conductance, $p$ = voltage, $q$ = current.
+:::
+
+## Edges, groups and orientation {#groups}
+
+:::: {.columns}
+::: {.column width="50%"}
+::: {.text-06}
+**ODE groups** (column `ODE_groups`)
+
+| code | edge | in the pressure system |
+|:--|:--|:--|
+| 0 | marginal $(0,i)$ / $(i,0)$ | boundary row ($Q$ / outflow) |
+| 1 | inner | conservation row |
+| 2 | preterminal, ends in a leaf | leaf pressure → terminal row |
+| 3 | terminal self-edge $(n,n)$ | not used |
+
+**Orientation**: edges point in the direction of the flow
+
+- **inflow** (A, P): root edge $(0, i)$, flow **splits** towards the leaves
+- **outflow** (V, B): stored **reversed**, root edge $(i, 0)$, flow **merges** towards the outlet
+- node $0$ is outside the tree → **no column**
+:::
+:::
+
+::: {.column width="50%"}
+```{=html}
+<svg viewBox="0 0 460 330" width="100%" role="img" aria-label="Inflow tree splits from root, outflow tree merges into outlet">
+  <defs>
+    <marker id="arrA" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#c53030"/></marker>
+    <marker id="arrV" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#2b6cb0"/></marker>
+  </defs>
+  <text x="10" y="22" font-size="15" font-weight="bold" fill="#c53030">inflow (A, P)</text>
+  <circle cx="30" cy="80" r="12" fill="#fff" stroke="#a0aec0" stroke-dasharray="3,3"/><text x="30" y="85" text-anchor="middle" font-size="12">0</text>
+  <circle cx="120" cy="80" r="12" fill="#f9d0d0" stroke="#c53030"/><text x="120" y="85" text-anchor="middle" font-size="12">i</text>
+  <circle cx="220" cy="45" r="12" fill="#f9d0d0" stroke="#c53030"/>
+  <circle cx="220" cy="115" r="12" fill="#f9d0d0" stroke="#c53030"/>
+  <circle cx="320" cy="25" r="10" fill="#fbe3d0" stroke="#c05621"/><circle cx="320" cy="65" r="10" fill="#fbe3d0" stroke="#c05621"/>
+  <circle cx="320" cy="100" r="10" fill="#fbe3d0" stroke="#c05621"/><circle cx="320" cy="135" r="10" fill="#fbe3d0" stroke="#c05621"/>
+  <line x1="42" y1="80" x2="105" y2="80" stroke="#c53030" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arrA)"/>
+  <line x1="132" y1="75" x2="206" y2="50" stroke="#c53030" stroke-width="2" marker-end="url(#arrA)"/>
+  <line x1="132" y1="85" x2="206" y2="110" stroke="#c53030" stroke-width="2" marker-end="url(#arrA)"/>
+  <line x1="232" y1="42" x2="308" y2="28" stroke="#c05621" stroke-width="2" marker-end="url(#arrA)"/>
+  <line x1="232" y1="48" x2="308" y2="62" stroke="#c05621" stroke-width="2" marker-end="url(#arrA)"/>
+  <line x1="232" y1="112" x2="308" y2="102" stroke="#c05621" stroke-width="2" marker-end="url(#arrA)"/>
+  <line x1="232" y1="118" x2="308" y2="132" stroke="#c05621" stroke-width="2" marker-end="url(#arrA)"/>
+  <text x="70" y="70" text-anchor="middle" font-size="11" fill="#4a5568">0</text>
+  <text x="165" y="55" font-size="11" fill="#4a5568">1</text>
+  <text x="268" y="25" font-size="11" fill="#4a5568">2</text>
+  <text x="345" y="85" font-size="12" fill="#c05621">leaves</text>
+
+  <text x="10" y="192" font-size="15" font-weight="bold" fill="#2b6cb0">outflow (V, B), reversed</text>
+  <circle cx="40" cy="215" r="10" fill="#fbe3d0" stroke="#c05621"/><circle cx="40" cy="255" r="10" fill="#fbe3d0" stroke="#c05621"/>
+  <circle cx="40" cy="290" r="10" fill="#fbe3d0" stroke="#c05621"/><circle cx="40" cy="320" r="8" fill="#fbe3d0" stroke="#c05621"/>
+  <circle cx="140" cy="235" r="12" fill="#cfe0f3" stroke="#2b6cb0"/>
+  <circle cx="140" cy="300" r="12" fill="#cfe0f3" stroke="#2b6cb0"/>
+  <circle cx="240" cy="268" r="12" fill="#cfe0f3" stroke="#2b6cb0"/><text x="240" y="273" text-anchor="middle" font-size="12">i</text>
+  <circle cx="330" cy="268" r="12" fill="#fff" stroke="#a0aec0" stroke-dasharray="3,3"/><text x="330" y="273" text-anchor="middle" font-size="12">0</text>
+  <line x1="50" y1="217" x2="126" y2="232" stroke="#c05621" stroke-width="2" marker-end="url(#arrV)"/>
+  <line x1="50" y1="253" x2="126" y2="239" stroke="#c05621" stroke-width="2" marker-end="url(#arrV)"/>
+  <line x1="50" y1="291" x2="126" y2="298" stroke="#c05621" stroke-width="2" marker-end="url(#arrV)"/>
+  <line x1="48" y1="318" x2="126" y2="304" stroke="#c05621" stroke-width="2" marker-end="url(#arrV)"/>
+  <line x1="152" y1="239" x2="226" y2="263" stroke="#2b6cb0" stroke-width="2" marker-end="url(#arrV)"/>
+  <line x1="152" y1="296" x2="226" y2="273" stroke="#2b6cb0" stroke-width="2" marker-end="url(#arrV)"/>
+  <line x1="252" y1="268" x2="315" y2="268" stroke="#2b6cb0" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arrV)"/>
+  <text x="285" y="258" text-anchor="middle" font-size="11" fill="#4a5568">0</text>
+  <text x="185" y="245" font-size="11" fill="#4a5568">1</text>
+  <text x="80" y="208" font-size="11" fill="#4a5568">2</text>
+</svg>
+```
+::: {.small .center .muted}
+numbers on the edges = ODE group; dashed = marginal edge, orange = leaves
+:::
+:::
+::::
+
+## Unknowns and the layout of the matrix {#unknowns}
+
+::: {.text-06}
+**Unknowns** $x$: one pressure per node of every tree, then one inflow per inflow tree
+
+$$
+x = \big(\underbrace{p^{A}_1,\dots,p^{A}_{n_A}}_{\text{tree A}},\;
+\underbrace{p^{P}_1,\dots}_{\text{tree P}},\;
+\underbrace{p^{V}_1,\dots}_{\text{tree V}},\;
+\underbrace{p^{B}_1,\dots}_{\text{tree B}},\;
+Q_A,\; Q_P\big)
+$$
+
+- **columns**: tree $t$ uses columns $\text{col\_offset}_t + 1, \dots, \text{col\_offset}_t + n_t$, then the $Q$ columns after all pressures
+- **rows**: tree $t$ uses one row per edge, $\text{row\_offset}_t + k$ for edge $k$; boundary rows follow after all tree blocks
+- offsets grow tree by tree in the order of `tree_info.vascular_trees`
+:::
+
+```{=html}
+<table class="mat">
+<tr><th></th><th>p<sup>A</sup></th><th>p<sup>P</sup></th><th>p<sup>V</sup></th><th>p<sup>B</sup></th><th>Q<sub>A</sub>, Q<sub>P</sub></th><th>b</th></tr>
+<tr><th style="text-align:right">edges of A</th><td class="A">C<sub>A</sub></td><td class="e">0</td><td class="e">0</td><td class="e">0</td><td class="A">+1 (root row)</td><td class="e">0</td></tr>
+<tr><th style="text-align:right">edges of P</th><td class="e">0</td><td class="P">C<sub>P</sub></td><td class="e">0</td><td class="e">0</td><td class="P">+1 (root row)</td><td class="e">0</td></tr>
+<tr><th style="text-align:right">edges of V</th><td class="e">0</td><td class="e">0</td><td class="V">C<sub>V</sub></td><td class="e">0</td><td class="e">0</td><td class="e">0</td></tr>
+<tr><th style="text-align:right">edges of B</th><td class="e">0</td><td class="e">0</td><td class="e">0</td><td class="B">C<sub>B</sub></td><td class="e">0</td><td class="e">0</td></tr>
+<tr><th style="text-align:right">outflow balance</th><td class="e">0</td><td class="e">0</td><td class="V">± c</td><td class="B">± c</td><td class="g">−1, −1</td><td class="e">0</td></tr>
+<tr><th style="text-align:right">pressure drops</th><td class="A">+1</td><td class="P">+1</td><td class="V">−1</td><td class="B">−1</td><td class="e">0</td><td class="T">ΔP</td></tr>
+<tr><th style="text-align:right">common leaf pressure</th><td class="A">±1</td><td class="P">±1</td><td class="V">±1</td><td class="B">±1</td><td class="e">0</td><td class="e">0</td></tr>
+</table>
+```
+
+## Inner edges of an inflow tree: flow splits {#inner-inflow}
+
+:::: {.columns}
+::: {.column width="50%"}
+```{=html}
+<svg viewBox="0 0 420 230" width="100%" role="img" aria-label="Edge k from i to j splits into successors s1 to h1 and s2 to h2">
+  <defs><marker id="arrI" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#c53030"/></marker></defs>
+  <circle cx="50" cy="115" r="20" fill="#f9d0d0" stroke="#c53030" stroke-width="2"/><text x="50" y="121" text-anchor="middle" font-size="18">i</text>
+  <circle cx="210" cy="115" r="20" fill="#f9d0d0" stroke="#c53030" stroke-width="3"/><text x="210" y="121" text-anchor="middle" font-size="18">j</text>
+  <circle cx="370" cy="45" r="20" fill="#f9d0d0" stroke="#c53030" stroke-width="2"/><text x="370" y="51" text-anchor="middle" font-size="16">h₁</text>
+  <circle cx="370" cy="185" r="20" fill="#f9d0d0" stroke="#c53030" stroke-width="2"/><text x="370" y="191" text-anchor="middle" font-size="16">h₂</text>
+  <line x1="72" y1="115" x2="185" y2="115" stroke="#c53030" stroke-width="3" marker-end="url(#arrI)"/>
+  <line x1="230" y1="105" x2="347" y2="55" stroke="#c53030" stroke-width="2" marker-end="url(#arrI)"/>
+  <line x1="230" y1="125" x2="347" y2="175" stroke="#c53030" stroke-width="2" marker-end="url(#arrI)"/>
+  <text x="128" y="103" text-anchor="middle" font-size="16">k: c<tspan font-size="11" dy="4">k</tspan></text>
+  <text x="290" y="65" text-anchor="middle" font-size="15">s₁</text>
+  <text x="290" y="175" text-anchor="middle" font-size="15">s₂</text>
+  <text x="210" y="160" text-anchor="middle" font-size="13" fill="#4a5568">shared node</text>
+</svg>
+```
+:::
+
+::: {.column width="50%"}
+::: {.text-06}
+Edge $k=(i,j)\in E_1$, successors $s=(j,h)\in N^{+}(k)$
+
+flow into $j$ = flow out of $j$:
+
+$$
+c_k\,(p_i - p_j) \;=\; \sum_{s=(j,h)\in N^{+}(k)} c_s\,(p_j - p_h)
+$$
+
+row $\text{row\_offset}+k$, everything on the left:
+
+$$
+c_k\,p_i \;-\;\Big(c_k + \sum_s c_s\Big)\,p_j \;+\; \sum_s c_s\,p_h \;=\; 0
+$$
+:::
+:::
+::::
+
+::: {.small .center .muted}
+the row of edge $k$ is the conservation law at its **end node** $j$ — `add_equations!`, `is_inflow = true`
+:::
+
+## Inner edges of an outflow tree: flow merges {#inner-outflow}
+
+:::: {.columns}
+::: {.column width="50%"}
+```{=html}
+<svg viewBox="0 0 420 230" width="100%" role="img" aria-label="Predecessors g1 to i and g2 to i merge into edge k from i to j">
+  <defs><marker id="arrO" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#2b6cb0"/></marker></defs>
+  <circle cx="50" cy="45" r="20" fill="#cfe0f3" stroke="#2b6cb0" stroke-width="2"/><text x="50" y="51" text-anchor="middle" font-size="16">g₁</text>
+  <circle cx="50" cy="185" r="20" fill="#cfe0f3" stroke="#2b6cb0" stroke-width="2"/><text x="50" y="191" text-anchor="middle" font-size="16">g₂</text>
+  <circle cx="210" cy="115" r="20" fill="#cfe0f3" stroke="#2b6cb0" stroke-width="3"/><text x="210" y="121" text-anchor="middle" font-size="18">i</text>
+  <circle cx="370" cy="115" r="20" fill="#cfe0f3" stroke="#2b6cb0" stroke-width="2"/><text x="370" y="121" text-anchor="middle" font-size="18">j</text>
+  <line x1="70" y1="55" x2="187" y2="105" stroke="#2b6cb0" stroke-width="2" marker-end="url(#arrO)"/>
+  <line x1="70" y1="175" x2="187" y2="125" stroke="#2b6cb0" stroke-width="2" marker-end="url(#arrO)"/>
+  <line x1="232" y1="115" x2="345" y2="115" stroke="#2b6cb0" stroke-width="3" marker-end="url(#arrO)"/>
+  <text x="290" y="103" text-anchor="middle" font-size="16">k: c<tspan font-size="11" dy="4">k</tspan></text>
+  <text x="130" y="65" text-anchor="middle" font-size="15">s₁</text>
+  <text x="130" y="175" text-anchor="middle" font-size="15">s₂</text>
+  <text x="210" y="160" text-anchor="middle" font-size="13" fill="#4a5568">shared node</text>
+</svg>
+```
+:::
+
+::: {.column width="50%"}
+::: {.text-06}
+Edge $k=(i,j)\in E_1$, predecessors $s=(g,i)\in N^{-}(k)$
+
+flow into $i$ = flow out of $i$:
+
+$$
+c_k\,(p_i - p_j) \;=\; \sum_{s=(g,i)\in N^{-}(k)} c_s\,(p_g - p_i)
+$$
+
+row $\text{row\_offset}+k$:
+
+$$
+\Big(c_k + \sum_s c_s\Big)\,p_i \;-\; c_k\,p_j \;-\; \sum_s c_s\,p_g \;=\; 0
+$$
+:::
+:::
+::::
+
+::: {.small .center .muted}
+the row of edge $k$ is the conservation law at its **start node** $i$ — `add_equations!`, `is_inflow = false`
+:::
+
+## One function for both directions {#unified}
+
+::: {.text-06}
+Both rows have the same shape: own edge term + one term per neighbour.
+Only the **shared node**, the **far node** and one **sign** $\sigma$ differ:
+
+| | neighbours | shared node | far node of $s$ | $\sigma$ | coefficient of $p_\text{far}$ | coefficient of $p_\text{shared}$ |
+|:--|:--|:--|:--|:--|:--|:--|
+| inflow | successors $(j,h)$ | $j$ | $h$ | $+1$ | $+c_s$ | $-c_s$ |
+| outflow | predecessors $(g,i)$ | $i$ | $g$ | $-1$ | $-c_s$ | $+c_s$ |
+
+$$
+\text{row of } k:\qquad
+c_k\,p_i - c_k\,p_j \;+\; \sum_{s} \sigma\,c_s\,\big(p_{\text{far}(s)} - p_{\text{shared}}\big) \;=\; 0
+$$
+
+- only **group 1** edges get this row; rows of groups 0, 2, 3 stay empty here
+- the shared node collects several entries ($-c_k$, $-c_{s_1}$, $-c_{s_2}$, …) → summed when the matrix is built
+- a neighbour that does not touch the shared node → `@warn` (consistency check of the table)
+:::
+
+## Inflow boundary: the unknown inflow $Q_t$ {#inflow-bc}
+
+:::: {.columns}
+::: {.column width="45%"}
+```{=html}
+<svg viewBox="0 0 380 220" width="100%" role="img" aria-label="Inflow Q enters through root edge 0 to i and splits into successors">
+  <defs><marker id="arrQ" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#c53030"/></marker></defs>
+  <circle cx="40" cy="110" r="18" fill="#fff" stroke="#a0aec0" stroke-dasharray="4,3"/><text x="40" y="116" text-anchor="middle" font-size="16">0</text>
+  <circle cx="180" cy="110" r="20" fill="#f9d0d0" stroke="#c53030" stroke-width="3"/><text x="180" y="116" text-anchor="middle" font-size="18">i</text>
+  <circle cx="330" cy="45" r="18" fill="#f9d0d0" stroke="#c53030" stroke-width="2"/><text x="330" y="51" text-anchor="middle" font-size="15">h₁</text>
+  <circle cx="330" cy="175" r="18" fill="#f9d0d0" stroke="#c53030" stroke-width="2"/><text x="330" y="181" text-anchor="middle" font-size="15">h₂</text>
+  <line x1="60" y1="110" x2="155" y2="110" stroke="#c53030" stroke-width="3" stroke-dasharray="6,4" marker-end="url(#arrQ)"/>
+  <line x1="200" y1="100" x2="310" y2="55" stroke="#c53030" stroke-width="2" marker-end="url(#arrQ)"/>
+  <line x1="200" y1="120" x2="310" y2="165" stroke="#c53030" stroke-width="2" marker-end="url(#arrQ)"/>
+  <text x="108" y="98" text-anchor="middle" font-size="18" fill="#c53030">Q<tspan font-size="12" dy="4">t</tspan></text>
+  <text x="108" y="140" text-anchor="middle" font-size="12" fill="#718096">group 0</text>
+</svg>
+```
+:::
+
+::: {.column width="55%"}
+::: {.text-06}
+Root edge $k_0=(0,i)$ of inflow tree $t$ — node $0$ has no pressure.
+The flow through it is a **new unknown** $Q_t$:
+
+$$
+Q_t \;=\; \sum_{s=(i,h)\in N^{+}(k_0)} c_s\,(p_i - p_h)
+$$
+
+$$
+1\cdot Q_t \;+\; \sum_s c_s\,p_h \;-\; \sum_s c_s\,p_i \;=\; 0
+$$
+
+- written in the (otherwise empty) row $\text{row\_offset}_t + k_0$
+- column of $Q_t$: after all pressure columns
+- the conductance of the root edge itself is **not used**
+:::
+:::
+::::
+
+::: {.small .center .muted}
+`add_inflow_boundary!` — one per inflow tree, exactly one marginal edge per tree
+:::
+
+## Outflow balance: all outflow = all inflow {#outflow-bc}
+
+:::: {.columns}
+::: {.column width="45%"}
+```{=html}
+<svg viewBox="0 0 380 220" width="100%" role="img" aria-label="Predecessors merge into node i, which leaves through the root edge i to 0">
+  <defs><marker id="arrB" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#2b6cb0"/></marker></defs>
+  <circle cx="40" cy="45" r="18" fill="#cfe0f3" stroke="#2b6cb0" stroke-width="2"/><text x="40" y="51" text-anchor="middle" font-size="15">g₁</text>
+  <circle cx="40" cy="175" r="18" fill="#cfe0f3" stroke="#2b6cb0" stroke-width="2"/><text x="40" y="181" text-anchor="middle" font-size="15">g₂</text>
+  <circle cx="190" cy="110" r="20" fill="#cfe0f3" stroke="#2b6cb0" stroke-width="3"/><text x="190" y="116" text-anchor="middle" font-size="18">i</text>
+  <circle cx="335" cy="110" r="18" fill="#fff" stroke="#a0aec0" stroke-dasharray="4,3"/><text x="335" y="116" text-anchor="middle" font-size="16">0</text>
+  <line x1="58" y1="55" x2="168" y2="100" stroke="#2b6cb0" stroke-width="2" marker-end="url(#arrB)"/>
+  <line x1="58" y1="165" x2="168" y2="120" stroke="#2b6cb0" stroke-width="2" marker-end="url(#arrB)"/>
+  <line x1="212" y1="110" x2="312" y2="110" stroke="#a0aec0" stroke-width="3" stroke-dasharray="6,4" marker-end="url(#arrB)"/>
+  <text x="262" y="140" text-anchor="middle" font-size="12" fill="#718096">not in the matrix</text>
+</svg>
+```
+:::
+
+::: {.column width="55%"}
+::: {.text-06}
+Root edge $(i_t, 0)$ of outflow tree $t$: its flow = flow from its **predecessors** into $i_t$.
+**One** row for all trees:
+
+$$
+\sum_{t\,\in\,\text{out}}\;\sum_{s=(g,\,i_t)\in N^{-}(k_0^t)} c_s\,(p_g - p_{i_t})
+\;-\; \sum_{t\,\in\,\text{in}} Q_t \;=\; 0
+$$
+
+- every outflow tree writes into the **same row**, the entries are summed
+- $-Q_t$ is pushed **once** per inflow tree
+- the root edge (conductance, node $0$) never enters the matrix
+- row: first row after all tree blocks
+:::
+:::
+::::
+
+::: {.small .center .muted}
+`add_outflow_boundary!` — called after the loop over the trees, with the stored column offset of each tree
+:::
+
+## Pressure drops between the trees {#pressure-drops}
+
+:::: {.columns}
+::: {.column width="50%"}
+::: {.text-06}
+Root nodes: $r_t$ = real node of the marginal edge (`marginal_node`)
+
+One row per **(inflow, outflow) pair**:
+
+$$
+p_{r_a} - p_{r_b} \;=\; \big(P_a - P_b\big)\cdot 133.322
+\qquad a\in\text{in},\ b\in\text{out}
+$$
+
+$P_t$ from `TreePressures` (mmHg) → right side $b$ in Pa
+:::
+:::
+
+::: {.column width="50%"}
+::: {.text-06}
+`Rectangle_quad` (in: A, P · out: V, B)
+
+| row | equation | $b$ [mmHg] | $b$ [Pa] |
+|:--|:--|--:|--:|
+| A–V | $p_{r_A} - p_{r_V}$ | 77 | 10 266 |
+| A–B | $p_{r_A} - p_{r_B}$ | 76 | 10 132 |
+| P–V | $p_{r_P} - p_{r_V}$ | 7 | 933 |
+| P–B | $p_{r_P} - p_{r_B}$ | 6 | 800 |
+
+`Rectangle_trio`: only A–V, P–V
+:::
+:::
+::::
+
+::: {.small .center .muted}
+`add_pressure_drop_boundary!` — the only rows with a non-zero right side
+:::
+
+## Common terminal pressure {#terminal}
+
+:::: {.columns}
+::: {.column width="45%"}
+```{=html}
+<svg viewBox="0 0 380 240" width="100%" role="img" aria-label="Leaves of all four trees are tied to one common pressure">
+  <circle cx="190" cy="120" r="38" fill="#fbe3d0" stroke="#c05621" stroke-width="2"/>
+  <text x="190" y="116" text-anchor="middle" font-size="15">p<tspan font-size="11" dy="4">leaf</tspan></text>
+  <text x="190" y="138" text-anchor="middle" font-size="11" fill="#4a5568">one value</text>
+  <g font-size="13" text-anchor="middle">
+    <circle cx="50" cy="40" r="14" fill="#f9d0d0" stroke="#c53030"/><text x="50" y="45">A</text>
+    <circle cx="50" cy="200" r="14" fill="#e8d6f0" stroke="#6b46c1"/><text x="50" y="205">P</text>
+    <circle cx="330" cy="40" r="14" fill="#cfe0f3" stroke="#2b6cb0"/><text x="330" y="45">V</text>
+    <circle cx="330" cy="200" r="14" fill="#dcf0d2" stroke="#2f855a"/><text x="330" y="205">B</text>
+  </g>
+  <g stroke="#a0aec0" stroke-width="2" stroke-dasharray="4,3">
+    <line x1="62" y1="50" x2="158" y2="100"/><line x1="62" y1="190" x2="158" y2="140"/>
+    <line x1="318" y1="50" x2="222" y2="100"/><line x1="318" y1="190" x2="222" y2="140"/>
+  </g>
+  <text x="50" y="72" text-anchor="middle" font-size="11" fill="#4a5568">leaves j</text>
+  <text x="50" y="232" text-anchor="middle" font-size="11" fill="#4a5568">leaves j</text>
+  <text x="330" y="72" text-anchor="middle" font-size="11" fill="#4a5568">leaves i</text>
+  <text x="330" y="232" text-anchor="middle" font-size="11" fill="#4a5568">leaves i</text>
+</svg>
+```
+:::
+
+::: {.column width="55%"}
+::: {.text-06}
+Leaves $L$ = end nodes of all preterminal (group 2) edges, **all trees**:
+
+- inflow edge $(i, j)$ → leaf $j$
+- outflow edge $(i, j)$ (reversed) → leaf $i$
+
+All leaves have the **same pressure** — no matching of terminals between trees:
+
+$$
+p_{\ell_1} - p_{\ell} \;=\; 0 \qquad \forall\, \ell \in L\setminus\{\ell_1\}
+$$
+
+- $|L| - 1$ rows, right side $0$
+- only the tree `.arrow` tables are used (no `T.arrow`, no `synch_idx`)
+- the whole capillary bed acts as **one node**
+:::
+:::
+::::
+
+::: {.small .center .muted}
+`add_terminal_pressure_boundary!`
+:::
+
+## Assembly: entries → sparse matrix {#assembly}
+
+:::: {.columns}
+::: {.column width="52%"}
+::: {.text-06}
+Every equation is written as **entries** (COO format), never cell by cell:
+
+| vector | meaning |
+|:--|:--|
+| `rows` | equation (matrix row) |
+| `cols` | unknown (matrix column) |
+| `values` | coefficient |
+| `labels` | same entry as text, e.g. `-c1,2` |
+
+$$
+A_{rc} \;=\; \sum_{n:\ \text{rows}[n]=r,\ \text{cols}[n]=c} \text{values}[n]
+$$
+
+`sparse(…)` sums duplicates → the shared node gets $-c_k-\sum c_s$ automatically;
+no slow cell-by-cell insertion into a `SparseMatrixCSC`.
+:::
+:::
+
+::: {.column width="48%"}
+::: {.code-xs}
+```julia
+for (id, df) in tree_dfs            # order of vascular_trees
+    add_equations!(…, row_offset, col_offset)     # group 1
+    if is_inflow
+        add_inflow_boundary!(…, q_col)            # Q_t
+    end
+    store marginal column, leaf columns
+    row_offset += n_edges;  col_offset += n_nodes
+end
+outflow balance row       # all outflow trees, -ΣQ
+pressure-drop rows        # (in, out) pairs, b ≠ 0
+common leaf pressure rows # p_ℓ1 - p_ℓ = 0
+A = sparse(rows, cols, values, n_rows, n_cols)
+html_report && write_matrix_html_report(…)
+```
+:::
+
+::: {.small .muted}
+HTML report (`html_report = true`): symbolic matrix, diagonal highlighted, click a row/column label to highlight it
+:::
+:::
+::::
+
+## Counting equations and unknowns {#counting}
+
+::: {.text-06}
+Tree $t$ with $n_t$ nodes and $L_t$ leaves (one marginal edge, one row per edge):
+
+| | unknowns | equations |
+|:--|:--|:--|
+| inflow tree | $n_t$ pressures $+\,1$ ($Q_t$) | $n_t - L_t$: inner nodes (group 1) + root ($Q_t$ row) |
+| outflow tree | $n_t$ pressures | $n_t - L_t - 1$: inner nodes; the root is in the shared balance |
+| shared | — | $1$ outflow balance $+\ n_\text{in}\,n_\text{out}$ pressure drops $+\ (\sum_t L_t - 1)$ leaf rows |
+
+$$
+\#\text{unknowns} - \#\text{equations} \;=\; n_\text{in} + n_\text{out} - n_\text{in}\,n_\text{out}
+$$
+
+| configuration | $n_\text{in}$ | $n_\text{out}$ | difference |
+|:--|:--|:--|:--|
+| `Rectangle_quad` | 2 | 2 | $0$ → square **by count** |
+| `Rectangle_trio` | 2 | 1 | $1$ → one equation missing |
+
+**By count** is not enough — see the next slide.
+:::
+
+::: {.small .center .muted}
+assumes: node numbers $1\dots n_t$ inside every tree, node $0$ outside, every non-leaf, non-root node has a group-1 edge into (inflow) / out of (outflow) it — to be checked on the data
+:::
+
+# Challenges {#challenges background-color="#2b6cb0"}
+
+## Challenges: is the system solvable? {#ch-solvable}
+
+::: {.cards}
+::: {.card}
+**Only differences are fixed**
+
+- every row contains $p_a - p_b$ or $Q$ only
+- $p \to p + C$ for all nodes keeps **every** row true
+- → the matrix has a **null space**, `A \ b` fails or gives garbage
+- fix: **one absolute pressure**, e.g. $p_{r_V} = 3$ mmHg
+:::
+
+::: {.card}
+**Redundant pressure-drop rows**
+
+- $n_\text{in}\,n_\text{out}$ rows, but only $n_\text{in}+n_\text{out}-1$ independent
+- quad: $(A{-}V) - (A{-}B) + (P{-}B) = (P{-}V)$ → 4 rows, rank 3
+- square by count, but **rank-deficient**
+- fix: replace one pair row by the absolute pressure above
+:::
+
+::: {.card}
+**Size of the system**
+
+- now `n_rows = n_cols = 2·n_variables` (`FIXME`)
+- exact: columns $=\sum_t n_t + n_\text{in}$, rows = tree rows $+ 1 + n_\text{in}n_\text{out} + |L|-1$
+- empty rows (groups 0 of outflow, 2, 3) and empty columns (unused node numbers) make $A$ singular
+- fix: compact the row/column numbering before solving
+:::
+:::
+
+## Challenges: model and numerics {#ch-model}
+
+::: {.cards}
+::: {.card}
+**One common terminal pressure**
+
+- all leaves of all trees are one node → the **capillary bed has no resistance**
+- terminals cannot differ in pressure → flow distribution only from tree geometry
+- alternative: one pressure per terminal + a terminal conductance (needs the terminal matching again)
+:::
+
+::: {.card}
+**Conditioning**
+
+- $c \propto d^4$: diameters over 2–3 orders of magnitude → $c$ over **8–12 orders**
+- mixed units in one matrix: $c$ (mm³/(Pa·s)), $\pm1$ rows, Pa on the right side
+- → scale rows / unknowns (e.g. pressures in mmHg, $c$ normalised) before a direct solve
+:::
+
+::: {.card}
+**Size and solver**
+
+- $N \sim 10^6$ nodes per tree → sparse LU (`A \ b`, UMFPACK) is fine in memory, but slow to build if not compacted
+- trees are **acyclic**: pressures can be computed tree by tree (resistances add up) in $O(N)$ — a check for the matrix solution
+- validation: $Q_A : Q_P \approx 1 : 3$ (physiology), mass balance $\sum Q_\text{in} = \sum Q_\text{out}$
+:::
+:::
+
+## Status and next steps {#status}
+
+::: {.text-06}
+**Done** (`src/trees_processing/trees/pressure.jl`)
+
+- conductances, inner-edge rows for inflow and outflow trees (one function, sign $\sigma$)
+- boundary rows: $Q_t$ per inflow tree, one outflow balance, pressure drops per (in, out) pair, common leaf pressure
+- assembly in COO form, one `sparse` call; HTML report of the symbolic matrix with row/column highlighting
+
+**Next**
+
+1. exact system size, compact row/column numbering (remove empty rows and columns)
+2. one absolute reference pressure instead of a redundant pressure-drop row → full rank
+3. solve $A\,x = b$, check $\operatorname{rank}(A)$, residual, $\sum Q_\text{in} = \sum Q_\text{out}$
+4. compare with a tree-by-tree (resistance) solution on `Rectangle_quad_10`
+5. edge flows $q_k = c_k(p_i - p_j)$ → flow values for the pharmacokinetic simulation
+:::

@@ -19,6 +19,7 @@ run_test(name) = isempty(SELECTED) || name in SELECTED
 
 @testset "VascularTrees" verbose = true begin   # verbose: pass/fail counts for every nested testset
     run_test("definitions") && @testset "definitions and options" include("test_definitions.jl")
+    run_test("processing") && @testset "trees processing" include("test_processing.jl")
     run_test("vtkhdf")      && @testset "write_vtkhdf" include("test_vtkhdf.jl")
     run_test("mesh")        && @testset "mesh partition" include("test_mesh_partition.jl")
     run_test("voxel")       && @testset "node to voxel connection" include("test_node_to_voxel.jl")
