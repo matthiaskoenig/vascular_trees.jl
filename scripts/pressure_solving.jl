@@ -18,6 +18,7 @@ for tree_configuration ∈ t_options.tree_configurations
         tree_info =
             TreeStructure(; tree_configuration = tree_configuration, n_node = n_node, tree_components = trees.vascular_trees[tree_configuration])
         @info "Working on $(tree_info.graph_id)"
-        calculate_pressure_distribution(tree_info; html_report = true)
+        (sol, unknowns) = calculate_pressure_distribution(tree_info; html_report = true)
+        @show sol.retcode
     end
 end

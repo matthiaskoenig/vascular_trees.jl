@@ -117,16 +117,40 @@ function calculate_pressure_distribution(tree_info; html_report::Bool = false)
     # Terminal pressures: all leaves of all trees have the same pressure (right side = 0)
     add_terminal_pressure_boundary!(rows, cols, values, labels, terminal_row, preterminal_p_cols)
 
+    # Compact numbering: keep only rows / columns that have at least one entry.
+    # Empty rows (edges of groups 2, 3, outflow marginal edges, unused rows of the
+    # 2·n_variables FIXME size) and empty columns (unused node numbers) make the matrix singular.
+    used_rows = sort!(unique(rows)) # old row numbers that are kept, new row r = used_rows[r]
+    used_cols = sort!(unique(cols)) # old column numbers that are kept, new column c = used_cols[c]
+    row_map = zeros(Int, n_rows); row_map[used_rows] = 1:length(used_rows) # old row → new row
+    col_map = zeros(Int, n_cols); col_map[used_cols] = 1:length(used_cols) # old column → new column
+    rows_compact = row_map[rows]
+    cols_compact = col_map[cols]
+    n_rows_compact = length(used_rows)
+    n_cols_compact = length(used_cols)
+    unknowns = pressures[used_cols]                    # names of the kept unknowns, e.g. "p3_A", "QA"
+    right_side_compact = Vector(right_side)[used_rows] # every row with b ≠ 0 also has matrix entries
+
     # Build the matrix in one step. Entries with the same (row, col) are summed,
     # e.g. the shared node gets -c_k - Σ c_s from several pushed entries.
-    conductances = sparse(rows, cols, values, n_rows, n_cols)
+    conductances = sparse(rows_compact, cols_compact, values, n_rows_compact, n_cols_compact)
+    @info "Pressure system: $(n_rows_compact) equations * $(n_cols_compact) unknowns " *
+          "(removed $(n_rows - n_rows_compact) empty rows, $(n_cols - n_cols_compact) empty columns)"
 
     if html_report
         report_path = normpath(joinpath(tree_info.GRAPH_DIR, "reports", "pressure_matrix_$(tree_info.graph_id).html"))
-        write_matrix_html_report(report_path, rows, cols, labels, pressures, n_rows, n_cols)
+        write_matrix_html_report(report_path, rows_compact, cols_compact, labels, unknowns,
+            n_rows_compact, n_cols_compact)
         @info "Pressure matrix report written to $(report_path)"
     end
 
+    if n_rows_compact != n_cols_compact
+        @warn "Pressure system is not square ($(n_rows_compact) * $(n_cols_compact)), not solved."
+        return (sol = nothing, unknowns = unknowns)
+    end
+
+    sol = solve(LinearProblem(conductances, right_side_compact), UMFPACKFactorization())
+    return (sol = sol, unknowns = unknowns) # sol.u[c] is the value of unknowns[c]
 end
 
 """
@@ -465,7 +489,7 @@ function write_matrix_html_report(path, rows, cols, labels, pressures, n_rows, n
             "a cell to highlight its row and column. Esc clears the selection.</div>")
         pretty_table(io, matrix_str;
             backend       = :html, # writes only the <table> (stand_alone = false)
-            title         = "Pressure system: $(n_rows) equations × $(n_cols) unknowns",
+            title         = "Pressure system: $(n_rows) equations * $(n_cols) unknowns",
             column_labels = vcat(pressures, fill("", n_cols - length(pressures))), # pad to table width
             row_labels    = ["eq$i" for i in 1:n_rows],
             alignment     = :c,

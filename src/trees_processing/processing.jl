@@ -31,6 +31,7 @@ module TreesProcessing
         GeometryBasics,
         LinearAlgebra,
         SparseArrays,
+        LinearSolve,
         PrettyTables
 
 
