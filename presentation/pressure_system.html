@@ -10,7 +10,7 @@
   <meta name="generator" content="quarto-1.11.9">
 
   <meta name="author" content="Mariia Myshkina, Matthias König">
-  <meta name="dcterms.date" content="2026-11-27">
+  <meta name="dcterms.date" content="2026-11-28">
   <title>Pressure system</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -212,7 +212,7 @@ Mariia Myshkina, Matthias König
 </div>
 </div>
 
-  <p class="date">2026-11-27</p>
+  <p class="date">2026-11-28</p>
 </section>
 <section id="question" class="slide level2">
 <h2>The question</h2>
@@ -278,7 +278,7 @@ c_k = \frac{\pi\, d_k^4}{128\,\mu\, l_k}
 <tr class="even">
 <td style="text-align: left;"><span class="math inline">\(c_k\)</span></td>
 <td style="text-align: left;">hydraulic conductance</td>
-<td style="text-align: left;">mm³/(Pa·s)</td>
+<td style="text-align: left;">L/(Pa·s)</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;"><span class="math inline">\(\mu = 3.71\cdot10^{-3}\)</span></td>
@@ -293,7 +293,7 @@ c_k = \frac{\pi\, d_k^4}{128\,\mu\, l_k}
 <tr class="odd">
 <td style="text-align: left;"><span class="math inline">\(q_k\)</span></td>
 <td style="text-align: left;">volume flow</td>
-<td style="text-align: left;">mm³/s</td>
+<td style="text-align: left;">L/s</td>
 </tr>
 </tbody>
 </table>
@@ -711,7 +711,7 @@ Q_t \;=\; \sum_{s=(i,h)\in N^{+}(k_0)} c_s\,(p_i - p_h)
 <div class="column" style="width:50%;">
 <div class="text-06">
 <p>Root nodes: <span class="math inline">\(r_t\)</span> = real node of the marginal edge (<code>marginal_node</code>)</p>
-<p>One row per <strong>(inflow, outflow) pair</strong>:</p>
+<p>Only a <strong>spanning set</strong> of (inflow, outflow) pairs: first inflow with every outflow, first outflow with every other inflow → <span class="math inline">\(n_\text{in}+n_\text{out}-1\)</span> rows:</p>
 <p><span class="math display">\[
 p_{r_a} - p_{r_b} \;=\; \big(P_a - P_b\big)\cdot 133.322
 \qquad a\in\text{in},\ b\in\text{out}
@@ -750,18 +750,18 @@ p_{r_a} - p_{r_b} \;=\; \big(P_a - P_b\big)\cdot 133.322
 <td style="text-align: right;">933</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">P–B</td>
-<td style="text-align: left;"><span class="math inline">\(p_{r_P} - p_{r_B}\)</span></td>
+<td style="text-align: left;"><del>P–B</del></td>
+<td style="text-align: left;">dropped: P–B = A–B + P–V − A–V</td>
 <td style="text-align: right;">6</td>
-<td style="text-align: right;">800</td>
+<td style="text-align: right;">—</td>
 </tr>
 </tbody>
 </table>
-<p><code>Rectangle_trio</code>: only A–V, P–V</p>
+<p><code>Rectangle_trio</code>: A–V, P–V (nothing dropped)</p>
 </div>
 </div></div>
 <div class="small center muted">
-<p><code>add_pressure_drop_boundary!</code> — the only rows with a non-zero right side</p>
+<p><code>add_pressure_drop_boundary!</code> — with the absolute pressure row, the only rows with a non-zero right side</p>
 </div>
 </section>
 <section id="terminal" class="slide level2">
@@ -809,8 +809,22 @@ p_{\ell_1} - p_{\ell} \;=\; 0 \qquad \forall\, \ell \in L\setminus\{\ell_1\}
 <p><code>add_terminal_pressure_boundary!</code></p>
 </div>
 </section>
+<section id="absolute" class="slide level2">
+<h2>Absolute pressure: fix <span class="math inline">\(p_1\)</span> of tree A</h2>
+<div class="text-06">
+<p>All rows so far contain only <strong>differences</strong> → <span class="math inline">\(p \to p + C\)</span> is a null vector. One more row fixes the level:</p>
+<p><span class="math display">\[
+p^{A}_1 \;=\; P_A \cdot 133.322 \;=\; 80 \cdot 133.322 \;=\; 10\,666\ \text{Pa}
+\]</span></p>
+<ul>
+<li>node 1 of tree A: column <span class="math inline">\(\text{col\_offset}_A + 1\)</span>, one entry <span class="math inline">\(+1\)</span>, right side in Pa</li>
+<li>written after the terminal rows</li>
+<li>with it every pressure is fixed by the pressure drops, so the other three root pressures follow</li>
+</ul>
+</div>
+</section>
 <section id="assembly" class="slide level2">
-<h2>Assembly: list of entries → one sparse matrix</h2>
+<h2>Assembly: entries → sparse matrix</h2>
 <div class="columns">
 <div class="column" style="width:52%;">
 <div class="text-06">
@@ -844,7 +858,7 @@ p_{\ell_1} - p_{\ell} \;=\; 0 \qquad \forall\, \ell \in L\setminus\{\ell_1\}
 <p><span class="math display">\[
 A_{rc} \;=\; \sum_{n:\ \text{rows}[n]=r,\ \text{cols}[n]=c} \text{values}[n]
 \]</span></p>
-<p><code>sparse(rows, cols, values, n_rows, n_cols)</code> sums duplicates → the shared node gets <span class="math inline">\(-c_k-\sum c_s\)</span> automatically. Inserting into a <code>SparseMatrixCSC</code> cell by cell would shift the stored arrays on every new entry.</p>
+<p><code>sparse(…)</code> sums duplicates → the shared node gets <span class="math inline">\(-c_k-\sum c_s\)</span> automatically; no slow cell-by-cell insertion into a <code>SparseMatrixCSC</code>.</p>
 </div>
 </div><div class="column" style="width:48%;">
 <div class="code-xs">
@@ -857,10 +871,12 @@ A_{rc} \;=\; \sum_{n:\ \text{rows}[n]=r,\ \text{cols}[n]=c} \text{values}[n]
 <span id="cb1-7"><a href="" aria-label="7"></a>    row_offset <span class="op">+=</span> n_edges;  col_offset <span class="op">+=</span> n_nodes</span>
 <span id="cb1-8"><a href="" aria-label="8"></a><span class="cf">end</span></span>
 <span id="cb1-9"><a href="" aria-label="9"></a>outflow balance row       <span class="co"># all outflow trees, -ΣQ</span></span>
-<span id="cb1-10"><a href="" aria-label="10"></a>pressure<span class="op">-</span>drop rows        <span class="co"># (in, out) pairs, b ≠ 0</span></span>
+<span id="cb1-10"><a href="" aria-label="10"></a>pressure<span class="op">-</span>drop rows        <span class="co"># spanning (in, out) pairs, b ≠ 0</span></span>
 <span id="cb1-11"><a href="" aria-label="11"></a>common leaf pressure rows <span class="co"># p_ℓ1 - p_ℓ = 0</span></span>
-<span id="cb1-12"><a href="" aria-label="12"></a>A <span class="op">=</span> <span class="fu">sparse</span>(rows, cols, values, n_rows, n_cols)</span>
-<span id="cb1-13"><a href="" aria-label="13"></a>html_report <span class="op">&amp;&amp;</span> <span class="fu">write_matrix_html_report</span>(<span class="op">…</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-12"><a href="" aria-label="12"></a>absolute pressure row     <span class="co"># p_1(A) = 80 mmHg</span></span>
+<span id="cb1-13"><a href="" aria-label="13"></a>compact empty rows <span class="op">/</span> columns</span>
+<span id="cb1-14"><a href="" aria-label="14"></a>A <span class="op">=</span> <span class="fu">sparse</span>(rows, cols, values, n_rows, n_cols)</span>
+<span id="cb1-15"><a href="" aria-label="15"></a>html_report <span class="op">&amp;&amp;</span> <span class="fu">write_matrix_html_report</span>(<span class="op">…</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="small muted">
 <p>HTML report (<code>html_report = true</code>): symbolic matrix, diagonal highlighted, click a row/column label to highlight it</p>
@@ -868,9 +884,159 @@ A_{rc} \;=\; \sum_{n:\ \text{rows}[n]=r,\ \text{cols}[n]=c} \text{values}[n]
 </div></div>
 </section>
 <section id="counting" class="slide level2">
-<h2>Counting equations and unknowns</h2>
+<h2>Counting equations: <code>Rectangle_quad_500</code></h2>
+<div class="columns">
+<div class="column" style="width:60%;">
 <div class="text-06">
-<p>Tree <span class="math inline">\(t\)</span> with <span class="math inline">\(n_t\)</span> nodes and <span class="math inline">\(L_t\)</span> leaves (one marginal edge, one row per edge):</p>
+<p><strong>1. Start from the vector of unknowns</strong> — each tree: <span class="math inline">\(n=1094\)</span> nodes, <span class="math inline">\(L=547\)</span> leaves</p>
+<p><span class="math inline">\(x\)</span>: <span class="math inline">\(4\cdot1094\)</span> pressures <span class="math inline">\(+\ 2\)</span> (<span class="math inline">\(Q_A, Q_P\)</span>) <span class="math inline">\(=\)</span> <strong>4378</strong>. Every block of rows takes some off:</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">step</th>
+<th style="text-align: right;">rows</th>
+<th style="text-align: right;">still missing</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">unknowns</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"><strong>4378</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">tree A: <span class="math inline">\(n-L\)</span> (546 inner + root)</td>
+<td style="text-align: right;">547</td>
+<td style="text-align: right;">3831</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">tree P: <span class="math inline">\(n-L\)</span></td>
+<td style="text-align: right;">547</td>
+<td style="text-align: right;">3284</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">tree V: <span class="math inline">\(n-L-1\)</span> (root is in the balance)</td>
+<td style="text-align: right;">546</td>
+<td style="text-align: right;">2738</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">tree B: <span class="math inline">\(n-L-1\)</span></td>
+<td style="text-align: right;">546</td>
+<td style="text-align: right;">2192</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">outflow balance</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">2191</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">pressure drops: <span class="math inline">\(n_\text{in}+n_\text{out}-1\)</span></td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">2188</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">common leaf pressure: <span class="math inline">\(\sum L - 1\)</span></td>
+<td style="text-align: right;">2187</td>
+<td style="text-align: right;"><strong>1</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">absolute pressure <span class="math inline">\(p^A_1\)</span></td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;"><strong>0</strong> ✓</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div><div class="column" style="width:40%;">
+<div class="text-06">
+<p><strong>2. How many more?</strong> — the last number in the column</p>
+<ul>
+<li>without the absolute row: <strong>1</strong> missing</li>
+<li>one leaf pressure <strong>per tree</strong>: leaf rows <span class="math inline">\(\sum(L_t-1)=2184\)</span> → <strong>4</strong> missing (after pressure drops, before absolute row: <span class="math inline">\(T\)</span>)</li>
+</ul>
+<p><strong>3. Which equations can close it?</strong></p>
+<ul>
+<li>absolute pressure (used)</li>
+<li>total flow <span class="math inline">\(Q_A+Q_P=Q_\text{tot}\)</span></li>
+<li>flow split <span class="math inline">\(A:P\)</span>, <span class="math inline">\(V:B\)</span></li>
+<li>fixed leaf pressure per tree</li>
+<li>leaf coupling by a sinusoid conductance</li>
+</ul>
+<p>per-tree leaf pressure: absolute + 2 splits + total flow = 4 ✓</p>
+</div>
+</div></div>
+<div class="small center muted">
+<p>general: <span class="math inline">\(\#\text{unknowns}=\sum_t n_t + n_\text{in}\)</span>, <span class="math inline">\(E=\sum_t n_t + n_\text{in}-1\)</span> before the absolute row (<span class="math inline">\(L_t\)</span> cancels) · <code>Rectangle_trio</code> (2→1): <span class="math inline">\(3\cdot1094+2=3284\)</span> → 1640 + 1 + 2 + 1640 = 3283, +1 absolute = 3284 ✓ (by count)</p>
+</div>
+</section>
+<section id="report" class="slide level2">
+<h2>Current result: <code>Rectangle_quad_500</code></h2>
+<div class="columns">
+<div class="column" style="width:55%;">
+<div class="text-06">
+<p><strong>Trees</strong> (pressures in mmHg, flow in L/s and L/min)</p>
+<table class="caption-top" style="width:100%;">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">tree</th>
+<th style="text-align: right;"><span class="math inline">\(p_1\)</span></th>
+<th style="text-align: right;"><span class="math inline">\(p_\text{root}\)</span></th>
+<th style="text-align: right;"><span class="math inline">\(p_\text{leaves}\)</span></th>
+<th style="text-align: right;"><span class="math inline">\(Q\)</span> [L/s] (L/min)</th>
+<th style="text-align: right;">share</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">A in</td>
+<td style="text-align: right;">80.0</td>
+<td style="text-align: right;">80.0</td>
+<td style="text-align: right;">10.45</td>
+<td style="text-align: right;">0.0714 (4.28)</td>
+<td style="text-align: right;">104.2 %</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">P in</td>
+<td style="text-align: right;">10.0</td>
+<td style="text-align: right;">10.0</td>
+<td style="text-align: right;">10.45</td>
+<td style="text-align: right;"><strong>−0.0029</strong> (−0.17)</td>
+<td style="text-align: right;">−4.2 %</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">V out</td>
+<td style="text-align: right;">3.0</td>
+<td style="text-align: right;">3.0</td>
+<td style="text-align: right;">10.45</td>
+<td style="text-align: right;">0.0684 (4.10)</td>
+<td style="text-align: right;">99.8 %</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">B out</td>
+<td style="text-align: right;">4.0</td>
+<td style="text-align: right;">4.0</td>
+<td style="text-align: right;">10.45</td>
+<td style="text-align: right;">0.0001 (0.007)</td>
+<td style="text-align: right;">0.2 %</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><span class="math inline">\(\sum Q_\text{in} = \sum Q_\text{out}\)</span> = 0.0685 L/s</li>
+<li><strong>P has negative flow</strong>: the common leaf pressure (10.45) is above its root (10)</li>
+</ul>
+</div>
+</div><div class="column" style="width:45%;">
+<div class="text-06">
+<p><strong>Check of the boundary conditions</strong> (<code>pressure_report_&lt;id&gt;.html</code>)</p>
 <table class="caption-top">
 <colgroup>
 <col style="width: 33%">
@@ -879,98 +1045,153 @@ A_{rc} \;=\; \sum_{n:\ \text{rows}[n]=r,\ \text{cols}[n]=c} \text{values}[n]
 </colgroup>
 <thead>
 <tr class="header">
-<th style="text-align: left;"></th>
-<th style="text-align: left;">unknowns</th>
-<th style="text-align: left;">equations</th>
+<th style="text-align: left;">condition</th>
+<th style="text-align: right;">expected</th>
+<th style="text-align: right;">actual</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left;">inflow tree</td>
-<td style="text-align: left;"><span class="math inline">\(n_t\)</span> pressures <span class="math inline">\(+\,1\)</span> (<span class="math inline">\(Q_t\)</span>)</td>
-<td style="text-align: left;"><span class="math inline">\(n_t - L_t\)</span>: inner nodes (group 1) + root (<span class="math inline">\(Q_t\)</span> row)</td>
+<td style="text-align: left;">root pressures A, P, V, B (implied, not a row)</td>
+<td style="text-align: right;">80, 10, 3, 4</td>
+<td style="text-align: right;">✓ (1e−15)</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">outflow tree</td>
-<td style="text-align: left;"><span class="math inline">\(n_t\)</span> pressures</td>
-<td style="text-align: left;"><span class="math inline">\(n_t - L_t - 1\)</span>: inner nodes; the root is in the shared balance</td>
+<td style="text-align: left;">drops A–V, A–B, P–V</td>
+<td style="text-align: right;">77, 76, 7</td>
+<td style="text-align: right;">✓</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;">shared</td>
-<td style="text-align: left;">—</td>
-<td style="text-align: left;"><span class="math inline">\(1\)</span> outflow balance <span class="math inline">\(+\ n_\text{in}\,n_\text{out}\)</span> pressure drops <span class="math inline">\(+\ (\sum_t L_t - 1)\)</span> leaf rows</td>
+<td style="text-align: left;">drop P–B (implied)</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">✓</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><span class="math inline">\(p_1\)</span> of A</td>
+<td style="text-align: right;">80</td>
+<td style="text-align: right;">✓</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">leaf pressure spread</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">✓</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">mass balance</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">✓ (6e−17)</td>
 </tr>
 </tbody>
 </table>
-<p><span class="math display">\[
-\#\text{unknowns} - \#\text{equations} \;=\; n_\text{in} + n_\text{out} - n_\text{in}\,n_\text{out}
-\]</span></p>
+</div>
+</div></div>
+<div class="small center muted">
+<p>4378 × 4378, rank 4378 · report written after every solve: <code>write_pressure_report</code></p>
+</div>
+</section>
+<section id="proposal" class="slide level2">
+<h2>Proposed step: leaf pressure per tree</h2>
+<div class="columns">
+<div class="column" style="width:52%;">
+<div class="text-06">
+<p><strong>Change</strong>: leaves of <strong>one tree</strong> share a pressure <span class="math inline">\(p_{\ell,t}\)</span>, different trees may differ</p>
+<p><span class="math inline">\(p_{\ell_{t,1}} - p_{\ell_{t,m}} = 0\)</span> for every leaf <span class="math inline">\(m&gt;1\)</span> of tree <span class="math inline">\(t\)</span> → <span class="math inline">\(L_t-1\)</span> rows per tree</p>
 <table class="caption-top">
 <thead>
 <tr class="header">
-<th style="text-align: left;">configuration</th>
-<th style="text-align: left;"><span class="math inline">\(n_\text{in}\)</span></th>
-<th style="text-align: left;"><span class="math inline">\(n_\text{out}\)</span></th>
-<th style="text-align: left;">difference</th>
+<th style="text-align: left;">step (<code>Rectangle_quad_500</code>)</th>
+<th style="text-align: right;">rows</th>
+<th style="text-align: right;">still missing</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left;"><code>Rectangle_quad</code></td>
-<td style="text-align: left;">2</td>
-<td style="text-align: left;">2</td>
-<td style="text-align: left;"><span class="math inline">\(0\)</span> → square <strong>by count</strong></td>
+<td style="text-align: left;">unknowns</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">4378</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;"><code>Rectangle_trio</code></td>
-<td style="text-align: left;">2</td>
-<td style="text-align: left;">1</td>
-<td style="text-align: left;"><span class="math inline">\(1\)</span> → one equation missing</td>
+<td style="text-align: left;">tree rows (A, P, V, B)</td>
+<td style="text-align: right;">547 + 547 + 546 + 546</td>
+<td style="text-align: right;">2192</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">outflow balance</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">2191</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">pressure drops (spanning)</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">2188</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">leaf rows <strong>per tree</strong>: <span class="math inline">\(4\cdot(547-1)\)</span></td>
+<td style="text-align: right;">2184</td>
+<td style="text-align: right;"><strong>4</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">absolute pressure <span class="math inline">\(p^A_1\)</span></td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;"><strong>3</strong></td>
 </tr>
 </tbody>
 </table>
-<p><strong>By count</strong> is not enough — see the next slide.</p>
+<p>before: leaf rows <span class="math inline">\(\sum L_t - 1 = 2187\)</span> → <span class="math inline">\(T-1 = 3\)</span> rows fewer</p>
+<p><strong>3 more rows needed</strong> (trio: <span class="math inline">\(T-1 = 2\)</span>)</p>
 </div>
+</div><div class="column" style="width:48%;">
+<div class="text-06">
+<p><strong>What do we know, what can we change</strong></p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">now</th>
+<th style="text-align: left;">alternatives</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">root pressures of all 4 trees: 3 differences + <span class="math inline">\(p^A_1\)</span></td>
+<td style="text-align: left;">replace by <strong>flows</strong>, e.g.&nbsp;<span class="math inline">\(Q_A\)</span>, <span class="math inline">\(Q_P\)</span> given</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">leaf pressure: one common value (unknown)</td>
+<td style="text-align: left;"><strong>per tree</strong>, then fix 3 more:</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"></td>
+<td style="text-align: left;">– total flow <span class="math inline">\(Q_A + Q_P = Q_\text{tot}\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"></td>
+<td style="text-align: left;">– splits <span class="math inline">\(A{:}P\)</span> and <span class="math inline">\(V{:}B\)</span></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"></td>
+<td style="text-align: left;">– leaf pressure of a tree given</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"></td>
+<td style="text-align: left;">– leaves of different trees coupled by a sinusoid conductance</td>
+</tr>
+</tbody>
+</table>
+<p>each tree has two ends (root, leaf) and one relation <span class="math inline">\(p_\text{root}-p_\text{leaf}=R_t\,Q_t\)</span> → every tree needs <strong>two</strong> known values among pressure / flow</p>
+</div>
+</div></div>
 <div class="small center muted">
-<p>assumes: node numbers <span class="math inline">\(1\dots n_t\)</span> inside every tree, node <span class="math inline">\(0\)</span> outside, every non-leaf, non-root node has a group-1 edge into (inflow) / out of (outflow) it — to be checked on the data</p>
+<p>check after the change: rows = columns, <code>rank(A)</code> = columns, report: P no longer forced above its root pressure</p>
 </div>
 </section>
 <section>
 <section id="challenges" class="title-slide slide level1 center" data-background-color="#2b6cb0">
 <h1>Challenges</h1>
 
-</section>
-<section id="ch-solvable" class="slide level2">
-<h2>Challenges: is the system solvable?</h2>
-<div class="cards">
-<div class="card">
-<p><strong>Only differences are fixed</strong></p>
-<ul>
-<li>every row contains <span class="math inline">\(p_a - p_b\)</span> or <span class="math inline">\(Q\)</span> only</li>
-<li><span class="math inline">\(p \to p + C\)</span> for all nodes keeps <strong>every</strong> row true</li>
-<li>→ the matrix has a <strong>null space</strong>, <code>A \ b</code> fails or gives garbage</li>
-<li>fix: <strong>one absolute pressure</strong>, e.g.&nbsp;<span class="math inline">\(p_{r_V} = 3\)</span> mmHg</li>
-</ul>
-</div>
-<div class="card">
-<p><strong>Redundant pressure-drop rows</strong></p>
-<ul>
-<li><span class="math inline">\(n_\text{in}\,n_\text{out}\)</span> rows, but only <span class="math inline">\(n_\text{in}+n_\text{out}-1\)</span> independent</li>
-<li>quad: <span class="math inline">\((A{-}V) - (A{-}B) + (P{-}B) = (P{-}V)\)</span> → 4 rows, rank 3</li>
-<li>square by count, but <strong>rank-deficient</strong></li>
-<li>fix: replace one pair row by the absolute pressure above</li>
-</ul>
-</div>
-<div class="card">
-<p><strong>Size of the system</strong></p>
-<ul>
-<li>now <code>n_rows = n_cols = 2·n_variables</code> (<code>FIXME</code>)</li>
-<li>exact: columns <span class="math inline">\(=\sum_t n_t + n_\text{in}\)</span>, rows = tree rows <span class="math inline">\(+ 1 + n_\text{in}n_\text{out} + |L|-1\)</span></li>
-<li>empty rows (groups 0 of outflow, 2, 3) and empty columns (unused node numbers) make <span class="math inline">\(A\)</span> singular</li>
-<li>fix: compact the row/column numbering before solving</li>
-</ul>
-</div>
-</div>
 </section>
 <section id="ch-model" class="slide level2">
 <h2>Challenges: model and numerics</h2>
@@ -980,14 +1201,15 @@ A_{rc} \;=\; \sum_{n:\ \text{rows}[n]=r,\ \text{cols}[n]=c} \text{values}[n]
 <ul>
 <li>all leaves of all trees are one node → the <strong>capillary bed has no resistance</strong></li>
 <li>terminals cannot differ in pressure → flow distribution only from tree geometry</li>
-<li>alternative: one pressure per terminal + a terminal conductance (needs the terminal matching again)</li>
+<li>first result (quad): leaf pressure 10.45 mmHg &gt; P root 10 mmHg → <strong>flow in P is reversed</strong></li>
+<li>alternative: leaf pressure per tree → <span class="math inline">\(T-1\)</span> rows fewer, closed with flow splits + total flow (see counting)</li>
 </ul>
 </div>
 <div class="card">
 <p><strong>Conditioning</strong></p>
 <ul>
 <li><span class="math inline">\(c \propto d^4\)</span>: diameters over 2–3 orders of magnitude → <span class="math inline">\(c\)</span> over <strong>8–12 orders</strong></li>
-<li>mixed units in one matrix: <span class="math inline">\(c\)</span> (mm³/(Pa·s)), <span class="math inline">\(\pm1\)</span> rows, Pa on the right side</li>
+<li>mixed units in one matrix: <span class="math inline">\(c\)</span> (L/(Pa·s)), <span class="math inline">\(\pm1\)</span> rows, Pa on the right side</li>
 <li>→ scale rows / unknowns (e.g.&nbsp;pressures in mmHg, <span class="math inline">\(c\)</span> normalised) before a direct solve</li>
 </ul>
 </div>
@@ -1009,13 +1231,14 @@ A_{rc} \;=\; \sum_{n:\ \text{rows}[n]=r,\ \text{cols}[n]=c} \text{values}[n]
 <li>conductances, inner-edge rows for inflow and outflow trees (one function, sign <span class="math inline">\(\sigma\)</span>)</li>
 <li>boundary rows: <span class="math inline">\(Q_t\)</span> per inflow tree, one outflow balance, pressure drops per (in, out) pair, common leaf pressure</li>
 <li>assembly in COO form, one <code>sparse</code> call; HTML report of the symbolic matrix with row/column highlighting</li>
+<li>square, full-rank system for <code>Rectangle_quad_500</code> (4378 × 4378): spanning pressure-drop rows, absolute pressure <span class="math inline">\(p^A_1\)</span>, compact numbering; solved with UMFPACK</li>
+<li><code>node_pressures</code>, <code>edge_pressure_drops</code>, <code>tree_pressure_results</code>: pressure per node, drop per edge, aligned with <code>nodes_ids</code> / <code>all_edges</code></li>
 </ul>
 <p><strong>Next</strong></p>
 <ol type="1">
-<li>exact system size, compact row/column numbering (remove empty rows and columns)</li>
-<li>one absolute reference pressure instead of a redundant pressure-drop row → full rank</li>
-<li>solve <span class="math inline">\(A\,x = b\)</span>, check <span class="math inline">\(\operatorname{rank}(A)\)</span>, residual, <span class="math inline">\(\sum Q_\text{in} = \sum Q_\text{out}\)</span></li>
-<li>compare with a tree-by-tree (resistance) solution on <code>Rectangle_quad_10</code></li>
+<li>run <code>Rectangle_trio</code> (graphs not built yet) and check square / full rank</li>
+<li>P tree has reversed flow with one common leaf pressure → per-tree leaf pressure with flow splits and total flow</li>
+<li>check residual, <span class="math inline">\(\sum Q_\text{in} = \sum Q_\text{out}\)</span>; compare with a tree-by-tree (resistance) solution</li>
 <li>edge flows <span class="math inline">\(q_k = c_k(p_i - p_j)\)</span> → flow values for the pharmacokinetic simulation</li>
 </ol>
 </div>

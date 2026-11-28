@@ -67,10 +67,10 @@ $$
 | symbol | meaning | unit |
 |:--|:--|:--|
 | $p_i$ | pressure at node $i$ | Pa |
-| $c_k$ | hydraulic conductance | mm³/(Pa·s) |
+| $c_k$ | hydraulic conductance | L/(Pa·s) |
 | $\mu = 3.71\cdot10^{-3}$ | blood viscosity | Pa·s |
 | $d_k,\ l_k$ | diameter, length | mm |
-| $q_k$ | volume flow | mm³/s |
+| $q_k$ | volume flow | L/s |
 
 - pressures in **Pa**: tree pressures in mmHg are multiplied by `MMHG_TO_PA` $=133.322$
 - $c \propto d^4$: halving the diameter → **16×** less flow
@@ -408,7 +408,8 @@ $$
 ::: {.text-06}
 Root nodes: $r_t$ = real node of the marginal edge (`marginal_node`)
 
-One row per **(inflow, outflow) pair**:
+Only a **spanning set** of (inflow, outflow) pairs: first inflow with every outflow,
+first outflow with every other inflow → $n_\text{in}+n_\text{out}-1$ rows:
 
 $$
 p_{r_a} - p_{r_b} \;=\; \big(P_a - P_b\big)\cdot 133.322
@@ -428,15 +429,15 @@ $P_t$ from `TreePressures` (mmHg) → right side $b$ in Pa
 | A–V | $p_{r_A} - p_{r_V}$ | 77 | 10 266 |
 | A–B | $p_{r_A} - p_{r_B}$ | 76 | 10 132 |
 | P–V | $p_{r_P} - p_{r_V}$ | 7 | 933 |
-| P–B | $p_{r_P} - p_{r_B}$ | 6 | 800 |
+| ~~P–B~~ | dropped: P–B = A–B + P–V − A–V | 6 | — |
 
-`Rectangle_trio`: only A–V, P–V
+`Rectangle_trio`: A–V, P–V (nothing dropped)
 :::
 :::
 ::::
 
 ::: {.small .center .muted}
-`add_pressure_drop_boundary!` — the only rows with a non-zero right side
+`add_pressure_drop_boundary!` — with the absolute pressure row, the only rows with a non-zero right side
 :::
 
 ## Common terminal pressure {#terminal}
@@ -490,6 +491,20 @@ $$
 `add_terminal_pressure_boundary!`
 :::
 
+## Absolute pressure: fix $p_1$ of tree A {#absolute}
+
+::: {.text-06}
+All rows so far contain only **differences** → $p \to p + C$ is a null vector. One more row fixes the level:
+
+$$
+p^{A}_1 \;=\; P_A \cdot 133.322 \;=\; 80 \cdot 133.322 \;=\; 10\,666\ \text{Pa}
+$$
+
+- node 1 of tree A: column $\text{col\_offset}_A + 1$, one entry $+1$, right side in Pa
+- written after the terminal rows
+- with it every pressure is fixed by the pressure drops, so the other three root pressures follow
+:::
+
 ## Assembly: entries → sparse matrix {#assembly}
 
 :::: {.columns}
@@ -525,8 +540,10 @@ for (id, df) in tree_dfs            # order of vascular_trees
     row_offset += n_edges;  col_offset += n_nodes
 end
 outflow balance row       # all outflow trees, -ΣQ
-pressure-drop rows        # (in, out) pairs, b ≠ 0
+pressure-drop rows        # spanning (in, out) pairs, b ≠ 0
 common leaf pressure rows # p_ℓ1 - p_ℓ = 0
+absolute pressure row     # p_1(A) = 80 mmHg
+compact empty rows / columns
 A = sparse(rows, cols, values, n_rows, n_cols)
 html_report && write_matrix_html_report(…)
 ```
@@ -538,65 +555,139 @@ HTML report (`html_report = true`): symbolic matrix, diagonal highlighted, click
 :::
 ::::
 
-## Counting equations and unknowns {#counting}
+## Counting equations: `Rectangle_quad_500` {#counting}
 
+:::: {.columns}
+::: {.column width="60%"}
 ::: {.text-06}
-Tree $t$ with $n_t$ nodes and $L_t$ leaves (one marginal edge, one row per edge):
+**1. Start from the vector of unknowns** — each tree: $n=1094$ nodes, $L=547$ leaves
 
-| | unknowns | equations |
-|:--|:--|:--|
-| inflow tree | $n_t$ pressures $+\,1$ ($Q_t$) | $n_t - L_t$: inner nodes (group 1) + root ($Q_t$ row) |
-| outflow tree | $n_t$ pressures | $n_t - L_t - 1$: inner nodes; the root is in the shared balance |
-| shared | — | $1$ outflow balance $+\ n_\text{in}\,n_\text{out}$ pressure drops $+\ (\sum_t L_t - 1)$ leaf rows |
+$x$: $4\cdot1094$ pressures $+\ 2$ ($Q_A, Q_P$) $=$ **4378**. Every block of rows takes some off:
 
-$$
-\#\text{unknowns} - \#\text{equations} \;=\; n_\text{in} + n_\text{out} - n_\text{in}\,n_\text{out}
-$$
-
-| configuration | $n_\text{in}$ | $n_\text{out}$ | difference |
-|:--|:--|:--|:--|
-| `Rectangle_quad` | 2 | 2 | $0$ → square **by count** |
-| `Rectangle_trio` | 2 | 1 | $1$ → one equation missing |
-
-**By count** is not enough — see the next slide.
+| step | rows | still missing |
+|:--|--:|--:|
+| unknowns | | **4378** |
+| tree A: $n-L$ (546 inner + root) | 547 | 3831 |
+| tree P: $n-L$ | 547 | 3284 |
+| tree V: $n-L-1$ (root is in the balance) | 546 | 2738 |
+| tree B: $n-L-1$ | 546 | 2192 |
+| outflow balance | 1 | 2191 |
+| pressure drops: $n_\text{in}+n_\text{out}-1$ | 3 | 2188 |
+| common leaf pressure: $\sum L - 1$ | 2187 | **1** |
+| absolute pressure $p^A_1$ | 1 | **0** ✓ |
+:::
 :::
 
+::: {.column width="40%"}
+::: {.text-06}
+**2. How many more?** — the last number in the column
+
+- without the absolute row: **1** missing
+- one leaf pressure **per tree**: leaf rows $\sum(L_t-1)=2184$ → **4** missing (after pressure drops, before absolute row: $T$)
+
+**3. Which equations can close it?**
+
+- absolute pressure (used)
+- total flow $Q_A+Q_P=Q_\text{tot}$
+- flow split $A:P$, $V:B$
+- fixed leaf pressure per tree
+- leaf coupling by a sinusoid conductance
+
+per-tree leaf pressure: absolute + 2 splits + total flow = 4 ✓
+:::
+:::
+::::
+
 ::: {.small .center .muted}
-assumes: node numbers $1\dots n_t$ inside every tree, node $0$ outside, every non-leaf, non-root node has a group-1 edge into (inflow) / out of (outflow) it — to be checked on the data
+general: $\#\text{unknowns}=\sum_t n_t + n_\text{in}$, $E=\sum_t n_t + n_\text{in}-1$ before the absolute row ($L_t$ cancels) · `Rectangle_trio` (2→1): $3\cdot1094+2=3284$ → 1640 + 1 + 2 + 1640 = 3283, +1 absolute = 3284 ✓ (by count)
+:::
+
+## Current result: `Rectangle_quad_500` {#report}
+
+:::: {.columns}
+::: {.column width="55%"}
+::: {.text-06}
+**Trees** (pressures in mmHg, flow in L/s and L/min)
+
+| tree | $p_1$ | $p_\text{root}$ | $p_\text{leaves}$ | $Q$ [L/s] (L/min) | share |
+|:--|--:|--:|--:|--:|--:|
+| A in | 80.0 | 80.0 | 10.45 | 0.0714 (4.28) | 104.2 % |
+| P in | 10.0 | 10.0 | 10.45 | **−0.0029** (−0.17) | −4.2 % |
+| V out | 3.0 | 3.0 | 10.45 | 0.0684 (4.10) | 99.8 % |
+| B out | 4.0 | 4.0 | 10.45 | 0.0001 (0.007) | 0.2 % |
+
+- $\sum Q_\text{in} = \sum Q_\text{out}$ = 0.0685 L/s
+- **P has negative flow**: the common leaf pressure (10.45) is above its root (10)
+:::
+:::
+
+::: {.column width="45%"}
+::: {.text-06}
+**Check of the boundary conditions** (`pressure_report_<id>.html`)
+
+| condition | expected | actual |
+|:--|--:|--:|
+| root pressures A, P, V, B (implied, not a row) | 80, 10, 3, 4 | ✓ (1e−15) |
+| drops A–V, A–B, P–V | 77, 76, 7 | ✓ |
+| drop P–B (implied) | 6 | ✓ |
+| $p_1$ of A | 80 | ✓ |
+| leaf pressure spread | 0 | ✓ |
+| mass balance | 0 | ✓ (6e−17) |
+:::
+:::
+::::
+
+::: {.small .center .muted}
+4378 × 4378, rank 4378 · report written after every solve: `write_pressure_report`
+:::
+
+## Proposed step: leaf pressure per tree {#proposal}
+
+:::: {.columns}
+::: {.column width="52%"}
+::: {.text-06}
+**Change**: leaves of **one tree** share a pressure $p_{\ell,t}$, different trees may differ
+
+$p_{\ell_{t,1}} - p_{\ell_{t,m}} = 0$ for every leaf $m>1$ of tree $t$ → $L_t-1$ rows per tree
+
+| step (`Rectangle_quad_500`) | rows | still missing |
+|:--|--:|--:|
+| unknowns | | 4378 |
+| tree rows (A, P, V, B) | 547 + 547 + 546 + 546 | 2192 |
+| outflow balance | 1 | 2191 |
+| pressure drops (spanning) | 3 | 2188 |
+| leaf rows **per tree**: $4\cdot(547-1)$ | 2184 | **4** |
+| absolute pressure $p^A_1$ | 1 | **3** |
+
+before: leaf rows $\sum L_t - 1 = 2187$ → $T-1 = 3$ rows fewer
+
+**3 more rows needed** (trio: $T-1 = 2$)
+:::
+:::
+
+::: {.column width="48%"}
+::: {.text-06}
+**What do we know, what can we change**
+
+| now | alternatives |
+|:--|:--|
+| root pressures of all 4 trees: 3 differences + $p^A_1$ | replace by **flows**, e.g. $Q_A$, $Q_P$ given |
+| leaf pressure: one common value (unknown) | **per tree**, then fix 3 more: |
+| | – total flow $Q_A + Q_P = Q_\text{tot}$ |
+| | – splits $A{:}P$ and $V{:}B$ |
+| | – leaf pressure of a tree given |
+| | – leaves of different trees coupled by a sinusoid conductance |
+
+each tree has two ends (root, leaf) and one relation $p_\text{root}-p_\text{leaf}=R_t\,Q_t$ → every tree needs **two** known values among pressure / flow
+:::
+:::
+::::
+
+::: {.small .center .muted}
+check after the change: rows = columns, `rank(A)` = columns, report: P no longer forced above its root pressure
 :::
 
 # Challenges {#challenges background-color="#2b6cb0"}
-
-## Challenges: is the system solvable? {#ch-solvable}
-
-::: {.cards}
-::: {.card}
-**Only differences are fixed**
-
-- every row contains $p_a - p_b$ or $Q$ only
-- $p \to p + C$ for all nodes keeps **every** row true
-- → the matrix has a **null space**, `A \ b` fails or gives garbage
-- fix: **one absolute pressure**, e.g. $p_{r_V} = 3$ mmHg
-:::
-
-::: {.card}
-**Redundant pressure-drop rows**
-
-- $n_\text{in}\,n_\text{out}$ rows, but only $n_\text{in}+n_\text{out}-1$ independent
-- quad: $(A{-}V) - (A{-}B) + (P{-}B) = (P{-}V)$ → 4 rows, rank 3
-- square by count, but **rank-deficient**
-- fix: replace one pair row by the absolute pressure above
-:::
-
-::: {.card}
-**Size of the system**
-
-- now `n_rows = n_cols = 2·n_variables` (`FIXME`)
-- exact: columns $=\sum_t n_t + n_\text{in}$, rows = tree rows $+ 1 + n_\text{in}n_\text{out} + |L|-1$
-- empty rows (groups 0 of outflow, 2, 3) and empty columns (unused node numbers) make $A$ singular
-- fix: compact the row/column numbering before solving
-:::
-:::
 
 ## Challenges: model and numerics {#ch-model}
 
@@ -606,14 +697,15 @@ assumes: node numbers $1\dots n_t$ inside every tree, node $0$ outside, every no
 
 - all leaves of all trees are one node → the **capillary bed has no resistance**
 - terminals cannot differ in pressure → flow distribution only from tree geometry
-- alternative: one pressure per terminal + a terminal conductance (needs the terminal matching again)
+- first result (quad): leaf pressure 10.45 mmHg > P root 10 mmHg → **flow in P is reversed**
+- alternative: leaf pressure per tree → $T-1$ rows fewer, closed with flow splits + total flow (see counting)
 :::
 
 ::: {.card}
 **Conditioning**
 
 - $c \propto d^4$: diameters over 2–3 orders of magnitude → $c$ over **8–12 orders**
-- mixed units in one matrix: $c$ (mm³/(Pa·s)), $\pm1$ rows, Pa on the right side
+- mixed units in one matrix: $c$ (L/(Pa·s)), $\pm1$ rows, Pa on the right side
 - → scale rows / unknowns (e.g. pressures in mmHg, $c$ normalised) before a direct solve
 :::
 
@@ -634,12 +726,13 @@ assumes: node numbers $1\dots n_t$ inside every tree, node $0$ outside, every no
 - conductances, inner-edge rows for inflow and outflow trees (one function, sign $\sigma$)
 - boundary rows: $Q_t$ per inflow tree, one outflow balance, pressure drops per (in, out) pair, common leaf pressure
 - assembly in COO form, one `sparse` call; HTML report of the symbolic matrix with row/column highlighting
+- square, full-rank system for `Rectangle_quad_500` (4378 × 4378): spanning pressure-drop rows, absolute pressure $p^A_1$, compact numbering; solved with UMFPACK
+- `node_pressures`, `edge_pressure_drops`, `tree_pressure_results`: pressure per node, drop per edge, aligned with `nodes_ids` / `all_edges`
 
 **Next**
 
-1. exact system size, compact row/column numbering (remove empty rows and columns)
-2. one absolute reference pressure instead of a redundant pressure-drop row → full rank
-3. solve $A\,x = b$, check $\operatorname{rank}(A)$, residual, $\sum Q_\text{in} = \sum Q_\text{out}$
-4. compare with a tree-by-tree (resistance) solution on `Rectangle_quad_10`
-5. edge flows $q_k = c_k(p_i - p_j)$ → flow values for the pharmacokinetic simulation
+1. run `Rectangle_trio` (graphs not built yet) and check square / full rank
+2. P tree has reversed flow with one common leaf pressure → per-tree leaf pressure with flow splits and total flow
+3. check residual, $\sum Q_\text{in} = \sum Q_\text{out}$; compare with a tree-by-tree (resistance) solution
+4. edge flows $q_k = c_k(p_i - p_j)$ → flow values for the pharmacokinetic simulation
 :::

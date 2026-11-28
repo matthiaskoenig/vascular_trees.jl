@@ -102,7 +102,7 @@ module Definitions
         tree_components::Dict{Symbol,Vector{S}}
         vascular_trees::Vector{S} = reduce(vcat, values(tree_components))
         CONFIG_DIR::S = joinpath(JULIA_RESULTS_DIR, tree_configuration)
-        MESH::Vector{S} = isdir(CONFIG_DIR) ? filter(endswith(".ply"), readdir(CONFIG_DIR, join=true)) : S[]
+        MESH::Vector{S} = isdir(CONFIG_DIR) ? filter(endswith(".ply"), readdir(CONFIG_DIR, join=true)) : String[]
         GRAPH_DIR::S = joinpath(CONFIG_DIR, graph_id)
     end
 

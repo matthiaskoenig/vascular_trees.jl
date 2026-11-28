@@ -48,7 +48,6 @@ function process_individual_tree(GRAPH_DIR::String, vascular_tree::String)
     edges_df, nodes_df = read_graph(GRAPH_PATH, EDGES_PATH, NODES_PATH)
     add_graph_characteristics!(edges_df, vascular_tree)
     graph_df = build_arrow_df(edges_df, nodes_df, vascular_tree)
-    print(graph_df.predecessors)
     
     mkpath(joinpath(GRAPH_DIR, "graphs"))
     save_as_arrow(graph_df, joinpath(GRAPH_DIR, "graphs/$(vascular_tree).arrow"))

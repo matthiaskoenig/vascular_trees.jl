@@ -5,7 +5,7 @@ function compute_hydraulic_conductance(d, l)
     return c
 end
 
-const MMHG_TO_PA = 133.322 # 1 mmHg in Pa (conductances are in mm³/(Pa·s), so pressures must be in Pa)
+const MMHG_TO_PA = 133.322 # 1 mmHg in Pa (conductances in the arrow files are in L/(Pa·s), see read_tree_files.jl, so pressures must be in Pa and flows come out in L/s)
 
 """
     calculate_pressure_distribution(tree_info; html_report = false)
@@ -115,7 +115,16 @@ function calculate_pressure_distribution(tree_info; html_report::Bool = false)
         inflow_marginal_p_col, inflow_ids, outflow_marginal_p_col, outflow_ids, TreePressures().pressures_mmHg)
 
     # Terminal pressures: all leaves of all trees have the same pressure (right side = 0)
-    add_terminal_pressure_boundary!(rows, cols, values, labels, terminal_row, preterminal_p_cols)
+    next_row = add_terminal_pressure_boundary!(rows, cols, values, labels, terminal_row, preterminal_p_cols)
+
+    # One more row, fix p1 of tree A to its known pressure.
+    a = findfirst(t -> t[1] == "A", tree_dfs)
+    a === nothing && error("Tree A not found, cannot fix p1.")
+    push!(rows, next_row)
+    push!(cols, tree_col_offsets[a] + 1) # node 1 of tree A
+    push!(values, 1.0)
+    push!(labels, "+1")
+    right_side[next_row] = TreePressures().pressures_mmHg["A"] * MMHG_TO_PA
 
     # Compact numbering: keep only rows / columns that have at least one entry.
     # Empty rows (edges of groups 2, 3, outflow marginal edges, unused rows of the
@@ -136,6 +145,7 @@ function calculate_pressure_distribution(tree_info; html_report::Bool = false)
     conductances = sparse(rows_compact, cols_compact, values, n_rows_compact, n_cols_compact)
     @info "Pressure system: $(n_rows_compact) equations * $(n_cols_compact) unknowns " *
           "(removed $(n_rows - n_rows_compact) empty rows, $(n_cols - n_cols_compact) empty columns)"
+    @info "Matrix rank $(rank(conductances))"
 
     if html_report
         report_path = normpath(joinpath(tree_info.GRAPH_DIR, "reports", "pressure_matrix_$(tree_info.graph_id).html"))
@@ -349,25 +359,26 @@ by tree id. The known difference goes to `right_side`. Returns the next free row
 function add_pressure_drop_boundary!(rows, cols, values, labels, right_side, row,
                                      inflow_marginal_p_col, inflow_ids, outflow_marginal_p_col, outflow_ids,
                                      tree_pressures)
-    for (inflow_col, inflow_id) in zip(inflow_marginal_p_col, inflow_ids)
-        for (outflow_col, outflow_id) in zip(outflow_marginal_p_col, outflow_ids)
-            # +p_in
-            push!(rows, row)
-            push!(cols, inflow_col)
-            push!(values, 1.0)
-            push!(labels, "+1")
-            # -p_out
-            push!(rows, row)
-            push!(cols, outflow_col)
-            push!(values, -1.0)
-            push!(labels, "-1")
-            # known pressure difference of this pair, in Pa
-            right_side[row] = (tree_pressures[inflow_id] - tree_pressures[outflow_id]) * MMHG_TO_PA
-            row += 1
+    for (ki, (inflow_col, inflow_id)) in enumerate(zip(inflow_marginal_p_col, inflow_ids))
+        for (ko, (outflow_col, outflow_id)) in enumerate(zip(outflow_marginal_p_col, outflow_ids))
+            (ki == 1 || ko == 1) || continue
+                # +p_in
+                push!(rows, row)
+                push!(cols, inflow_col)
+                push!(values, 1.0)
+                push!(labels, "+1")
+                # -p_out
+                push!(rows, row)
+                push!(cols, outflow_col)
+                push!(values, -1.0)
+                push!(labels, "-1")
+                # known pressure difference of this pair, in Pa
+                right_side[row] = (tree_pressures[inflow_id] - tree_pressures[outflow_id]) * MMHG_TO_PA
+                row += 1
+            end
         end
+        return row # next free row
     end
-    return row # next free row
-end
 
 """
     add_terminal_pressure_boundary!(rows, cols, values, labels, row, preterminal_p_cols)
@@ -390,6 +401,273 @@ function add_terminal_pressure_boundary!(rows, cols, values, labels, row, preter
         row += 1
     end
     return row # next free row
+end
+
+"""
+    node_pressures(df, pressure_by_unknown) -> Vector{Float64}
+
+Pressure (Pa) of every node of one tree. Element `n` belongs to the same node as
+`df.nodes_ids[n]` and `df.nodes_coordinates[n]`, so one index gives node id, coordinates and pressure.
+
+`pressure_by_unknown` maps the unknown names of the solved system (`"p<node id>_<tree id>"`) to values,
+see [`pressure_lookup`](@ref). Padding rows (`missing` node id) and nodes without an unknown
+in the system get `NaN`.
+"""
+function node_pressures(df, pressure_by_unknown::AbstractDict{String,Float64})
+    tree_id = df.vascular_tree_id[1]
+    pressures = fill(NaN, length(df.nodes_ids))
+    for (n, id) in enumerate(df.nodes_ids)
+        ismissing(id) && continue
+        pressures[n] = get(pressure_by_unknown, "p$(id)_$(tree_id)", NaN)
+    end
+    return pressures
+end
+
+"""
+    edge_pressure_drops(df, pressures) -> Vector{Float64}
+
+Pressure drop `p_i - p_j` (Pa) of every edge `i → j` of one tree. Element `k` belongs to
+`df.all_edges[k]`. The marginal edge (group 0) gets `0`; padding rows and edges with a node
+without pressure get `NaN`. `pressures` is the result of [`node_pressures`](@ref) for the same `df`.
+"""
+function edge_pressure_drops(df, pressures::AbstractVector{Float64})
+    # node id => pressure, so that the edge's node ids need not equal positions in nodes_ids
+    pressure_by_id = Dict(
+        id => pressures[n] for (n, id) in enumerate(df.nodes_ids) if !ismissing(id)
+    )
+    drops = fill(NaN, length(df.all_edges))
+    for (k, edge) in enumerate(df.all_edges)
+        ismissing(edge) && continue
+        if df.ODE_groups[k] == 0 # marginal edge: its outer node is not in the system
+            drops[k] = 0.0
+            continue
+        end
+        i, j = edge
+        drops[k] = get(pressure_by_id, i, NaN) - get(pressure_by_id, j, NaN)
+    end
+    return drops
+end
+
+"""
+    edge_flows(df, drops, pressure_by_unknown) -> Vector{Float64}
+
+Volume flow `q_k = c_k·(p_i - p_j)` (L/s, conductances are in L/(Pa·s)) of every edge `k` of one tree. Element `k` belongs to
+`df.all_edges[k]`; `drops` is the result of [`edge_pressure_drops`](@ref) for the same `df`.
+
+The marginal edge (group 0) has no pressure drop; its flow is taken from the flow balance instead:
+- inflow tree: the unknown `Q<tree id>` of the solution,
+- outflow tree: the sum of the flows of its predecessor edges.
+
+Padding rows and edges without pressure get `NaN`.
+"""
+function edge_flows(df, drops::AbstractVector{Float64}, pressure_by_unknown::AbstractDict{String,Float64})
+    flows = fill(NaN, length(df.all_edges))
+    for k in eachindex(flows)
+        (ismissing(df.all_edges[k]) || ismissing(df.conductances[k])) && continue
+        df.ODE_groups[k] == 0 && continue # marginal edge, set below
+        flows[k] = df.conductances[k] * drops[k]
+    end
+    tree_id = df.vascular_tree_id[1]
+    for k in eachindex(flows)
+        (ismissing(df.all_edges[k]) || df.ODE_groups[k] != 0) && continue
+        flows[k] = df.is_inflow[1] ?
+            get(pressure_by_unknown, "Q$(tree_id)", NaN) :
+            sum(flows[s] for s in df.predecessors[k]; init = 0.0)
+    end
+    return flows
+end
+
+"""
+    pressure_lookup(result) -> Dict{String,Float64}
+
+Unknown name (`"p3_A"`, `"QA"`, ...) => solved value, from the result of
+[`calculate_pressure_distribution`](@ref).
+"""
+function pressure_lookup(result)
+    result.sol === nothing && error("Pressure system was not solved, no pressures available.")
+    return Dict{String,Float64}(zip(result.unknowns, result.sol.u))
+end
+
+"""
+    tree_pressure_results(tree_info, result) -> Dict{String, NamedTuple}
+
+For every tree id: `(node_pressures, edge_pressure_drops, edge_flows)` (Pa, Pa, L/s), aligned with that
+tree's `nodes_ids` / `nodes_coordinates` and `all_edges` (see [`node_pressures`](@ref),
+[`edge_pressure_drops`](@ref), [`edge_flows`](@ref)). `result` comes from [`calculate_pressure_distribution`](@ref).
+"""
+function tree_pressure_results(tree_info, result)
+    lookup = pressure_lookup(result)
+    out = Dict{String,NamedTuple{(:node_pressures, :edge_pressure_drops, :edge_flows),Tuple{Vector{Float64},Vector{Float64},Vector{Float64}}}}()
+    for tree in tree_info.vascular_trees
+        df = load_arrow(normpath(joinpath(tree_info.GRAPH_DIR, "graphs/$(tree).arrow")))
+        pressures = node_pressures(df, lookup)
+        drops = edge_pressure_drops(df, pressures)
+        out[df.vascular_tree_id[1]] = (
+            node_pressures = pressures,
+            edge_pressure_drops = drops,
+            edge_flows = edge_flows(df, drops, lookup),
+        )
+    end
+    return out
+end
+
+"""
+    write_pressure_report(tree_info, result; path = ...) -> path
+
+HTML report of one solved pressure system (pressures in mmHg, flows in L/s and L/min):
+
+1. one row per tree: direction, `p1` (node 1), pressure at the root (marginal) node, leaf pressure
+   (min … max), flow `Q` through the root edge and its share of the total;
+2. a check of the boundary conditions against `TreePressures`: pressure drops of every (inflow, outflow)
+   pair, absolute pressure of tree A, common leaf pressure, mass balance ΣQ in = ΣQ out, and the
+   root pressures. Only the spanning pair rows, `p1` of A, the leaf rows and the balance are rows of
+   the matrix; the root pressures are implied by them and are marked as such;
+3. a check of the inequalities (not rows of the system): `p_leaf < p_root` in inflow trees,
+   `p_leaf > p_root` in outflow trees (both mean `Q > 0`), and the window
+   `(max outflow root, min inflow root)` for one common leaf pressure.
+
+Default path: `<GRAPH_DIR>/reports/pressure_report_<graph_id>.html`.
+"""
+function write_pressure_report(tree_info, result;
+        path = normpath(joinpath(tree_info.GRAPH_DIR, "reports", "pressure_report_$(tree_info.graph_id).html")))
+    results = tree_pressure_results(tree_info, result)
+    known = TreePressures().pressures_mmHg # mmHg
+    to_mmHg(p) = p / MMHG_TO_PA
+
+    rows = NamedTuple[]
+    for tree in tree_info.vascular_trees
+        df = load_arrow(normpath(joinpath(tree_info.GRAPH_DIR, "graphs/$(tree).arrow")))
+        id = df.vascular_tree_id[1]
+        is_inflow = df.is_inflow[1]
+        pressures = results[id].node_pressures
+        flows = results[id].edge_flows
+        by_node = Dict(n => pressures[i] for (i, n) in enumerate(df.nodes_ids) if !ismissing(n))
+        k0 = findfirst(==(0), df.ODE_groups)
+        root = marginal_node(df.all_edges, df.ODE_groups, is_inflow)
+        leaves = [is_inflow ? df.all_edges[k][2] : df.all_edges[k][1]
+                  for k in eachindex(df.ODE_groups) if df.ODE_groups[k] == 2]
+        leaf_p = [by_node[l] for l in leaves if haskey(by_node, l)]
+        push!(rows, (id = id, inflow = is_inflow,
+            p1 = to_mmHg(get(by_node, 1, NaN)), p_root = to_mmHg(by_node[root]),
+            leaf_min = to_mmHg(minimum(leaf_p)), leaf_max = to_mmHg(maximum(leaf_p)),
+            Q = flows[k0]))
+    end
+    q_in  = sum(r.Q for r in rows if r.inflow)
+    q_out = sum(r.Q for r in rows if !r.inflow)
+
+    # Boundary-condition checks: (description, expected, actual, unit, how it enters the system)
+    checks = NamedTuple[]
+    for r in rows # root pressure of every tree
+        push!(checks, (what = "root pressure $(r.id)", expected = known[r.id], actual = r.p_root,
+            unit = "mmHg", how = "implied by the pressure-drop rows and p1 of tree A"))
+    end
+    first_in  = findfirst(r -> r.inflow, rows)
+    first_out = findfirst(r -> !r.inflow, rows)
+    for (i, ri) in enumerate(filter(r -> r.inflow, rows)), (o, ro) in enumerate(filter(r -> !r.inflow, rows))
+        push!(checks, (what = "pressure drop $(ri.id)–$(ro.id)", expected = known[ri.id] - known[ro.id],
+            actual = ri.p_root - ro.p_root, unit = "mmHg",
+            how = (i == 1 || o == 1) ? "imposed" : "implied (dependent pair, no row)"))
+    end
+    a = findfirst(r -> r.id == "A", rows)
+    a === nothing || push!(checks, (what = "absolute pressure p1 of tree A", expected = known["A"],
+        actual = rows[a].p1, unit = "mmHg", how = "imposed"))
+    leaf_lo = minimum(r.leaf_min for r in rows); leaf_hi = maximum(r.leaf_max for r in rows)
+    push!(checks, (what = "common leaf pressure (max − min over all leaves)", expected = 0.0,
+        actual = leaf_hi - leaf_lo, unit = "mmHg", how = "imposed"))
+    push!(checks, (what = "mass balance (Σ Q in − Σ Q out)", expected = 0.0, actual = q_in - q_out,
+        unit = "L/s", how = "imposed"))
+
+    fmt(x; d = 3) = isnan(x) ? "–" : string(round(x; digits = d))
+    ok(c) = abs(c.actual - c.expected) <= 1e-6 * max(1.0, abs(c.expected)) + 1e-9
+    mkpath(dirname(path))
+    open(path, "w") do io
+        println(io, "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">",
+            "<title>Pressure report $(tree_info.graph_id)</title>\n<style>",
+            "body{font-family:sans-serif;margin:20px} table{border-collapse:collapse;margin-bottom:20px}",
+            "th,td{border:1px solid #ccc;padding:4px 10px;text-align:right}",
+            "th{background:#f0f0f0} td.l,th.l{text-align:left} .neg,.bad{color:#c53030;font-weight:bold}",
+            ".good{color:#2f855a;font-weight:bold} .implied{color:#718096}",
+            "</style>\n</head>\n<body>")
+        println(io, "<h2>Pressure report: $(tree_info.graph_id)</h2>")
+        println(io, "<p>Pressures in mmHg, flows in L/s (L/min in brackets). ",
+            "Negative flow = flow against the tree's direction.</p>")
+        println(io, "<h3>Trees</h3>\n<table>\n<tr><th class=\"l\">tree</th><th class=\"l\">direction</th>",
+            "<th>p1 [mmHg]</th><th>p root [mmHg]</th><th>p leaves, min … max [mmHg]</th>",
+            "<th>Q [L/s] (L/min)</th><th>share</th></tr>")
+        for r in rows
+            qcls = r.Q < 0 ? " class=\"neg\"" : ""
+            share = r.inflow ? "$(fmt(100 * r.Q / q_in; d = 1)) % of inflow" : "$(fmt(100 * r.Q / q_out; d = 1)) % of outflow"
+            println(io, "<tr><td class=\"l\">$(r.id)</td><td class=\"l\">$(r.inflow ? "inflow" : "outflow")</td>",
+                "<td>$(fmt(r.p1))</td><td>$(fmt(r.p_root))</td>",
+                "<td>$(fmt(r.leaf_min)) … $(fmt(r.leaf_max))</td>",
+                "<td$(qcls)>$(fmt(r.Q; d = 5)) ($(fmt(r.Q * 60)))</td><td>$(share)</td></tr>")
+        end
+        println(io, "</table>")
+        println(io, "<h3>Check of the boundary conditions</h3>\n<table>\n<tr><th class=\"l\">condition</th>",
+            "<th>expected</th><th>actual</th><th>difference</th><th class=\"l\">unit</th>",
+            "<th class=\"l\">row in the system</th><th class=\"l\">result</th></tr>")
+        for c in checks
+            println(io, "<tr><td class=\"l\">$(c.what)</td><td>$(fmt(c.expected; d = 5))</td>",
+                "<td>$(fmt(c.actual; d = 5))</td><td>$(c.actual - c.expected)</td><td class=\"l\">$(c.unit)</td>",
+                "<td class=\"l $(c.how == "imposed" ? "" : "implied")\">$(c.how)</td>",
+                "<td class=\"l $(ok(c) ? "good" : "bad")\">$(ok(c) ? "OK" : "VIOLATED")</td></tr>")
+        end
+        println(io, "</table>")
+
+        # Inequalities (no rows of the matrix): flow must run from the root to the leaves in inflow trees
+        # (p_leaf < p_root) and from the leaves to the root in outflow trees (p_leaf > p_root), i.e. Q > 0.
+        println(io, "<h3>Check of the inequalities (not rows of the system)</h3>\n<table>\n<tr>",
+            "<th class=\"l\">tree</th><th class=\"l\">condition</th><th>p root [mmHg]</th>",
+            "<th>p leaves, min … max [mmHg]</th><th>Q [L/s]</th><th class=\"l\">result</th></tr>")
+        for r in rows
+            good = r.inflow ? r.leaf_max < r.p_root : r.leaf_min > r.p_root
+            println(io, "<tr><td class=\"l\">$(r.id)</td>",
+                "<td class=\"l\">$(r.inflow ? "p leaves &lt; p root" : "p leaves &gt; p root") (Q &gt; 0)</td>",
+                "<td>$(fmt(r.p_root))</td><td>$(fmt(r.leaf_min)) … $(fmt(r.leaf_max))</td><td>$(fmt(r.Q; d = 5))</td>",
+                "<td class=\"l $(good ? "good" : "bad")\">$(good ? "OK" : "VIOLATED")</td></tr>")
+        end
+        # Window for ONE common leaf pressure: below every inflow root, above every outflow root
+        lo = maximum(r.p_root for r in rows if !r.inflow)
+        hi = minimum(r.p_root for r in rows if r.inflow)
+        in_window = lo < leaf_lo && leaf_hi < hi
+        println(io, "<tr><td class=\"l\">all</td><td class=\"l\">common leaf pressure in the window ",
+            "(max outflow root, min inflow root)</td><td>$(fmt(lo)) … $(fmt(hi))</td>",
+            "<td>$(fmt(leaf_lo)) … $(fmt(leaf_hi))</td><td></td>",
+            "<td class=\"l $(in_window ? "good" : "bad")\">$(in_window ? "OK" : "VIOLATED")</td></tr>")
+        println(io, "</table>\n</body>\n</html>")
+    end
+    @info "Pressure report written to $(path)"
+    return path
+end
+
+"""
+    save_pressure_results(tree_info, result)
+
+Add the solution to the `.arrow` table of every tree (columns padded with `missing`, replaced on a re-run):
+
+- `node_pressures_mmHg`: pressure of node `nodes_ids[n]` (same index as `nodes_coordinates`);
+- `edge_pressure_drops_mmHg`: `p_i - p_j` of edge `all_edges[k]`, `0` for the marginal edge;
+- `edge_flows_L_per_min`: `c_k·(p_i - p_j)` of edge `all_edges[k]` (same unit as the column `flows`).
+
+The table is written to a temporary file and then moved over the original, because the loaded
+table is memory-mapped from that file.
+"""
+function save_pressure_results(tree_info, result)
+    results = tree_pressure_results(tree_info, result)
+    to_missing(v) = Union{Missing,Float64}[isnan(x) ? missing : x for x in v]
+    for tree in tree_info.vascular_trees
+        path = normpath(joinpath(tree_info.GRAPH_DIR, "graphs/$(tree).arrow"))
+        df = DataFrame(load_arrow(path); copycols = true) # own copy, no longer tied to the file
+        r = results[df.vascular_tree_id[1]]
+        df.node_pressures_mmHg = to_missing(r.node_pressures ./ MMHG_TO_PA)
+        df.edge_pressure_drops_mmHg = to_missing(r.edge_pressure_drops ./ MMHG_TO_PA)
+        df.edge_flows_L_per_min = to_missing(r.edge_flows .* 60) # L/s → L/min
+        tmp = path * ".tmp"
+        save_as_arrow(df, tmp)
+        mv(tmp, path; force = true)
+        @info "Pressures and flows saved to $(path)"
+    end
+    return nothing
 end
 
 # Style of the HTML matrix report:
